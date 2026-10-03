@@ -125,7 +125,10 @@ class SimMessage(BaseModel):
 @app.post("/api/bots/{bot_id}/simulate")
 def simulate(bot_id: int, body: SimMessage, user: User = Depends(current_user), db: Session = Depends(get_db)):
     bot = own_bot(bot_id, user, db)
-    spec = BotSpec.model_validate(latest_version(bot.id, db).spec)
+    ver = latest_version(bot.id, db)
+    if ver is None:
+        raise HTTPException(400, "این ربات هنوز ساخته نشده است")
+    spec = BotSpec.model_validate(ver.spec)
     row = db.scalar(select(ChatSession).where(ChatSession.bot_id == bot.id, ChatSession.key == "sim:" + body.session_id))
     if row is None:
         row = ChatSession(bot_id=bot.id, key="sim:" + body.session_id, state=bot_engine.new_session())
@@ -151,6 +154,76 @@ def records(bot_id: int, sandbox: bool = False, user: User = Depends(current_use
     bot = own_bot(bot_id, user, db)
     q = select(Record).where(Record.bot_id == bot.id, Record.sandbox == sandbox).order_by(Record.id.desc()).limit(500)
     return [{"id": r.id, "collection": r.collection, "data": r.data, "created_at": r.created_at.isoformat()} for r in db.scalars(q)]
+
+
+# ---------- builder agent ----------
+from fastapi import BackgroundTasks  # noqa: E402
+
+from .agent import run_builder  # noqa: E402
+from .models import BuilderMessage, BuilderRun, LlmCall, VersionTests  # noqa: E402
+
+DAILY_RUN_LIMIT = 40  # per user per 24h: protects the OpenAI budget while the demo is public
+
+
+class BuilderIn(BaseModel):
+    text: str = Field(min_length=2, max_length=3000)
+
+
+@app.post("/api/bots/draft")
+def create_draft(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    bot = Bot(user_id=user.id, name="ربات جدید")
+    db.add(bot)
+    db.commit()
+    return {"id": bot.id, "name": bot.name, "version": 0, "spec": None}
+
+
+@app.post("/api/bots/{bot_id}/builder")
+def builder_send(bot_id: int, body: BuilderIn, tasks: BackgroundTasks, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    from datetime import datetime, timedelta, timezone
+
+    bot = own_bot(bot_id, user, db)
+    running = db.scalar(select(BuilderRun).where(BuilderRun.bot_id == bot.id, BuilderRun.status == "running"))
+    if running:
+        raise HTTPException(409, "ایجنت هنوز در حال کار روی درخواست قبلی است")
+    since = datetime.now(timezone.utc) - timedelta(hours=24)
+    used = db.scalar(select(func.count()).select_from(BuilderRun).join(Bot, Bot.id == BuilderRun.bot_id).where(Bot.user_id == user.id, BuilderRun.created_at >= since))
+    if used >= DAILY_RUN_LIMIT:
+        raise HTTPException(429, "سقف درخواست‌های روزانه پر شده است؛ فردا دوباره تلاش کنید")
+    run = BuilderRun(bot_id=bot.id, status="running", events=[], result={})
+    db.add(run)
+    db.commit()
+    tasks.add_task(run_builder, run.id, bot.id, body.text)
+    return {"run_id": run.id}
+
+
+@app.get("/api/bots/{bot_id}/builder/runs/{run_id}")
+def builder_run(bot_id: int, run_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    own_bot(bot_id, user, db)
+    run = db.get(BuilderRun, run_id)
+    if not run or run.bot_id != bot_id:
+        raise HTTPException(404, "اجرا یافت نشد")
+    return {"id": run.id, "status": run.status, "events": run.events, "result": run.result}
+
+
+@app.get("/api/bots/{bot_id}/builder/messages")
+def builder_messages(bot_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    own_bot(bot_id, user, db)
+    rows = db.scalars(select(BuilderMessage).where(BuilderMessage.bot_id == bot_id).order_by(BuilderMessage.id)).all()
+    return [{"role": m.role, "content": m.content} for m in rows]
+
+
+@app.get("/api/bots/{bot_id}/tests")
+def bot_tests(bot_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    own_bot(bot_id, user, db)
+    t = db.scalars(select(VersionTests).where(VersionTests.bot_id == bot_id).order_by(VersionTests.version.desc())).first()
+    return {"version": t.version, "results": t.results} if t else {"version": 0, "results": []}
+
+
+@app.get("/api/bots/{bot_id}/cost")
+def bot_cost(bot_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    own_bot(bot_id, user, db)
+    rows = db.execute(select(LlmCall.step, func.count(), func.sum(LlmCall.cost_usd), func.sum(LlmCall.input_tokens), func.sum(LlmCall.output_tokens)).where(LlmCall.bot_id == bot_id).group_by(LlmCall.step)).all()
+    return {"total_usd": sum(r[2] or 0 for r in rows), "by_step": [{"step": r[0], "calls": r[1], "usd": r[2], "in": r[3], "out": r[4]} for r in rows]}
 
 
 # ---------- static frontend (Next.js export copied to api/static at build time) ----------

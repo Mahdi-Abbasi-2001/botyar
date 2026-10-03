@@ -52,3 +52,46 @@ class ChatSession(Base):
     bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
     key: Mapped[str] = mapped_column(String(128), index=True)
     state: Mapped[dict] = mapped_column(JSON)
+
+
+class BuilderMessage(Base):
+    __tablename__ = "builder_messages"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    role: Mapped[str] = mapped_column(String(16))  # user | assistant
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class BuilderRun(Base):
+    __tablename__ = "builder_runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    status: Mapped[str] = mapped_column(String(24), default="running")  # running | needs_input | done | failed
+    events: Mapped[list] = mapped_column(JSON, default=list)
+    result: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class LlmCall(Base):
+    __tablename__ = "llm_calls"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(Integer, index=True)
+    run_id: Mapped[int] = mapped_column(Integer, index=True, default=0)
+    step: Mapped[str] = mapped_column(String(32))
+    model: Mapped[str] = mapped_column(String(64))
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cached_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float] = mapped_column(default=0.0)
+    seconds: Mapped[float] = mapped_column(default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class VersionTests(Base):
+    __tablename__ = "version_tests"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    scenarios: Mapped[list] = mapped_column(JSON)
+    results: Mapped[list] = mapped_column(JSON)
