@@ -1,0 +1,5 @@
+{
+  "app": "buildx-botbuilder",
+  "platform": "docker",
+  "port": 8000
+}

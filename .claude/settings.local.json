@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(liara --version)",
+      "Bash(liara account *)",
+      "Bash(liara app *)",
+      "Bash(liara db *)",
+      "Bash(npm ls *)",
+      "Read(//home/mahdi/**)",
+      "Bash(npx --no-install liara --version)",
+      "Bash(git init *)",
+      "Bash(mkdir -p api/app api/tests)",
+      "Bash(python3 -m venv api/.venv)",
+      "Bash(api/.venv/bin/pip install *)",
+      "Bash(api/.venv/bin/pip list *)",
+      "Bash(rm -rf api/.venv)",
+      "Read(//usr/bin/**)",
+      "Bash(pip3 --version)",
+      "Bash(python3 -m pip install --user --break-system-packages -q virtualenv)",
+      "Bash(python3 -m virtualenv -q api/.venv)",
+      "Bash(touch app/__init__.py tests/__init__.py)",
+      "Bash(.venv/bin/python -m pytest -q)"
+    ]
+  }
+}

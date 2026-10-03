@@ -1,0 +1,127 @@
+"""BotSpec: the declarative description of a bot. The agent writes this; the engine runs it."""
+from __future__ import annotations
+
+from typing import Annotated, Literal, Union
+
+from pydantic import BaseModel, Field, model_validator
+
+FieldKind = Literal["text", "phone", "number", "choice"]
+
+
+class FormField(BaseModel):
+    key: str = Field(pattern=r"^[a-z][a-z0-9_]{0,31}$")
+    label: str
+    kind: FieldKind = "text"
+    choices: list[str] = []
+    required: bool = True
+
+    @model_validator(mode="after")
+    def _choices(self):
+        if self.kind == "choice" and len(self.choices) < 2:
+            raise ValueError(f"field '{self.key}': choice fields need at least 2 choices")
+        return self
+
+
+class MessageBlock(BaseModel):
+    type: Literal["message"] = "message"
+    id: str
+    text: str
+
+
+class FormBlock(BaseModel):
+    type: Literal["form"] = "form"
+    id: str
+    title: str
+    fields: list[FormField] = Field(min_length=1)
+    done_text: str = "اطلاعات شما ثبت شد. ممنون!"
+
+
+class Slot(BaseModel):
+    id: str
+    label: str
+    capacity: int = Field(gt=0)
+
+
+DEFAULT_CONTACT = [
+    FormField(key="name", label="نام و نام خانوادگی"),
+    FormField(key="phone", label="شماره موبایل", kind="phone"),
+]
+
+
+class BookingBlock(BaseModel):
+    type: Literal["booking"] = "booking"
+    id: str
+    title: str
+    slots: list[Slot] = Field(min_length=1)
+    waitlist: bool = False
+    fields: list[FormField] = Field(default_factory=lambda: [f.model_copy() for f in DEFAULT_CONTACT])
+    confirm_text: str = "ثبت‌نام شما با موفقیت انجام شد."
+    full_text: str = "متأسفانه ظرفیت این زمان تکمیل است."
+    waitlist_text: str = "ظرفیت تکمیل است؛ شما در لیست انتظار قرار گرفتید و در صورت خالی شدن جا خبر می‌دهیم."
+
+
+class OptionGroup(BaseModel):
+    name: str
+    choices: list[str] = Field(min_length=2)
+
+
+class CatalogItem(BaseModel):
+    id: str
+    name: str
+    price: int = Field(ge=0)
+    options: list[OptionGroup] = []
+
+
+class CatalogOrderBlock(BaseModel):
+    type: Literal["catalog_order"] = "catalog_order"
+    id: str
+    title: str
+    items: list[CatalogItem] = Field(min_length=1)
+    max_items: int = Field(default=10, gt=0)
+    min_total: int = Field(default=0, ge=0)
+    fields: list[FormField] = Field(default_factory=lambda: [f.model_copy() for f in DEFAULT_CONTACT])
+    confirm_text: str = "سفارش شما ثبت شد."
+
+
+class AdminNotifyBlock(BaseModel):
+    type: Literal["admin_notify"] = "admin_notify"
+    id: str
+    on: str  # id of the block whose completion triggers the notification
+    text: str = "ثبت جدید"
+
+
+Block = Annotated[
+    Union[MessageBlock, FormBlock, BookingBlock, CatalogOrderBlock, AdminNotifyBlock],
+    Field(discriminator="type"),
+]
+
+
+class MenuItem(BaseModel):
+    label: str
+    block: str
+
+
+class BotSpec(BaseModel):
+    name: str
+    welcome: str
+    menu: list[MenuItem] = Field(min_length=1)
+    blocks: list[Block] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _refs(self):
+        ids = [b.id for b in self.blocks]
+        if len(ids) != len(set(ids)):
+            raise ValueError("block ids must be unique")
+        for m in self.menu:
+            target = next((b for b in self.blocks if b.id == m.block), None)
+            if target is None:
+                raise ValueError(f"menu item '{m.label}' points to unknown block '{m.block}'")
+            if target.type == "admin_notify":
+                raise ValueError("menu cannot point to an admin_notify block")
+        for b in self.blocks:
+            if b.type == "admin_notify" and b.on not in ids:
+                raise ValueError(f"admin_notify '{b.id}' watches unknown block '{b.on}'")
+        return self
+
+    def block(self, block_id: str):
+        return next(b for b in self.blocks if b.id == block_id)
