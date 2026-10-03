@@ -1,0 +1,169 @@
+# Botyar — Test Tour (learn the product by trying to break it)
+
+Live site: https://botyar.liara.run · Shared Bale bot: **@botyar_ai_bot** · Sample files: `docs/samples/`
+
+How to use this: go station by station. Each station says **what it is**, **how it works**, **what to do**, **what you
+should see**, and **how to try to break it**. Write down anything that surprises you — a surprise is either a bug or a
+gap in our explanation, and both are worth fixing.
+
+---
+
+## 0. The system in one minute
+
+```
+ Owner's browser ──► Static UI (Next.js) ──► FastAPI backend ──► Postgres (Liara)
+                                                  │
+              ┌───────────────────────────────────┤
+              ▼                                   ▼
+   BUILDER AGENT (LangGraph)               RUNTIME ENGINE (no AI)
+   clarify → design → validate →           reads the bot's published BotSpec (JSON)
+   write tests → run tests → repair →      and answers every customer message
+   save a version                          deterministically
+        │  uses only gpt-6-luna                   ▲
+        ▼                                         │ webhook
+   OpenAI API                          Bale messenger (customers, owner)
+```
+
+Three ideas to hold on to:
+
+1. **The agent never writes code.** It writes a **BotSpec** (a JSON description built from 5 block types: message, form,
+   booking, catalog_order, admin_notify). A fixed engine executes it. That is why bots are safe, testable and diff-able.
+2. **Customers never talk to an AI.** Their messages go to the deterministic engine. So a running bot costs no OpenAI
+   money, cannot be prompt-injected, and behaves the same every time. AI is used only to *build and change* bots.
+3. **Every version is tested before it can be published.** The agent writes test conversations, the engine runs them,
+   failures go back to the agent for repair (max 3 rounds). Publishing is blocked while any test fails.
+
+Where things live (for when you want to read the code):
+
+| Part | File |
+|---|---|
+| BotSpec schema (the 5 blocks) | `api/app/spec.py` |
+| Runtime engine (all bot behaviour) | `api/app/engine.py` |
+| Agent graph + prompts | `api/app/agent.py`, `api/app/prompts.py` |
+| Test runner + spec diff | `api/app/testing.py` |
+| LLM calls + cost log (Luna only) | `api/app/llm.py` |
+| Bale channel (webhooks, buttons, editing) | `api/app/bale.py`, `api/app/publish.py` |
+| Product catalog + imports | `api/app/catalog.py` |
+| Exports (CSV/XLSX) | `api/app/export.py` |
+| UI | `web/app/*`, `web/components/workspace/*` |
+
+---
+
+## Station 1 — Sign up / log in
+
+**What it is:** email + password accounts; a login token (JWT, 72 h) kept in the browser.
+**Do:** register; log out; log in; try a wrong password; register the same email again; use a 5-character password.
+**Expect:** Persian error messages; no crash.
+**Break it:** register 9 accounts quickly from one network → the 9th is refused (limit: 8/hour/IP). Open
+`/bots/` in a private window → sent to login. Edit the token in DevTools → sent to login.
+**Why it works this way:** the sign-up limit stops someone from creating thousands of accounts to burn the OpenAI budget.
+
+## Station 2 — Describe a bot, watch the agent
+
+**What it is:** the core of the product. One message in, a tested bot out (typically 12–45 s, about $0.002).
+**Do (vague request):** type `یه ربات برای باشگاهم می‌خوام` → the agent should ask up to 3 questions as cards.
+Answer them → watch the live timeline (clarify → design → tests → run → repair → save).
+**Do (complete request):** `برای آرایشگاه زنانه‌م ربات نوبت‌دهی می‌خوام. سه ساعت: ۱۰، ۱۲ و ۴، هر ساعت ۲ نفر. اسم و شماره بگیر و به من خبر بده.`
+**Expect:** a bot with one booking block, 3 time slots, a notification block; 3 or so green tests; the cost shown at the top.
+**Break it:**
+- Ask for something unsupported: `رزرو با پرداخت آنلاین و یادآوری پیامکی` → it must say so in the assumptions and build the closest bot, not pretend.
+- Gibberish, English, a 3000-character essay, empty-ish text.
+- Press send twice quickly / use two tabs → second request is refused ("agent still working").
+- **Refresh the page in the middle of a build** → the progress view should come back and finish by itself.
+- Watch for a bot that *looks* fine but isn't what you asked for. That is the main weakness (see "Known gaps": the tests are written by the same agent).
+
+## Station 3 — The Tests tab (what "tested" really means)
+
+**What it is:** each test is a scripted customer conversation + expectations (text the user sees, records created).
+Open one and read the transcript. **Expect** to understand exactly what was checked.
+**Ask yourself:** *would I have written this test?* Did it check capacity? invalid phone numbers? If a case you care
+about is missing, tell the agent in the builder ("add a test for …") and see whether it does.
+
+## Station 4 — The simulator ("امتحانش کن")
+
+**What it is:** the same engine the real Bale bot uses, with a fake chat window. Sandbox data only (never touches live records).
+**Do:** book a seat; give a bad phone (`123`) then a good one; type Persian digits (`۰۹۱۲۳۴۵۶۷۸۹`); type `انصراف` mid-flow;
+fill a slot to capacity and try once more; press "restart".
+**Expect:** slot counts show Persian digits («۱۰ جای خالی»); a full slot is marked and refused; the owner notification
+appears as an amber bubble.
+**Break it:** send `<script>alert(1)</script>`, a 2000-char message, emoji, `p:99999`, `n:-5`.
+
+## Station 5 — Change request, versions, diff, regression
+
+**What it is:** the "maintain" half of the product.
+**Do:** after station 2 say `وقتی ظرفیت پر شد، لیست انتظار هم بذار`. Open **Versions**.
+**Expect:** version 2 with a diff such as `waitlist: false → true`; old tests re-run as regression and still pass
+(or the agent explains why one changed).
+**Break it:** ask for two unrelated changes at once; ask to *remove* a feature; ask for a change that contradicts a test.
+Check that nothing *else* changed in the diff — the agent regenerates the whole spec, so unintended edits are the risk.
+
+## Station 6 — Publish to Bale (shared bot)
+
+**What it is:** the **انتشار** tab. Shared mode = customers message @botyar_ai_bot and send your bot's 6-character code.
+**Do:** publish → open Bale on your phone → `/start` → send the code → book a seat. Then send `/admin <your admin code>` from your
+own chat and book again from a second account/phone.
+**Expect:** buttons appear as inline buttons; **"next page" edits the same message** (catalog bots); the owner gets a
+🔔 notification with the customer's name and phone; the booking appears under *live records* in the app.
+**Break it:** send a photo/sticker (→ polite "text only"); add the bot to a group (ignored); `/switch` to change bot;
+republish a changed version **while a customer is mid-booking** → the customer gets "the bot was just updated, let's start over" and a menu (this used to be silence).
+
+## Station 7 — Own bot token (NOT yet tested on real Bale)
+
+**Do:** create a second bot with `@botfather` on Bale, paste its token in the publish tab.
+**Expect:** the token is validated; the webhook is registered; your bot username appears; the bot answers.
+**This is the biggest unverified feature — please test it and report exactly what you see.**
+
+## Station 8 — Shops with a catalog
+
+**What it is:** when a store has many products, the agent uses a **database table** instead of putting products in the spec.
+**Do:** describe a clothing shop (`فروشگاه پوشاک با چند صد لباس مردانه و زنانه، فایل اکسل رو بعدا آپلود می‌کنم`).
+It builds a demo catalog of ~8 sample products so the bot works immediately. Open **محصولات** and import:
+- `docs/samples/messy-store.csv` — title line above the header, prices in **rial**, code column, sizes/colors packed in cells.
+- `docs/samples/tricky-paste.txt` — copy-paste it into the box: thousand-toman prices, a size *range* (`۴۰ تا ۴۴`), a row with no price, and a cell starting with `=` (spreadsheet formula injection).
+- `docs/samples/price-list.jpg` — a photo of a price list (vision). **Review the preview carefully**: small text is sometimes misread.
+**Expect:** a preview table before anything is saved; size ranges expanded to ۴۰، ۴۱، …؛ rows without price skipped with a warning; demo products replaced.
+Then in the simulator: categories → 5 products per page → next/previous → pick a product → size → color → quantity → cart → checkout.
+**Break it:** add the same limited-stock product twice (it must refuse beyond stock); order the last item from two phones at once; search with `ي`/`ی` variants.
+
+## Station 9 — Records and exports
+
+**Do:** open **ثبت‌ها** (sandbox) and the live records in **انتشار**; download Excel and CSV.
+**Expect:** Persian headers; the phone number keeps its leading zero in Excel; order lines are readable; a customer name starting with `=` is neutralised.
+**Round trip:** export products as CSV and import that same file again — it should work (that is your backup/restore).
+
+## Station 10 — Try to break the security
+
+You do not need special tools:
+1. While logged in as user A, copy a bot URL (`/bot/?id=3`). Log in as user B and open it → "not found". (Automated: every route is checked.)
+2. Open `https://botyar.liara.run/docs` → 404 (the API schema is not published).
+3. In DevTools → Network, replay a request without the `Authorization` header → 401.
+4. Look at `/api/hook/shared/anything` → 404. The real webhook URL contains a secret because Bale cannot sign requests.
+
+---
+
+## Bug log from the systematic hunt (all fixed, each has a regression test)
+
+| # | Found by | Problem | Impact |
+|---|---|---|---|
+| 1 | random-conversation fuzzing | same limited-stock product added twice in one cart → stock went **negative** | overselling |
+| 2 | scenario test | owner republishes while a customer is mid-flow → engine crashed on the old state | customer got **silence** |
+| 3 | scenario test | an agent run killed by a restart stayed "running" → every new request answered "agent busy" | bot **permanently locked** |
+| 4 | garbage uploads | fake image / empty PDF → HTTP 500 | confusing failure |
+| 5 | oversized input | catalog commit accepted 5000-char names; Postgres would reject them (500) | failed import |
+| 6 | malformed input | webhook with invalid JSON → 500 | noisy errors |
+| 7 | review | `/docs` and the full API schema were public in production | needless exposure |
+| 8 | manual check | refreshing mid-build lost the live progress | looked like the agent never answered |
+| earlier | tests | chat state saved with a shallow copy → two consecutive option questions lost their place; Persian-digit sizes (`۴۲`) never matched their button | products with size+colour could not be ordered |
+
+## Known gaps and improvement ideas (honest, roughly by value)
+
+1. **Customers can't cancel or change a booking/order.** Real businesses ask for this first. (New block capability + owner notification.)
+2. **Self-graded tests.** The agent that designs the bot also writes its tests. Idea: show the owner a plain-language "what I understood" summary to confirm *before* building; add a second "reviewer" pass.
+3. **Category lists aren't paginated** (a store with 40 categories shows 40 buttons; Bale's limit is unknown). Product lists reload the whole catalog per tap — fine for hundreds of items, untested for thousands.
+4. **Single server instance.** The anti-double-booking lock lives in memory, so we cannot run two instances without moving locks into the database. No uptime monitoring/alerts; database backup policy unverified.
+5. **No password reset, email verification, account/data deletion.** (Out of competition scope, needed for a real product.)
+6. **Dates are Gregorian**, not Jalali. **No Telegram.** One owner chat gets notifications.
+7. **Own-token mode untested on real Bale**; the shared-bot code can't be regenerated.
+8. **No owner analytics** (e.g. "40% of customers drop out at the phone-number step") — also a strong pitch point.
+9. **Photo import can misread small text** (we saw a wrong size range). It always needs the owner's review; consider a second-pass check.
+10. **Prices/totals in notifications** use the digits typed; consistent Persian/Latin policy is a product decision.
