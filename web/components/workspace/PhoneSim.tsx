@@ -3,10 +3,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type Action, type Button } from "@/lib/api";
 import { Icon, fa } from "../ui";
 
-type Msg = { from: "bot" | "me" | "admin"; text: string; buttons?: Button[] };
+type Msg = { from: "bot" | "me" | "admin" | "note"; text: string; buttons?: Button[] };
 const rid = () => Math.random().toString(36).slice(2, 10);
 
-const STATUS: Record<string, string> = { confirmed: "ثبت شد", waitlisted: "در لیست انتظار", new: "سفارش جدید" };
+const STATUS: Record<string, string> = { confirmed: "ثبت شد", waitlisted: "در لیست انتظار", new: "سفارش جدید", cancelled: "لغو شد" };
 const HIDDEN = new Set(["id", "slot", "status", "items", "date"]);
 
 /** The engine's notification is "title\n[status] key: value\n…"; show it with the owner's own field labels, no ids. */
@@ -44,7 +44,7 @@ export function PhoneSim({ botId, version, labels, onActivity, className = "" }:
     try {
       const r = await api<{ actions: Action[] }>(`/bots/${botId}/simulate`, { body: { session_id: session, text: t } });
       setMsgs((m) => {
-        const mapped = r.actions.map((a): Msg => (a.type === "send" ? { from: "bot", text: a.text, buttons: a.buttons } : { from: "admin", text: a.text }));
+        const mapped = r.actions.map((a): Msg => (a.type === "send" ? { from: "bot", text: a.text, buttons: a.buttons } : a.type === "notify_customer" ? { from: "note", text: "📨 پیام به مشتریِ دیگر در بله: " + a.text } : { from: "admin", text: a.text }));
         const first = r.actions[0];
         // like Bale: navigation (next page, category, back) edits the clicked message instead of adding one
         if (first?.type === "send" && first.edit && m.length && m[m.length - 1].from === "me") {
@@ -94,10 +94,11 @@ export function PhoneSim({ botId, version, labels, onActivity, className = "" }:
       </div>
       <div ref={scroller} className="flex flex-1 flex-col gap-2.5 overflow-y-auto px-0.5">
         {msgs.map((m, i) => (
-          <div key={i} className={`anim-rise flex max-w-[88%] flex-col gap-1.5 ${m.from === "me" ? "self-end" : "self-start"} ${m.from === "admin" ? "max-w-full self-stretch" : ""}`}>
+          <div key={i} className={`anim-rise flex max-w-[88%] flex-col gap-1.5 ${m.from === "me" ? "self-end" : "self-start"} ${m.from === "admin" || m.from === "note" ? "max-w-full self-stretch" : ""}`}>
             <div className={`whitespace-pre-line px-3 py-2 text-[13px] leading-7 ${
               m.from === "me" ? "rounded-[14px_14px_4px_14px] bg-saffron text-ink"
               : m.from === "admin" ? "rounded-xl border border-amber-line bg-amber-bg text-amber-fg"
+              : m.from === "note" ? "rounded-xl border border-dashed border-line-3 text-xs text-dim"
               : "rounded-[14px_14px_14px_4px] bg-raised"}`}>
               {m.from === "admin" && <div className="mb-0.5 flex items-center gap-1.5 text-xs font-bold"><Icon name="bell" size={14} /> اعلان به مدیر</div>}
               {m.from === "admin" ? prettyAdmin(m.text, labels) : m.from === "bot" ? fa(m.text) : m.text}

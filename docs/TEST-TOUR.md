@@ -96,6 +96,14 @@ appears as an amber bubble.
 **Migrate an old bot:** open a bot with lifetime slots and say `این سانس‌ها هر هفته تکرار می‌شوند؛ ظرفیت برای هر هفته جدا شمرده شود` → the diff should change only `weekday`/`time` on each slot. (Bookings made before the change have no date, so they stop counting — the capacity starts fresh.)
 **Break it:** book at the very end of the day before a class; ask for «هر دو هفته یک‌بار» (not supported — the agent should say so honestly instead of faking it); mix a weekly class and a one-off event in one bot.
 
+### Station 4c — Customers cancelling («ثبت‌های من») (new)
+
+**What it is:** when a booking or order block allows it (the agent turns it on by default; say «مشتری نتونه لغو کنه» to turn it off), the bot's menu gets a built-in last button **«ثبت‌های من»**. The customer sees only their OWN active bookings/orders, taps one, confirms, and it is cancelled.
+**Rules to check:** a cancelled booking frees its place; **the first person waiting for the SAME date is promoted and gets a message** (and the owner gets ❌ and ✅ notifications); a deadline («تا ۲۴ ساعت قبل») blocks late cancels; an order can only be cancelled for a short window after it is placed (default 30 min) and its stock goes back on the shelf; past classes are not listed.
+**Do:** in the simulator book a one-seat class, then in the same bot from another session (or a second phone on Bale) join the waitlist; cancel the first booking; watch the second customer get the 🎉 message. In the simulator that message is shown as a dashed «📨 message to another customer» note.
+**Break it:** press an old confirm button twice; cancel after the deadline; try to cancel with someone else's chat (impossible by design — ids from the button are re-checked against the customer's identity on the server).
+**Not included:** *editing* a booking (the agent says so and offers cancel + rebook), refunds/payments, owner-side cancelling.
+
 ## Station 5 — Change request, versions, diff, regression
 
 **What it is:** the "maintain" half of the product.
@@ -166,7 +174,7 @@ You do not need special tools:
 ## Known gaps and improvement ideas (honest, roughly by value)
 
 0. ~~Weekly capacity never reset~~ — **fixed**: weekly slots count per date (see Station 4b). Still open: "every other week", month-based schedules, and clearing old one-off bookings by hand.
-1. **Customers can't cancel or change a booking/order.** Real businesses ask for this first. (New block capability + owner notification.)
+1. ~~Customers can't cancel~~ — **done** (Station 4c). Still open: customers *editing* a booking, and the owner cancelling/closing a booking from the dashboard.
 2. **Self-graded tests.** The agent that designs the bot also writes its tests. Idea: show the owner a plain-language "what I understood" summary to confirm *before* building; add a second "reviewer" pass.
 3. **Category lists aren't paginated** (a store with 40 categories shows 40 buttons; Bale's limit is unknown). Product lists reload the whole catalog per tap — fine for hundreds of items, untested for thousands.
 4. **Single server instance.** The anti-double-booking lock lives in memory, so we cannot run two instances without moving locks into the database. No uptime monitoring/alerts; database backup policy unverified.

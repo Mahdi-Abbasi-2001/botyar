@@ -70,6 +70,8 @@ class BookingBlock(BaseModel):
     slots: list[Slot] = Field(min_length=1)
     occurrences: int = Field(default=2, ge=1, le=4)  # how many upcoming dates are offered for each weekly slot
     waitlist: bool = False
+    allow_cancel: bool = False  # customers may cancel their own booking from «ثبت‌های من»
+    cancel_deadline_hours: int = Field(default=0, ge=0, le=168)  # no cancelling inside this many hours before a dated slot starts
     fields: list[FormField] = Field(default_factory=lambda: [f.model_copy() for f in DEFAULT_CONTACT])
     confirm_text: str = "ثبت‌نام شما با موفقیت انجام شد."
     full_text: str = "متأسفانه ظرفیت این زمان تکمیل است."
@@ -111,6 +113,8 @@ class CatalogOrderBlock(BaseModel):
     items: list[CatalogItem] = []
     max_items: int = Field(default=10, gt=0)
     min_total: int = Field(default=0, ge=0)
+    allow_cancel: bool = False  # customers may cancel their own order shortly after placing it
+    cancel_window_minutes: int = Field(default=30, ge=1, le=1440)
     fields: list[FormField] = Field(default_factory=lambda: [f.model_copy() for f in DEFAULT_CONTACT])
     confirm_text: str = "سفارش شما ثبت شد."
 

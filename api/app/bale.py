@@ -136,6 +136,10 @@ def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_
                 if a.get("buttons"):
                     payload["reply_markup"] = to_markup(a["buttons"], cb)
                 api_call(token, "sendMessage", payload)
+            elif a["type"] == "notify_customer":
+                # a message for ANOTHER customer (e.g. promoted from the waitlist); only Bale customers are reachable
+                if str(a.get("cust", "")).startswith("bale:"):
+                    api_call(token, "sendMessage", {"chat_id": a["cust"][5:], "text": engine.fa_digits(a["text"])[:4096]})
             elif a["type"] == "notify_admin" and admin_chat_id:
                 api_call(token, "sendMessage", {"chat_id": admin_chat_id, "text": ("🔔 " + a["text"])[:4096]})
         except Exception as e:  # noqa: BLE001
@@ -261,6 +265,7 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict):
             state, t = engine.new_session(), "/start"
         elif kind == "shared" and t.startswith("/start"):
             t = "/start"
+        state["cust"] = f"bale:{chat_id}"  # stable customer identity (set last: the welcome path above replaces the whole state)
         actions = engine.handle(spec, state, t, SqlStore(db, pub.bot_id, sandbox=False))
         deliver(token, chat_id, actions, state, pub.admin_chat_id, clicked_message_id)
         row.state = state

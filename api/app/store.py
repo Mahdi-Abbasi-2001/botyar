@@ -57,3 +57,24 @@ class SqlStore:
                     rows[pid].stock -= qty
             self.db.flush()
         return failed
+
+    # ---- cancellation support ----
+    def find(self, collection, **where):
+        rows = [{"id": r.id, **r.data} for r in self._rows(collection)]
+        return [r for r in rows if all(r.get(k) == v for k, v in where.items())]
+
+    def update(self, collection, row_id, **fields):
+        r = self.db.get(Record, row_id)
+        if r and r.bot_id == self.bot_id and r.collection == collection and r.sandbox == self.sandbox:
+            r.data = {**r.data, **fields}  # a NEW dict, so SQLAlchemy sees the change
+            self.db.flush()
+
+    def release(self, block_id, lines):
+        """Give cancelled stock back. The sandbox never touched live stock, so it never gives any back either."""
+        if self.sandbox:
+            return
+        need = engine.total_per_product(lines)
+        for p in self.db.scalars(select(Product).where(Product.bot_id == self.bot_id, Product.block_id == block_id, Product.id.in_(list(need)))):
+            if p.stock is not None:
+                p.stock += need[p.id]
+        self.db.flush()

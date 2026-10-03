@@ -214,3 +214,51 @@ def test_owner_notification_keeps_phone_digits_as_typed(env):
         c.post(url, json=step)
     note = sent(calls, 555)[-1]["text"]
     assert "09123456789" in note and "۰۹۱۲" not in note
+
+
+def test_cancel_on_bale_promotes_the_waiting_customer_and_messages_them(env):
+    from app.db import SessionLocal
+    from app.models import Bot, BotVersion, User
+
+    c, calls = env
+    tok = c.post("/api/auth/register", json={"email": "cx@x.com", "password": "123456"}).json()["token"]
+    H = {"Authorization": f"Bearer {tok}"}
+    spec = {"name": "کلاس", "welcome": "سلام", "menu": [{"label": "ثبت‌نام", "block": "b"}],
+            "blocks": [{"type": "booking", "id": "b", "title": "ثبت‌نام کلاس", "waitlist": True, "allow_cancel": True,
+                        "slots": [{"id": "once", "label": "کارگاه ویژه", "capacity": 1}]},
+                       {"type": "admin_notify", "id": "n", "on": "b", "text": "ثبت‌نام جدید"}]}
+    with SessionLocal() as db:
+        uid = db.query(User).filter(User.email == "cx@x.com").one().id
+        bot = Bot(user_id=uid, name="کلاس")
+        db.add(bot)
+        db.flush()
+        db.add(BotVersion(bot_id=bot.id, version=1, spec=spec, note=""))
+        db.commit()
+        bid = bot.id
+    st = c.post(f"/api/bots/{bid}/publish", json={"mode": "shared"}, headers=H).json()
+    url = f"/api/hook/shared/{bale.shared_hook_secret()}"
+    c.post(url, json=msg(900, f"/admin {st['admin_code']}"))                      # the owner
+    for chat, phone in ((901, "09120000001"), (902, "09120000002")):               # 901 gets the place, 902 waits
+        c.post(url, json=msg(chat, st["code"]))
+        for step in (cb(chat, "m:0"), cb(chat, "s:once"), msg(chat, "مشتری"), msg(chat, phone)):
+            c.post(url, json=step)
+    assert "لیست انتظار" in sent(calls, 902)[-2]["text"]
+    # the menu now has the built-in «ثبت‌های من» button, with an ASCII callback
+    c.post(url, json=msg(901, "/start"))
+    last_menu = sent(calls, 901)[-1]["reply_markup"]["inline_keyboard"]
+    assert last_menu[-1][0]["callback_data"] == "m:1" and "ثبت‌های من" in last_menu[-1][0]["text"]
+    c.post(url, json=cb(901, "m:1"))
+    listing = sent(calls, 901)[-1]
+    rid = next(r["data"] for r in c.get(f"/api/bots/{bid}/records?sandbox=false", headers=H).json() if r["data"]["status"] == "confirmed") and 1
+    assert listing["reply_markup"]["inline_keyboard"][0][0]["callback_data"] == f"x:0:{rid}"
+    calls.clear()
+    c.post(url, json=cb(901, f"x:0:{rid}"))
+    c.post(url, json=cb(901, "xy"))
+    assert "لغو شد" in sent(calls, 901)[-2]["text"]
+    promo = sent(calls, 902)                                                       # a DIFFERENT chat got a message
+    assert len(promo) == 1 and "جای خالی شد" in promo[0]["text"]
+    owner = " ".join(p["text"] for p in sent(calls, 900))
+    assert "❌" in owner and "✅" in owner                                           # the owner heard about both
+    live = {r["data"]["phone"]: r["data"]["status"] for r in c.get(f"/api/bots/{bid}/records?sandbox=false", headers=H).json()}
+    assert live == {"09120000001": "cancelled", "09120000002": "confirmed"}
+    assert not any("_cust" in r["data"] for r in c.get(f"/api/bots/{bid}/records?sandbox=false", headers=H).json())   # identity never reaches the owner UI

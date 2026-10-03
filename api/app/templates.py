@@ -56,6 +56,7 @@ WEEKLY_EXAMPLE = {
     "menu": [{"label": "ثبت‌نام در کلاس", "block": "classes"}],
     "blocks": [
         {"type": "booking", "id": "classes", "title": "ثبت‌نام کلاس هفتگی", "waitlist": True, "occurrences": 2,
+         "allow_cancel": True, "cancel_deadline_hours": 12,
          "slots": [
              {"id": "yoga", "label": "یوگا، شنبه ساعت ۸ صبح", "capacity": 10, "weekday": 0, "time": "08:00"},
              {"id": "pilates", "label": "پیلاتس، سه‌شنبه ساعت ۶ عصر", "capacity": 12, "weekday": 3, "time": "18:00"},

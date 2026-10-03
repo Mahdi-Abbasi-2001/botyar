@@ -65,11 +65,13 @@ def run_scenario(spec: BotSpec, sc: TestScenario, catalog: list[dict] | None = N
     transcript: list[dict] = []
     try:
         for s in sc.setup:
-            for _ in range(max(0, min(s.times, 60))):
+            for n in range(max(0, min(s.times, 60))):
                 sess = engine.new_session()
+                sess["cust"] = f"t:setup{n}"
                 for msg in s.steps:
                     engine.handle(spec, sess, msg, store, dates.TEST_NOW)
         sess = engine.new_session()
+        sess["cust"] = "t:main"
         for i, st in enumerate(sc.steps, 1):
             actions = engine.handle(spec, sess, st.say, store, dates.TEST_NOW)
             text = _texts(actions)

@@ -3,7 +3,8 @@ const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 export type Button = { text: string; data: string };
 export type Action =
   | { type: "send"; text: string; buttons: Button[]; edit?: boolean }
-  | { type: "notify_admin"; text: string };
+  | { type: "notify_admin"; text: string }
+  | { type: "notify_customer"; cust: string; text: string };
 
 /** sessionStorage key for a description typed on /bots, sent to the agent when the workspace opens. */
 export const PENDING_KEY = (id: number | string) => `botyar:pending:${id}`;

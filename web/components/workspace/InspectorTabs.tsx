@@ -86,6 +86,7 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
   const mine = records.filter((r) => r.collection === b.id);
   return (
     <>
+      <p className="mb-2 text-xs text-mute">{b.allow_cancel ? `مشتری می‌تواند لغو کند${b.cancel_deadline_hours ? ` · تا ${fa(b.cancel_deadline_hours)} ساعت پیش از شروع` : ""}` : "لغو توسط مشتری غیرفعال است"}</p>
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
         {b.slots.map((s) => {
           const weekly = weeklyText(s);
@@ -243,6 +244,7 @@ const STATUS: Record<string, [string, string]> = {
   confirmed: ["ثبت شد", "border border-line-3"],
   waitlisted: ["لیست انتظار", "bg-mint text-ink font-bold"],
   new: ["سفارش جدید", "border border-saffron text-saffron"],
+  cancelled: ["لغو شده", "border border-line-3 text-dim line-through"],
 };
 const mask = (p?: string) => (p && p.length >= 8 ? `${p.slice(0, 4)} ••• ${p.slice(-4)}` : p ?? "—");
 
@@ -271,13 +273,14 @@ export function RecordsTab({ records, spec }: { records: Rec[]; spec: Spec }) {
             : all.length ? Object.entries(all.reduce<Record<string, Rec[]>>((m, r) => ((m[r.data.slot_label ?? s.label] ??= []).push(r), m), {})) : [[s.label, []]];
           return groups.map(([title, mine]) => {
           const used = mine.filter((r) => r.data.status === "confirmed").length;
-          const wait = mine.length - used;
+          const wait = mine.filter((r) => r.data.status === "waitlisted").length;
+          const gone = mine.filter((r) => r.data.status === "cancelled").length;
           return (
             <div key={b.id + s.id + title} className="flex flex-col gap-2 rounded-2xl border border-line bg-panel p-[18px]">
               <span className="text-[13px] text-mute">{title}</span>
               <span className="text-[28px] font-black">{fa(used)} از {fa(s.capacity)}</span>
               <CapacityBar used={used} capacity={s.capacity} />
-              <span className={`text-[13px] ${wait ? "text-mint-fg" : "text-mute"}`}>{wait ? `+ ${fa(wait)} در لیست انتظار` : `${fa(Math.max(0, s.capacity - used))} جای خالی`}</span>
+              <span className={`text-[13px] ${wait ? "text-mint-fg" : "text-mute"}`}>{wait ? `+ ${fa(wait)} در لیست انتظار` : `${fa(Math.max(0, s.capacity - used))} جای خالی`}{gone ? ` · ${fa(gone)} لغو شده` : ""}</span>
             </div>
           );
           });

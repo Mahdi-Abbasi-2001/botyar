@@ -177,6 +177,7 @@ def simulate(bot_id: int, body: SimMessage, user: User = Depends(current_user), 
         row = ChatSession(bot_id=bot.id, key="sim:" + body.session_id, state=bot_engine.new_session())
         db.add(row)
     state = copy.deepcopy(row.state)  # a shallow copy would hide in-place edits from SQLAlchemy's change detection
+    state["cust"] = "sim:" + body.session_id
     actions = bot_engine.handle(spec, state, body.text, SqlStore(db, bot.id, sandbox=True))
     row.state = state
     db.commit()
@@ -196,7 +197,8 @@ def reset_sandbox(bot_id: int, user: User = Depends(current_user), db: Session =
 def records(bot_id: int, sandbox: bool = False, user: User = Depends(current_user), db: Session = Depends(get_db)):
     bot = own_bot(bot_id, user, db)
     q = select(Record).where(Record.bot_id == bot.id, Record.sandbox == sandbox).order_by(Record.id.desc()).limit(500)
-    return [{"id": r.id, "collection": r.collection, "data": r.data, "created_at": r.created_at.isoformat()} for r in db.scalars(q)]
+    return [{"id": r.id, "collection": r.collection, "data": {k: v for k, v in r.data.items() if not k.startswith("_")},
+             "created_at": r.created_at.isoformat()} for r in db.scalars(q)]
 
 
 # ---------- builder agent ----------

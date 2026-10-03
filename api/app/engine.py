@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 import logging
 import math
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from typing import Any, Protocol
 
 from . import dates
@@ -17,6 +17,9 @@ from .spec import BotSpec, BookingBlock, CatalogOrderBlock, FormBlock, FormField
 _DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 log = logging.getLogger("botyar.engine")
 STALE_RESETS = {"count": 0}  # tests assert this stays 0 unless a bot really changed under a conversation
+MY_LABEL = "ثبت‌های من"  # built-in menu entry, present when a block allows cancelling
+MY_BLOCK = "__my__"
+STATUS_FA = {"confirmed": "تأیید شده", "waitlisted": "در لیست انتظار", "new": "سفارش جدید", "cancelled": "لغو شده"}
 MENU_WORDS = {"/start", "/menu", "منو", "منوی اصلی", "شروع"}
 CANCEL_WORDS = {"/cancel", "انصراف", "لغو"}
 
@@ -69,6 +72,9 @@ class Store(Protocol):
     def products(self, block_id: str, category: str | None, query: str | None, offset: int, limit: int) -> tuple[list[dict], int]: ...
     def product(self, block_id: str, pid: int) -> dict | None: ...
     def reserve(self, block_id: str, lines: list[tuple[int, int]]) -> list[int]: ...
+    def release(self, block_id: str, lines: list[tuple[int, int]]) -> None: ...
+    def find(self, collection: str, **where: Any) -> list[dict]: ...
+    def update(self, collection: str, row_id: int, **fields: Any) -> None: ...
 
 
 class MemoryStore:
@@ -97,6 +103,20 @@ class MemoryStore:
     def product(self, block_id, pid):
         return next((p for p in self.catalog.get(block_id, []) if p["id"] == pid), None)
 
+    def find(self, collection, **where):
+        return [r for r in self.rows.get(collection, []) if all(r.get(k) == v for k, v in where.items())]
+
+    def update(self, collection, row_id, **fields):
+        for r in self.rows.get(collection, []):
+            if r["id"] == row_id:
+                r.update(fields)
+
+    def release(self, block_id, lines):
+        rows = {p["id"]: p for p in self.catalog.get(block_id, [])}
+        for pid, qty in total_per_product(lines).items():
+            if pid in rows and rows[pid]["stock"] is not None:
+                rows[pid]["stock"] += qty
+
     def reserve(self, block_id, lines):
         rows = {p["id"]: p for p in self.catalog.get(block_id, [])}
         need = total_per_product(lines)  # the same product on two cart lines must be checked as one quantity
@@ -109,7 +129,7 @@ class MemoryStore:
 
 
 def new_session() -> dict:
-    return {"block": None, "step": None, "data": {}}
+    return {"block": None, "step": None, "data": {}, "cust": None}
 
 
 def send(text, buttons=None, edit=False):
@@ -157,17 +177,20 @@ def _ask(field: FormField):
 
 def menu_actions(spec: BotSpec, prefix: str | None = None):
     text = prefix if prefix is not None else "از منوی زیر یکی را انتخاب کنید:"
-    return send(text, [_btn(m.label, f"m:{i}") for i, m in enumerate(spec.menu)])
+    buttons = [_btn(m.label, f"m:{i}") for i, m in enumerate(spec.menu)]
+    if _cancel_blocks(spec):
+        buttons.append(_btn(MY_LABEL, f"m:{len(spec.menu)}"))
+    return send(text, buttons)
 
 
 def _reset(session):
     session.update(block=None, step=None, data={})
 
 
-def _notify(spec: BotSpec, block_id: str, summary: str, actions: list):
+def _notify(spec: BotSpec, block_id: str, summary: str, actions: list, prefix: str | None = None):
     for b in spec.blocks:
         if b.type == "admin_notify" and b.on == block_id:
-            actions.append({"type": "notify_admin", "text": f"{b.text}\n{summary}"})
+            actions.append({"type": "notify_admin", "text": f"{prefix or b.text}\n{summary}"})
 
 
 def _summary(data: dict) -> str:
@@ -188,13 +211,15 @@ def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None) -> l
         return _from_menu(spec, session, text_n, store, now)
 
     try:
+        if session["block"] == MY_BLOCK:
+            return _mine(spec, session, text, store, now)
         block = spec.block(session["block"])
         if block.type == "form":
             return _form(spec, session, block, text, store)
         if block.type == "booking":
             return _booking(spec, session, block, text, store, now)
         if block.type == "catalog_order":
-            return _order(spec, session, block, text, store)
+            return _order(spec, session, block, text, store, now)
     except (StopIteration, IndexError, KeyError) as e:
         # The saved state belongs to an older version of the bot (the owner republished mid-conversation:
         # a block, field, slot or option it points to is gone). Never leave the customer in silence.
@@ -208,6 +233,8 @@ def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None) -> l
 
 # ---------- menu ----------
 def _from_menu(spec, session, text_n, store, now):
+    if _cancel_blocks(spec) and (text_n == f"m:{len(spec.menu)}" or text_n == MY_LABEL):
+        return _my_start(spec, session, store, now)
     item = None
     m = re.fullmatch(r"m:(\d+)", text_n)
     if m and int(m.group(1)) < len(spec.menu):
@@ -318,7 +345,7 @@ def _booking(spec, session, block: BookingBlock, text, store, now):
         _reset(session)
         return [send(block.full_text), menu_actions(spec)]
     status = "waitlisted" if full else "confirmed"
-    row = store.add(block.id, {**session["data"], "status": status})
+    row = store.add(block.id, {**session["data"], "status": status, **_ident(session, now)})
     actions = [send(block.waitlist_text if full else block.confirm_text)]
     _notify(spec, block.id, f"[{status}] " + _summary(row), actions)
     _reset(session)
@@ -444,7 +471,7 @@ def _pick_product(session, block, store, pid):
     return _next_option(session, block)
 
 
-def _order(spec, session, block: CatalogOrderBlock, text, store):
+def _order(spec, session, block: CatalogOrderBlock, text, store, now):
     text_n = norm(text)
     d = session["data"]
     step = session["step"]
@@ -556,10 +583,144 @@ def _order(spec, session, block: CatalogOrderBlock, text, store):
             return [send("متأسفانه موجودی این مورد کافی نیست و از سفارش حذف شد: " + "، ".join(gone)), _more_prompt()]
     total = _cart_total(cart)
     contact = {f.key: d[f.key] for f in block.fields}
-    row = store.add(block.id, {**contact, "items": cart, "total": total, "status": "new"})
+    row = store.add(block.id, {**contact, "items": cart, "total": total, "status": "new", **_ident(session, now)})
     lines = "\n".join(f"- {c['name']} {' '.join(c['options'].values())}".strip() + (f" × {c['qty']}" if "qty" in c else "") for c in cart)
     actions = [send(f"{block.confirm_text}\n{lines}\nجمع کل: {total:,} تومان")]
     _notify(spec, block.id, f"سفارش #{row['id']} - جمع {total:,} تومان\n{lines}", actions)
     _reset(session)
     actions.append(menu_actions(spec))
     return actions
+
+
+
+# ---------- customer cancellation («ثبت‌های من») ----------
+def _cancel_blocks(spec: BotSpec):
+    return [(i, b) for i, b in enumerate(spec.blocks) if b.type in ("booking", "catalog_order") and b.allow_cancel]
+
+
+def _ident(session: dict, now) -> dict:
+    """Who made a record and when (underscore keys are internal: never shown to the owner or exported)."""
+    c = session.get("cust")
+    return {"_cust": c, "_at": now.isoformat()} if c else {}
+
+
+def _active(b, r: dict, now) -> bool:
+    if b.type == "booking":
+        if r.get("status") not in ("confirmed", "waitlisted"):
+            return False
+        return not r.get("date") or date.fromisoformat(r["date"]) >= now.date()
+    return r.get("status") == "new"
+
+
+def _describe(b, r: dict) -> str:
+    if b.type == "booking":
+        return f"{r.get('slot_label', b.title)} — {STATUS_FA.get(r.get('status'), '')}"
+    return f"سفارش {r['id']} — {r.get('total', 0):,} تومان"
+
+
+def _why_not(b, r: dict, now) -> str | None:
+    """None = may cancel now; otherwise a polite Persian reason."""
+    if b.type == "booking":
+        if b.cancel_deadline_hours and r.get("date"):
+            slot = next((s for s in b.slots if s.id == r.get("slot")), None)
+            if slot and slot.time:
+                h, m = (int(x) for x in slot.time.split(":"))
+                start = datetime.combine(date.fromisoformat(r["date"]), time(h, m), tzinfo=now.tzinfo)
+                if now >= start - timedelta(hours=b.cancel_deadline_hours):
+                    return f"لغو فقط تا {b.cancel_deadline_hours} ساعت پیش از شروع ممکن است و این مهلت گذشته است. لطفاً با مدیر تماس بگیرید."
+        return None
+    try:
+        placed = datetime.fromisoformat(r.get("_at", ""))
+    except ValueError:
+        return "این سفارش دیگر قابل لغو نیست."
+    if now - placed > timedelta(minutes=b.cancel_window_minutes):
+        return f"لغو سفارش فقط تا {b.cancel_window_minutes} دقیقه پس از ثبت ممکن است. برای تغییر با مدیر تماس بگیرید."
+    return None
+
+
+def _owned(spec: BotSpec, session: dict, store, bi: int, rid: int):
+    """The record only if it belongs to THIS customer and its block allows cancelling (never trust ids from the client)."""
+    cust = session.get("cust")
+    if not cust or not 0 <= bi < len(spec.blocks):
+        return None
+    b = spec.blocks[bi]
+    if b.type not in ("booking", "catalog_order") or not b.allow_cancel:
+        return None
+    rows = store.find(b.id, id=rid, _cust=cust)
+    return (b, rows[0]) if rows else None
+
+
+def _my_start(spec, session, store, now):
+    cust = session.get("cust")
+    found = []
+    if cust:
+        for bi, b in _cancel_blocks(spec):
+            found += [(bi, b, r) for r in store.find(b.id, _cust=cust) if _active(b, r, now)]
+    if not found:
+        _reset(session)
+        return [send("هنوز ثبت فعالی ندارید."), menu_actions(spec)]
+    found.sort(key=lambda t: t[2]["id"], reverse=True)
+    session.update(block=MY_BLOCK, step="list", data={})
+    buttons = [_btn("لغو: " + _short(_describe(b, r), 50), f"x:{bi}:{r['id']}") for bi, b, r in found[:8]]
+    return [send("ثبت‌های فعال شما — برای لغو، روی مورد دلخواه بزنید:", buttons + [_btn("بازگشت به منو", "/menu")])]
+
+
+def _mine(spec, session, text, store, now):
+    text_n = norm(text)
+    d = session["data"]
+    if session["step"] == "list":
+        m = re.fullmatch(r"x:(\d+):(\d+)", text_n)
+        owned = _owned(spec, session, store, int(m.group(1)), int(m.group(2))) if m else None
+        if owned is None:
+            return [send("لطفاً یکی از موارد را انتخاب کنید یا به منو برگردید.")] + _my_start(spec, session, store, now)
+        b, r = owned
+        why = _why_not(b, r, now)
+        if why:
+            return [send(why)] + _my_start(spec, session, store, now)
+        d.update(bi=int(m.group(1)), rid=r["id"])
+        session["step"] = "confirm"
+        return [send(f"«{_describe(b, r)}» لغو شود؟", [_btn("بله، لغو کن", "xy"), _btn("نه، نگه دار", "xn")])]
+    # confirm
+    if text_n == "xn":
+        _reset(session)
+        return [send("باشه، ثبت شما سر جایش ماند."), menu_actions(spec)]
+    if text_n != "xy":
+        return [send("لطفاً یکی از دو دکمه را بزنید."), send("لغو شود؟", [_btn("بله، لغو کن", "xy"), _btn("نه، نگه دار", "xn")])]
+    owned = _owned(spec, session, store, d["bi"], d["rid"])
+    if owned is None or not _active(owned[0], owned[1], now):
+        _reset(session)
+        return [send("این مورد دیگر قابل لغو نیست."), menu_actions(spec)]
+    b, r = owned
+    why = _why_not(b, r, now)
+    if why:
+        _reset(session)
+        return [send(why), menu_actions(spec)]
+    return _do_cancel(spec, session, store, now, b, r)
+
+
+def _do_cancel(spec, session, store, now, b, r):
+    prev = r["status"]
+    store.update(b.id, r["id"], status="cancelled", _cancelled_at=now.isoformat())
+    who = f"❌ لغو توسط مشتری · {b.title}"
+    actions: list[dict] = []
+    _notify(spec, b.id, _summary(r), actions, prefix=who)
+    if b.type == "booking":
+        done = f"ثبت‌نام شما در «{r.get('slot_label', b.title)}» لغو شد."
+        if prev == "confirmed":  # a place just opened: the first person waiting for the SAME date gets it
+            where = {"slot": r.get("slot"), "status": "waitlisted"}
+            if r.get("date"):
+                where["date"] = r["date"]
+            waiting = sorted(store.find(b.id, **where), key=lambda w: w["id"])
+            if waiting:
+                w = waiting[0]
+                store.update(b.id, w["id"], status="confirmed", _promoted_at=now.isoformat())
+                if w.get("_cust"):
+                    actions.append({"type": "notify_customer", "cust": w["_cust"],
+                                    "text": f"🎉 جای خالی شد! ثبت‌نام شما در «{w.get('slot_label', b.title)}» تأیید شد."})
+                _notify(spec, b.id, _summary(w), actions, prefix=f"✅ از لیست انتظار تأیید شد · {b.title}")
+    else:
+        done = "سفارش شما لغو شد."
+        if b.source == "table":
+            store.release(b.id, [(it["id"], it.get("qty", 1)) for it in r.get("items", [])])
+    _reset(session)
+    return [send(done), *actions, menu_actions(spec)]

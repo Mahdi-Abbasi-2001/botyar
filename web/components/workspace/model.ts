@@ -7,7 +7,7 @@ export type Item = { id: string; name: string; price: number; options: { name: s
 export type Block =
   | { type: "message"; id: string; text: string }
   | { type: "form"; id: string; title: string; fields: Field[]; done_text: string }
-  | { type: "booking"; id: string; title: string; slots: Slot[]; waitlist: boolean; fields: Field[]; confirm_text: string; full_text: string; waitlist_text: string }
+  | { type: "booking"; id: string; title: string; slots: Slot[]; waitlist: boolean; allow_cancel?: boolean; cancel_deadline_hours?: number; occurrences?: number; fields: Field[]; confirm_text: string; full_text: string; waitlist_text: string }
   | { type: "catalog_order"; id: string; title: string; items: Item[]; max_items: number; min_total: number; fields: Field[]; confirm_text: string }
   | { type: "admin_notify"; id: string; on: string; text: string };
 export type Spec = { name: string; welcome: string; menu: { label: string; block: string }[]; blocks: Block[] };
@@ -118,7 +118,7 @@ export function parseQuestions(content: string): string[] | null {
 
 // ---------- version diff → sentences ----------
 const FIELD_NAME: Record<string, string> = {
-  name: "نام ربات", welcome: "پیام خوش‌آمد", menu: "منو", waitlist: "لیست انتظار", capacity: "ظرفیت", weekday: "روز هفته", time: "ساعت", occurrences: "تعداد تاریخ‌های پیشنهادی", label: "عنوان",
+  name: "نام ربات", welcome: "پیام خوش‌آمد", menu: "منو", waitlist: "لیست انتظار", capacity: "ظرفیت", allow_cancel: "لغو توسط مشتری", cancel_deadline_hours: "مهلت لغو (ساعت)", cancel_window_minutes: "مهلت لغو سفارش (دقیقه)", weekday: "روز هفته", time: "ساعت", occurrences: "تعداد تاریخ‌های پیشنهادی", label: "عنوان",
   text: "متن", title: "عنوان", confirm_text: "پیام تأیید", full_text: "پیام تکمیل ظرفیت", waitlist_text: "پیام لیست انتظار",
   done_text: "پیام پایان فرم", price: "قیمت", min_total: "حداقل مبلغ سفارش", max_items: "حداکثر تعداد آیتم", fields: "سؤال‌های فرم",
   slots: "زمان‌ها", items: "آیتم‌ها", on: "زمان ارسال اعلان", kind: "نوع", required: "اجباری", choices: "گزینه‌ها", options: "گزینه‌ها",
