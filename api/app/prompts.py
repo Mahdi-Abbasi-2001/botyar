@@ -1,6 +1,17 @@
 import json
 
-from .templates import TEMPLATES
+from datetime import timedelta
+
+from .dates import TEST_NOW, WEEKDAYS, jalali_str, persian_weekday
+from .templates import TEMPLATES, WEEKLY_EXAMPLE
+
+def _calendar() -> str:
+    rows = []
+    for i in range(15):
+        d = (TEST_NOW + timedelta(days=i)).date()
+        rows.append(f"{d.isoformat()} = {WEEKDAYS[persian_weekday(d)]} {jalali_str(d)}" + ("  <- today, 12:00" if i == 0 else ""))
+    return "\n".join(rows)
+
 
 # Identical for every step so the provider can cache this long prefix (cached input is 10x cheaper).
 COMMON = """You are the engine of Botyar (بات‌یار), an agent that builds, tests and maintains Persian chat bots for small businesses in Iran, running on the Bale messenger.
@@ -10,7 +21,7 @@ You NEVER write code. You produce a BotSpec (JSON) that a fixed deterministic ru
 - "/start" shows spec.welcome, then the menu. Menu buttons carry data "m:<index>" (0-based position in spec.menu); typing the exact menu label also works. "/cancel" or "انصراف" returns to the menu.
 - message block: sends its text, then the menu.
 - form block: asks each field in order (the field label IS the question). Kinds: text; phone (must be an Iranian mobile 09xxxxxxxxx, otherwise reply contains «معتبر نیست»); number (digits only); choice (user must send one of `choices` exactly; they are shown as buttons). Saves a record under collection = block id, sends done_text, then the menu.
-- booking block: after the menu pick it sends the title, then slot buttons labelled "<slot label> (<N> جای خالی)" with data "s:<slot id>". A full slot is labelled "(تکمیل)" when waitlist=false and "(تکمیل - لیست انتظار)" when waitlist=true. With waitlist=false choosing a full slot replies full_text. With waitlist=true choosing a full slot continues and the record gets status "waitlisted" and waitlist_text is sent. Then it asks `fields` in order (default: name, phone). Record = fields + slot (slot id) + slot_label + status ("confirmed" or "waitlisted"), stored under collection = block id.
+- booking block: after the menu pick it sends the title, then slot buttons. A WEEKLY slot (weekday and time set) repeats every week: the bot offers its next `occurrences` real dates (Tehran time; a date whose start time has passed is never offered), labelled "<slot label> — <Jalali date YYYY/MM/DD> (<N> جای خالی)" with data "s:<slot id>@<YYYYMMDD, Gregorian>", and counts capacity PER DATE — so it resets by itself after every class. A ONE-OFF slot (weekday null) is a single event: label "<slot label> (<N> جای خالی)", data "s:<slot id>", capacity counts for ever. A full slot is labelled "(تکمیل)" when waitlist=false and "(تکمیل - لیست انتظار)" when waitlist=true. With waitlist=false choosing a full slot replies full_text. With waitlist=true choosing a full slot continues and the record gets status "waitlisted" and waitlist_text is sent. Then it asks `fields` in order (default: name, phone). Record = fields + slot (slot id) + slot_label (weekly: label — date) + date (ISO, weekly only) + status ("confirmed" or "waitlisted"), stored under collection = block id.
 - catalog_order block: item buttons "<name> - <price> تومان" with data "i:<item id>"; for each option group of the item it asks to pick one (exact choice text); then buttons data "more" / "checkout". "checkout" below min_total replies with a message containing «حداقل». At most max_items per order. Then it asks `fields`, stores record = contact fields + items + total + status "new" under collection = block id.
 - catalog_order, source "inline": the items are written in the spec (small menus, up to about 12 items).
 - catalog_order, source "table": the products live in a database table that the owner fills later by uploading a file (CSV/Excel), pasting a table or photographing a price list. The spec then holds NO items (items = []). Use "table" whenever the owner has many products (more than ~12) or mentions a catalog, price list, Excel file, categories, sizes/colors, or a clothing/shoe/electronics/book style shop. Runtime: after the menu pick the user sees category buttons "c:<index>" (index = order of first appearance in the product list) plus «همه‌ی محصولات» (data "all") and «🔎 جستجو» (data "search") — skipped when there is at most one category. Then a list of 5 products per page: buttons "<name> - <price> تومان" with data "p:<product id>", «‹ قبلی» / «بعدی ›» with data "pg:<page, 0-based>", search, and «بازگشت به دسته‌ها» (data "back"); free text typed in the list is a name search. After a product is picked each of its option groups is asked in order (exact choice text), then «تعداد را انتخاب کنید» with buttons "n:1","n:2","n:3" (a typed number also works; above the stock it is refused with «حداکثر موجودی»; stock null = unlimited), then "more"/"checkout" as usual. Exact labels (copy them, including spelling and the emoji): «🔎 جستجو» (no half-space), «همه‌ی محصولات», «‹ قبلی», «بعدی ›», «بازگشت به دسته‌ها», «افزودن آیتم دیگر», «ثبت سفارش»; list header "<category or همه‌ی محصولات> — صفحه N از M". A product with stock 0 cannot be picked («فعلاً موجود نیست»). min_total and max_items (lines per order) apply. Record = contact fields + items [{id,name,price,options,qty}] + total + status "new".
@@ -19,6 +30,12 @@ You NEVER write code. You produce a BotSpec (JSON) that a fixed deterministic ru
 
 ## Catalog rule
 - For source "table" you MUST also fill `sample_products` with 6–10 realistic products for this kind of store: Persian names, prices in toman, at least 2 categories, different option groups (e.g. سایز/رنگ) on some products, and some products with small stock (2–5) so stock logic can be tested. They become the demo catalog and the fixture the tests run against. For every other design `sample_products` is [].
+
+## Weekly slots
+- Whenever the owner describes a repeating schedule («هر هفته»، «هر پنجشنبه»، «شنبه‌ها»، a clinic's weekly hours, a class timetable) use a WEEKLY slot: weekday 0=شنبه 1=یکشنبه 2=دوشنبه 3=سه‌شنبه 4=چهارشنبه 5=پنجشنبه 6=جمعه, and time "HH:MM" in 24h («۴ عصر» = "16:00", «۱۰ صبح» = "10:00"). The label names the weekday and time of day («پنجشنبه ساعت ۱۰ صبح») but NEVER a date: the bot appends the real date itself. If the owner names specific calendar dates («۲۵ مهر»), use a ONE-OFF slot (weekday null, time null) with the date written in the label. If it is unclear, assume weekly for classes and appointments and say so in assumptions. `occurrences` is 2 unless the owner wants to book further ahead.
+- Tests run on a FIXED clock, not today's date: Saturday 2026-10-03 12:00 Tehran. Weekly-slot buttons therefore show exactly these dates (next days):
+@@CALENDAR@@
+  A weekly slot's first date is the first matching row after the clock (a slot on Saturday 18:00 is still today's 2026-10-03; Saturday 10:00 is next week's 2026-10-10).
 
 ## Spec rules
 - Exactly these block types exist: message, form, booking, catalog_order, admin_notify. Do NOT invent other features (payments, photos, reminders, cancellation, editing records are NOT supported). If asked for them, say so honestly and offer the closest supported behaviour.
@@ -31,11 +48,14 @@ You NEVER write code. You produce a BotSpec (JSON) that a fixed deterministic ru
 - Drive the engine with exact inputs: "/start", then "m:<index>", slot "s:<id>", item "i:<id>", "more", "checkout", option choices as exact text, valid phone like "09121234567".
 - reply_contains / reply_not_contains check what the user SEES: message text AND button labels. Use short Persian substrings that really exist in the spec's texts. NEVER put internal button data values (m:0, s:<id>, i:<id>, more, checkout) in reply_contains — they are inputs for `say`, users never see them; assert on the visible labels instead (e.g. «افزودن آیتم دیگر», «ثبت سفارش»).
 - With a table catalog the tests run against the FIXTURE products you are given: product ids are 1..N in the order listed and categories are indexed by first appearance. Only use ids/names/options/stock that exist in the fixture.
+- For weekly slots use the calendar above to write the exact button data («s:yoga@20261003») and the Jalali dates in expectations. To test that capacity is per date, fill one date with `setup` and check that the next date is still free.
 - To test capacity, use `setup` (other users who run the same steps `times` times) instead of repeating steps.
 - Cover: happy path; invalid phone/number if the bot asks one; capacity edge for booking; minimum total for orders; admin notification is not testable via text so skip it.
 
 ## Example specs (valid; style reference)
-""" + "\n".join(json.dumps(v, ensure_ascii=False) for v in TEMPLATES.values()) + "\n"
+""" + "\n".join(json.dumps(v, ensure_ascii=False) for v in [*TEMPLATES.values(), WEEKLY_EXAMPLE]) + "\n"
+
+COMMON = COMMON.replace("@@CALENDAR@@", _calendar())
 
 CLARIFY = COMMON + """
 ## Your task now: CLARIFY

@@ -88,6 +88,14 @@ fill a slot to capacity and try once more; press "restart".
 appears as an amber bubble.
 **Break it:** send `<script>alert(1)</script>`, a 2000-char message, emoji, `p:99999`, `n:-5`.
 
+### Station 4b — Weekly classes and capacity that resets by itself (new)
+
+**What it is:** a slot can be *weekly* («هر شنبه ساعت ۸ صبح»). The bot then offers the next two real dates with their Jalali dates and counts capacity **per date**, so the class is bookable again the week after it has happened. A slot for a specific date («فقط ۲۵ مهر») stays a one-off with lifetime capacity.
+**Do:** describe `کلاس یوگا هر شنبه ساعت ۸ صبح ظرفیت ۱۰ نفر و پیلاتس هر سه‌شنبه ساعت ۶ عصر ظرفیت ۱۲ نفر`. In the simulator you should see buttons like «یوگا، شنبه ساعت ۸ صبح — ۱۴۰۵/۰۷/۱۸ (۱۰ جای خالی)» for two upcoming dates per class.
+**Expect:** booking one date lowers only that date's count; the Structure tab shows «هر هفته · شنبه ساعت 08:00»; the Records tab groups bookings per date; exports have a date column.
+**Migrate an old bot:** open a bot with lifetime slots and say `این سانس‌ها هر هفته تکرار می‌شوند؛ ظرفیت برای هر هفته جدا شمرده شود` → the diff should change only `weekday`/`time` on each slot. (Bookings made before the change have no date, so they stop counting — the capacity starts fresh.)
+**Break it:** book at the very end of the day before a class; ask for «هر دو هفته یک‌بار» (not supported — the agent should say so honestly instead of faking it); mix a weekly class and a one-off event in one bot.
+
 ## Station 5 — Change request, versions, diff, regression
 
 **What it is:** the "maintain" half of the product.
@@ -157,6 +165,7 @@ You do not need special tools:
 
 ## Known gaps and improvement ideas (honest, roughly by value)
 
+0. ~~Weekly capacity never reset~~ — **fixed**: weekly slots count per date (see Station 4b). Still open: "every other week", month-based schedules, and clearing old one-off bookings by hand.
 1. **Customers can't cancel or change a booking/order.** Real businesses ask for this first. (New block capability + owner notification.)
 2. **Self-graded tests.** The agent that designs the bot also writes its tests. Idea: show the owner a plain-language "what I understood" summary to confirm *before* building; add a second "reviewer" pass.
 3. **Category lists aren't paginated** (a store with 40 categories shows 40 buttons; Bale's limit is unknown). Product lists reload the whole catalog per tap — fine for hundreds of items, untested for thousands.

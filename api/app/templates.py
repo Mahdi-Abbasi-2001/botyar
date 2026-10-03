@@ -49,6 +49,22 @@ CAFE = {
     ],
 }
 
+# Style reference for the agent only (not offered as a template in the UI): a repeating weekly class.
+WEEKLY_EXAMPLE = {
+    "name": "ربات کلاس‌های باشگاه",
+    "welcome": "سلام! برای ثبت‌نام در کلاس‌های هفتگی باشگاه از منو استفاده کنید.",
+    "menu": [{"label": "ثبت‌نام در کلاس", "block": "classes"}],
+    "blocks": [
+        {"type": "booking", "id": "classes", "title": "ثبت‌نام کلاس هفتگی", "waitlist": True, "occurrences": 2,
+         "slots": [
+             {"id": "yoga", "label": "یوگا، شنبه ساعت ۸ صبح", "capacity": 10, "weekday": 0, "time": "08:00"},
+             {"id": "pilates", "label": "پیلاتس، سه‌شنبه ساعت ۶ عصر", "capacity": 12, "weekday": 3, "time": "18:00"},
+             {"id": "camp", "label": "کارگاه ویژه‌ی ۲۵ مهر", "capacity": 20},
+         ]},
+        {"type": "admin_notify", "id": "notify", "on": "classes", "text": "ثبت‌نام جدید در کلاس باشگاه"},
+    ],
+}
+
 TEMPLATES = {"workshop": WORKSHOP, "cafe": CAFE}
 
 

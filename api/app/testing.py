@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from . import engine
+from . import dates, engine
 from .spec import BotSpec
 
 
@@ -68,10 +68,10 @@ def run_scenario(spec: BotSpec, sc: TestScenario, catalog: list[dict] | None = N
             for _ in range(max(0, min(s.times, 60))):
                 sess = engine.new_session()
                 for msg in s.steps:
-                    engine.handle(spec, sess, msg, store)
+                    engine.handle(spec, sess, msg, store, dates.TEST_NOW)
         sess = engine.new_session()
         for i, st in enumerate(sc.steps, 1):
-            actions = engine.handle(spec, sess, st.say, store)
+            actions = engine.handle(spec, sess, st.say, store, dates.TEST_NOW)
             text = _texts(actions)
             transcript.append({"user": st.say, "bot": text})
             for needle in st.reply_contains:

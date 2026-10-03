@@ -1,6 +1,7 @@
 """BotSpec: the declarative description of a bot. The agent writes this; the engine runs it."""
 from __future__ import annotations
 
+import re
 from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, Field, model_validator
@@ -41,8 +42,19 @@ ShortId = Annotated[str, Field(pattern=r"^[a-z0-9_]{1,24}$")]  # goes into callb
 
 class Slot(BaseModel):
     id: ShortId
-    label: str
+    label: str  # for a weekly slot: «پنجشنبه ساعت ۱۰ صبح» WITHOUT a date; the bot appends the real date itself
     capacity: int = Field(gt=0)
+    weekday: int | None = None  # None = one-off slot (capacity counts for ever); 0=شنبه … 6=جمعه = repeats every week
+    time: str | None = None  # "HH:MM" 24h Tehran time, required for weekly slots
+
+    @model_validator(mode="after")
+    def _weekly(self):
+        if self.weekday is not None:
+            if not 0 <= self.weekday <= 6:
+                raise ValueError(f"slot '{self.id}': weekday must be 0 (شنبه) to 6 (جمعه)")
+            if not self.time or not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", self.time):
+                raise ValueError(f"slot '{self.id}': a weekly slot needs time as HH:MM")
+        return self
 
 
 DEFAULT_CONTACT = [
@@ -56,6 +68,7 @@ class BookingBlock(BaseModel):
     id: str
     title: str
     slots: list[Slot] = Field(min_length=1)
+    occurrences: int = Field(default=2, ge=1, le=4)  # how many upcoming dates are offered for each weekly slot
     waitlist: bool = False
     fields: list[FormField] = Field(default_factory=lambda: [f.model_copy() for f in DEFAULT_CONTACT])
     confirm_text: str = "ثبت‌نام شما با موفقیت انجام شد."

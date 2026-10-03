@@ -8,8 +8,10 @@ from __future__ import annotations
 import re
 import logging
 import math
+from datetime import date
 from typing import Any, Protocol
 
+from . import dates
 from .spec import BotSpec, BookingBlock, CatalogOrderBlock, FormBlock, FormField, MessageBlock
 
 _DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
@@ -172,7 +174,8 @@ def _summary(data: dict) -> str:
     return "\n".join(f"{k}: {v}" for k, v in data.items() if not k.startswith("_"))
 
 
-def handle(spec: BotSpec, session: dict, text: str, store: Store) -> list[dict]:
+def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None) -> list[dict]:
+    now = now or dates.now_tehran()  # injectable so tests run on a fixed clock
     text_n = norm(text)
     if text_n in MENU_WORDS:
         _reset(session)
@@ -182,14 +185,14 @@ def handle(spec: BotSpec, session: dict, text: str, store: Store) -> list[dict]:
         return [menu_actions(spec, "انصراف انجام شد.")]
 
     if session["block"] is None:
-        return _from_menu(spec, session, text_n, store)
+        return _from_menu(spec, session, text_n, store, now)
 
     try:
         block = spec.block(session["block"])
         if block.type == "form":
             return _form(spec, session, block, text, store)
         if block.type == "booking":
-            return _booking(spec, session, block, text, store)
+            return _booking(spec, session, block, text, store, now)
         if block.type == "catalog_order":
             return _order(spec, session, block, text, store)
     except (StopIteration, IndexError, KeyError) as e:
@@ -204,7 +207,7 @@ def handle(spec: BotSpec, session: dict, text: str, store: Store) -> list[dict]:
 
 
 # ---------- menu ----------
-def _from_menu(spec, session, text_n, store):
+def _from_menu(spec, session, text_n, store, now):
     item = None
     m = re.fullmatch(r"m:(\d+)", text_n)
     if m and int(m.group(1)) < len(spec.menu):
@@ -221,7 +224,7 @@ def _from_menu(spec, session, text_n, store):
         return [send(block.title), _ask(block.fields[0])]
     if block.type == "booking":
         session["step"] = "slot"
-        return [send(block.title), _slot_prompt(block, store)]
+        return [send(block.title), _slot_prompt(block, store, now)]
     if block.type == "catalog_order":
         return _order_start(spec, session, block, store)
     return [menu_actions(spec)]
@@ -247,34 +250,55 @@ def _form(spec, session, block: FormBlock, text, store):
 
 
 # ---------- booking ----------
-def _remaining(block: BookingBlock, slot, store):
-    return slot.capacity - store.count(block.id, slot=slot.id, status="confirmed")
+def _remaining(block: BookingBlock, slot, store, day=None):
+    """Free places. A weekly slot is counted per date (so it resets by itself); a one-off slot counts for ever."""
+    where = {"slot": slot.id, "status": "confirmed"}
+    if day is not None:
+        where["date"] = day.isoformat()
+    return slot.capacity - store.count(block.id, **where)
 
 
-def _slot_prompt(block: BookingBlock, store):
-    buttons = []
+def _options(block: BookingBlock, now):
+    """Everything the customer can pick right now: (slot, date-or-None, button data, display name)."""
+    out = []
     for s in block.slots:
-        left = _remaining(block, s, store)
+        days = dates.next_occurrences(now, s.weekday, s.time, block.occurrences) if s.weekday is not None else [None]
+        for day in days:
+            name = s.label + (f" — {dates.jalali_str(day)}" if day else "")
+            out.append((s, day, f"s:{s.id}" + (f"@{day:%Y%m%d}" if day else ""), name))
+    return out
+
+
+def _slot_prompt(block: BookingBlock, store, now):
+    buttons = []
+    for s, day, data, name in _options(block, now):
+        left = _remaining(block, s, store, day)
         if left > 0:
-            buttons.append(_btn(f"{s.label} ({left} جای خالی)", f"s:{s.id}"))
+            buttons.append(_btn(f"{name} ({left} جای خالی)", data))
         elif block.waitlist:
-            buttons.append(_btn(f"{s.label} (تکمیل - لیست انتظار)", f"s:{s.id}"))
+            buttons.append(_btn(f"{name} (تکمیل - لیست انتظار)", data))
         else:
-            buttons.append(_btn(f"{s.label} (تکمیل)", f"s:{s.id}"))
+            buttons.append(_btn(f"{name} (تکمیل)", data))
     return send("زمان مورد نظر را انتخاب کنید:", buttons)
 
 
-def _booking(spec, session, block: BookingBlock, text, store):
+def _booking(spec, session, block: BookingBlock, text, store, now):
     text_n = norm(text)
     if session["step"] == "slot":
-        slot_id = text_n[2:] if text_n.startswith("s:") else None
-        slot = next((s for s in block.slots if s.id == slot_id or text_n.startswith(s.label)), None)
-        if slot is None:
-            return [send("لطفاً یکی از زمان‌ها را انتخاب کنید."), _slot_prompt(block, store)]
-        if _remaining(block, slot, store) <= 0 and not block.waitlist:
-            return [send(block.full_text), _slot_prompt(block, store)]
+        opts = _options(block, now)
+        # exact button data first; typed text may start with the display name or (for the nearest date) the bare label
+        # (labels are compared in normalised form: text_n has ASCII digits, labels like «ساعت ۱۰» have Persian ones)
+        pick = next((o for o in opts if text_n == o[2]), None) or next((o for o in opts if text_n.startswith(norm(o[3]))), None) \
+            or next((o for o in opts if text_n.startswith(norm(o[0].label))), None)
+        if pick is None:
+            return [send("لطفاً یکی از زمان‌ها را انتخاب کنید."), _slot_prompt(block, store, now)]
+        slot, day, _, name = pick
+        if _remaining(block, slot, store, day) <= 0 and not block.waitlist:
+            return [send(block.full_text), _slot_prompt(block, store, now)]
         session["data"]["slot"] = slot.id
-        session["data"]["slot_label"] = slot.label
+        session["data"]["slot_label"] = name
+        if day is not None:
+            session["data"]["date"] = day.isoformat()
         session["step"] = 0
         return [_ask(block.fields[0])]
     idx = session["step"]
@@ -287,8 +311,9 @@ def _booking(spec, session, block: BookingBlock, text, store):
         session["step"] = idx + 1
         return [_ask(block.fields[idx + 1])]
     slot = next(s for s in block.slots if s.id == session["data"]["slot"])
-    # re-check capacity at commit time (another user may have taken the last seat)
-    full = _remaining(block, slot, store) <= 0
+    day = date.fromisoformat(session["data"]["date"]) if "date" in session["data"] else None
+    # re-check capacity at commit time (another customer may have taken the last place meanwhile)
+    full = _remaining(block, slot, store, day) <= 0
     if full and not block.waitlist:
         _reset(session)
         return [send(block.full_text), menu_actions(spec)]

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { CapacityBar, Icon, Stamp, TestBar, fa } from "../ui";
 import {
-  BLOCK_KIND, FIELD_KIND, ago, blockTitle, humanizeDiff, readableInput, toman,
+  BLOCK_KIND, FIELD_KIND, ago, blockTitle, humanizeDiff, readableInput, toman, weeklyText,
   type Block, type Rec, type Spec, type TestRes, type Ver,
 } from "./model";
 
@@ -88,6 +88,16 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
     <>
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
         {b.slots.map((s) => {
+          const weekly = weeklyText(s);
+          if (weekly) {  // a weekly slot is counted per date, so a lifetime "used" bar would be misleading
+            return (
+              <div key={s.id} className="flex flex-col gap-1.5 rounded-xl bg-raised p-3">
+                <div className="flex justify-between gap-2 text-sm"><span>{s.label}</span><span className="text-saffron">{fa(s.capacity)} جا</span></div>
+                <span className="text-xs text-mint-fg">{weekly}</span>
+                <span className="text-xs text-mute">ظرفیت هر جلسه {fa(s.capacity)} · برای هر تاریخ جداگانه شمرده می‌شود</span>
+              </div>
+            );
+          }
           const used = mine.filter((r) => r.data.slot === s.id && r.data.status === "confirmed").length;
           return (
             <div key={s.id} className="flex flex-col gap-1.5 rounded-xl bg-raised p-3">
@@ -254,18 +264,23 @@ export function RecordsTab({ records, spec }: { records: Rec[]; spec: Spec }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-        {bookings.flatMap((b) => b.slots.map((s) => {
-          const mine = records.filter((r) => r.collection === b.id && r.data.slot === s.id);
+        {bookings.flatMap((b) => b.slots.flatMap((s) => {
+          const all = records.filter((r) => r.collection === b.id && r.data.slot === s.id);
+          // weekly slots: one card per date (capacity is per date); one-off slots: a single card
+          const groups: [string, Rec[]][] = s.weekday == null ? [[s.label, all]]
+            : all.length ? Object.entries(all.reduce<Record<string, Rec[]>>((m, r) => ((m[r.data.slot_label ?? s.label] ??= []).push(r), m), {})) : [[s.label, []]];
+          return groups.map(([title, mine]) => {
           const used = mine.filter((r) => r.data.status === "confirmed").length;
           const wait = mine.length - used;
           return (
-            <div key={b.id + s.id} className="flex flex-col gap-2 rounded-2xl border border-line bg-panel p-[18px]">
-              <span className="text-[13px] text-mute">{s.label}</span>
+            <div key={b.id + s.id + title} className="flex flex-col gap-2 rounded-2xl border border-line bg-panel p-[18px]">
+              <span className="text-[13px] text-mute">{title}</span>
               <span className="text-[28px] font-black">{fa(used)} از {fa(s.capacity)}</span>
               <CapacityBar used={used} capacity={s.capacity} />
               <span className={`text-[13px] ${wait ? "text-mint-fg" : "text-mute"}`}>{wait ? `+ ${fa(wait)} در لیست انتظار` : `${fa(Math.max(0, s.capacity - used))} جای خالی`}</span>
             </div>
           );
+          });
         }))}
         <div className="flex flex-col gap-2 rounded-2xl border border-line bg-panel p-[18px]">
           <span className="text-[13px] text-mute">همه‌ی ثبت‌ها در پیش‌نمایش</span>

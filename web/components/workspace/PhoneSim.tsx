@@ -7,7 +7,7 @@ type Msg = { from: "bot" | "me" | "admin"; text: string; buttons?: Button[] };
 const rid = () => Math.random().toString(36).slice(2, 10);
 
 const STATUS: Record<string, string> = { confirmed: "ثبت شد", waitlisted: "در لیست انتظار", new: "سفارش جدید" };
-const HIDDEN = new Set(["id", "slot", "status", "items"]);
+const HIDDEN = new Set(["id", "slot", "status", "items", "date"]);
 
 /** The engine's notification is "title\n[status] key: value\n…"; show it with the owner's own field labels, no ids. */
 function prettyAdmin(text: string, labels: Record<string, string>): string {

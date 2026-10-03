@@ -22,7 +22,7 @@ TEHRAN = ZoneInfo("Asia/Tehran")
 CSV_TYPE = "text/csv; charset=utf-8"
 XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-KEY_LABEL = {"name": "نام", "phone": "موبایل", "status": "وضعیت", "slot_label": "زمان", "items": "اقلام", "total": "جمع (تومان)"}
+KEY_LABEL = {"date": "تاریخ جلسه (میلادی)", "name": "نام", "phone": "موبایل", "status": "وضعیت", "slot_label": "زمان", "items": "اقلام", "total": "جمع (تومان)"}
 STATUS_LABEL = {"confirmed": "تأیید شده", "waitlisted": "لیست انتظار", "new": "جدید"}
 
 

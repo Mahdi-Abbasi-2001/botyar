@@ -2,7 +2,7 @@
 import { fa } from "../ui";
 
 export type Field = { key: string; label: string; kind: "text" | "phone" | "number" | "choice"; choices: string[]; required: boolean };
-export type Slot = { id: string; label: string; capacity: number };
+export type Slot = { id: string; label: string; capacity: number; weekday?: number | null; time?: string | null };
 export type Item = { id: string; name: string; price: number; options: { name: string; choices: string[] }[] };
 export type Block =
   | { type: "message"; id: string; text: string }
@@ -35,13 +35,42 @@ export function blockTitle(b: Block): string {
 export const toman = (n: number) => `${n.toLocaleString("fa-IR")} تومان`;
 
 /** Turn button data the simulator sent ("s:sat9", "m:0", "i:latte") back into the label the user tapped. */
+export const WEEKDAYS = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"]; // 0 = Saturday
+
+/** Gregorian -> Jalali (same algorithm as the backend's app/dates.py). */
+export function toJalali(gy: number, gm: number, gd: number): [number, number, number] {
+  const gdm = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+  let jy: number;
+  if (gy > 1600) { jy = 979; gy -= 1600; } else { jy = 0; gy -= 621; }
+  const gy2 = gm > 2 ? gy + 1 : gy;
+  let days = 365 * gy + Math.floor((gy2 + 3) / 4) - Math.floor((gy2 + 99) / 100) + Math.floor((gy2 + 399) / 400) - 80 + gd + gdm[gm - 1];
+  jy += 33 * Math.floor(days / 12053); days %= 12053;
+  jy += 4 * Math.floor(days / 1461); days %= 1461;
+  if (days > 365) { jy += Math.floor((days - 1) / 365); days = (days - 1) % 365; }
+  const jm = days < 186 ? 1 + Math.floor(days / 31) : 7 + Math.floor((days - 186) / 30);
+  const jd = days < 186 ? 1 + (days % 31) : 1 + ((days - 186) % 30);
+  return [jy, jm, jd];
+}
+export function jalaliFromYmd(ymd: string): string {
+  const [jy, jm, jd] = toJalali(+ymd.slice(0, 4), +ymd.slice(4, 6), +ymd.slice(6, 8));
+  return `${jy}/${String(jm).padStart(2, "0")}/${String(jd).padStart(2, "0")}`;
+}
+/** «هر هفته · پنجشنبه ساعت ۱۰:۰۰» for a weekly slot, null for a one-off. */
+export function weeklyText(s: Slot): string | null {
+  return s.weekday == null ? null : `هر هفته · ${WEEKDAYS[s.weekday]} ساعت ${s.time ?? ""}`;
+}
+
 export function readableInput(spec: Spec | null, s: string): string {
   if (s === "/start") return "شروع گفت‌وگو";
   if (!spec) return s;
   const [k, v] = [s.slice(0, 2), s.slice(2)];
   if (k === "m:") return spec.menu[+v]?.label ?? s;
   for (const b of spec.blocks) {
-    if (k === "s:" && b.type === "booking") { const x = b.slots.find((x) => x.id === v); if (x) return x.label; }
+    if (k === "s:" && b.type === "booking") {
+      const [sid, ymd] = v.split("@"); // weekly slots carry their date: "s:thu@20261008"
+      const x = b.slots.find((x) => x.id === sid);
+      if (x) return ymd && /^\d{8}$/.test(ymd) ? `${x.label} — ${jalaliFromYmd(ymd)}` : x.label;
+    }
     if (k === "i:" && b.type === "catalog_order") { const x = b.items.find((x) => x.id === v); if (x) return x.name; }
   }
   return s;
@@ -89,7 +118,7 @@ export function parseQuestions(content: string): string[] | null {
 
 // ---------- version diff → sentences ----------
 const FIELD_NAME: Record<string, string> = {
-  name: "نام ربات", welcome: "پیام خوش‌آمد", menu: "منو", waitlist: "لیست انتظار", capacity: "ظرفیت", label: "عنوان",
+  name: "نام ربات", welcome: "پیام خوش‌آمد", menu: "منو", waitlist: "لیست انتظار", capacity: "ظرفیت", weekday: "روز هفته", time: "ساعت", occurrences: "تعداد تاریخ‌های پیشنهادی", label: "عنوان",
   text: "متن", title: "عنوان", confirm_text: "پیام تأیید", full_text: "پیام تکمیل ظرفیت", waitlist_text: "پیام لیست انتظار",
   done_text: "پیام پایان فرم", price: "قیمت", min_total: "حداقل مبلغ سفارش", max_items: "حداکثر تعداد آیتم", fields: "سؤال‌های فرم",
   slots: "زمان‌ها", items: "آیتم‌ها", on: "زمان ارسال اعلان", kind: "نوع", required: "اجباری", choices: "گزینه‌ها", options: "گزینه‌ها",
