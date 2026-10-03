@@ -23,6 +23,7 @@ class ClarifyResult(BaseModel):
     questions: list[str]
     assumptions: list[str]
     summary: str
+    out_of_scope: str  # "" normally; otherwise a friendly Persian explanation when the MAIN purpose is impossible with our blocks
 
 
 class RepairResult(BaseModel):
@@ -45,6 +46,7 @@ class S(TypedDict, total=False):
     results: list[dict]
     repair_attempts: int
     outcome: str
+    decline_message: str
     questions: list[str]
     version: int
     explanation: str
@@ -74,6 +76,8 @@ class Builder:
             BuilderMessage.bot_id == self.bot_id, BuilderMessage.role == "assistant", BuilderMessage.content.like("❓%"))) or 0
         payload = f"CONVERSATION SO FAR:\n{s['history']}\n\nLATEST OWNER MESSAGE:\n{s['request']}\n\nCURRENT SPEC:\n{json.dumps(s['current'], ensure_ascii=False) if s.get('current') else 'none (new bot)'}"
         r: ClarifyResult = self.ask("clarify", prompts.CLARIFY, payload, ClarifyResult, effort="low")
+        if r.out_of_scope.strip():
+            return {"outcome": "declined", "decline_message": r.out_of_scope.strip()}
         if not r.ready and not s.get("current") and rounds < MAX_CLARIFY_ROUNDS and r.questions:
             return {"outcome": "needs_input", "questions": r.questions[:3]}
         return {"outcome": "build", "assumptions": r.assumptions, "summary": r.summary}
@@ -179,7 +183,7 @@ class Builder:
                          ("repair", self.repair), ("save", self.save), ("fail", self.fail)]:
             g.add_node(name, fn)
         g.set_entry_point("clarify")
-        g.add_conditional_edges("clarify", lambda s: END if s["outcome"] == "needs_input" else "design", {END: END, "design": "design"})
+        g.add_conditional_edges("clarify", lambda s: END if s["outcome"] in ("needs_input", "declined") else "design", {END: END, "design": "design"})
         g.add_conditional_edges("design", self.after_design, {"tests": "tests", "design": "design", "fail": "fail"})
         g.add_edge("tests", "run")
         g.add_conditional_edges("run", self.after_tests, {"save": "save", "repair": "repair"})
@@ -217,6 +221,10 @@ def run_builder(run_id: int, bot_id: int, request: str):
             msg = "❓ برای ساخت دقیق‌تر چند سؤال دارم:\n" + "\n".join(f"{i}. {q}" for i, q in enumerate(final["questions"], 1))
             db.add(BuilderMessage(bot_id=bot_id, role="assistant", content=msg))
             run.status, run.result = "needs_input", {"message": msg, "cost_usd": b.cost()}
+        elif outcome == "declined":
+            msg = final["decline_message"]
+            db.add(BuilderMessage(bot_id=bot_id, role="assistant", content=msg))
+            run.status, run.result = "declined", {"message": msg, "cost_usd": b.cost()}
         elif outcome == "done":
             res = final["results"]
             ok = sum(r["passed"] for r in res)

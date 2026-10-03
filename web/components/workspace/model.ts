@@ -19,7 +19,7 @@ export type DiffRow = { path: string; before: any; after: any };
 export type Ver = { version: number; note: string; created_at: string; diff: DiffRow[]; tests_passed: number; tests_total: number };
 export type ChatMsg = { role: "user" | "assistant"; content: string };
 export type RunResult = { message: string; version?: number; tests?: TestRes[]; cost_usd?: number };
-export type RunStatus = "running" | "needs_input" | "done" | "failed";
+export type RunStatus = "running" | "needs_input" | "done" | "failed" | "declined";
 
 export const BLOCK_KIND: Record<Block["type"], string> = {
   message: "پیام", form: "فرم", booking: "نوبت‌دهی", catalog_order: "سفارش", admin_notify: "اعلان به مدیر",
