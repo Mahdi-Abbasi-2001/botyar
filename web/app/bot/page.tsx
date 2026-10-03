@@ -54,27 +54,8 @@ function Workspace() {
     return { b, msgs };
   }, [id, loadRecords]);
 
-  const sendBuild = useCallback(async (raw: string) => {
-    const t = raw.trim();
-    if (t.length < 2 || running) return;
-    setInput("");
-    setError("");
-    setRunning(true);
-    setStamped(false);
-    setEvents([]);
-    setTab("build");
-    setChat((c) => [...c, { role: "user", content: t }]);
-    let run_id: number;
-    try {
-      ({ run_id } = await api<{ run_id: number }>(`/bots/${id}/builder`, { body: { text: t } }));
-    } catch (e: any) {
-      // the request never reached the agent: undo the optimistic message and give the text back
-      setChat((c) => c.slice(0, -1));
-      setInput(t);
-      setError(e.message);
-      setRunning(false);
-      return;
-    }
+  /** Shows the live progress of a run and finishes it (also used to resume after a refresh). */
+  const follow = useCallback(async (run_id: number) => {
     let misses = 0;
     try {
       for (let i = 0; i < 200 && alive.current; i++) {
@@ -106,14 +87,48 @@ function Workspace() {
     } finally {
       setRunning(false);
     }
-  }, [id, running, loadAll]);
+  }, [id, loadAll]);
+
+  const sendBuild = useCallback(async (raw: string) => {
+    const t = raw.trim();
+    if (t.length < 2 || running) return;
+    setInput("");
+    setError("");
+    setRunning(true);
+    setStamped(false);
+    setEvents([]);
+    setTab("build");
+    setChat((c) => [...c, { role: "user", content: t }]);
+    let run_id: number;
+    try {
+      ({ run_id } = await api<{ run_id: number }>(`/bots/${id}/builder`, { body: { text: t } }));
+    } catch (e: any) {
+      // the request never reached the agent: undo the optimistic message and give the text back
+      setChat((c) => c.slice(0, -1));
+      setInput(t);
+      setError(e.message);
+      setRunning(false);
+      return;
+    }
+    await follow(run_id);
+  }, [id, running, follow]);
 
   useEffect(() => {
     alive.current = true;
     if (!getToken()) return void router.replace("/login/");
     if (!id) return void router.replace("/bots/");
     loadAll()
-      .then(({ msgs }) => {
+      .then(async ({ msgs }) => {
+        // the agent may still be working (the page was refreshed or reopened mid-build): pick the live view back up
+        const active = await api<{ run_id: number | null; events: string[] }>(`/bots/${id}/builder/active`).catch(() => null);
+        if (active?.run_id) {
+          pendingSent.current = true;
+          setRunning(true);
+          setEvents(active.events);
+          setTab("build");
+          follow(active.run_id);
+          return;
+        }
         // a description typed on /bots: send it once, as soon as the workspace opens
         const pending = sessionStorage.getItem(PENDING_KEY(id));
         if (pending && !msgs.length && !pendingSent.current) {

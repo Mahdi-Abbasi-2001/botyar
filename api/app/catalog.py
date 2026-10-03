@@ -5,12 +5,13 @@ from __future__ import annotations
 import base64
 import csv
 import io
+import logging
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
@@ -21,6 +22,7 @@ from .db import get_db
 from .models import Bot, BotVersion, LlmCall, Product, User
 from .spec import ProductIn, ProductOption
 
+log = logging.getLogger("botyar.catalog")
 router = APIRouter()
 MAX_ROWS, MAX_FILE, MAX_IMAGES, DAILY_IMPORTS = 3000, 8_000_000, 4, 30
 
@@ -227,10 +229,32 @@ Rules: copy names exactly as written; price as an integer in TOMAN (if the page 
 
 
 def pdf_to_images(data: bytes) -> list[bytes]:
-    import fitz
+    import pymupdf
 
-    doc = fitz.open(stream=data, filetype="pdf")
-    return [doc[i].get_pixmap(dpi=110).tobytes("png") for i in range(min(len(doc), MAX_IMAGES))]
+    try:
+        doc = pymupdf.open(stream=data, filetype="pdf")
+        pages = [doc[i].get_pixmap(dpi=110).tobytes("png") for i in range(min(len(doc), MAX_IMAGES))]
+    except Exception:  # noqa: BLE001 - corrupt / encrypted / not a PDF
+        raise HTTPException(422, "فایل PDF خوانده نشد؛ فایل دیگری را امتحان کنید")
+    if not pages:
+        raise HTTPException(422, "فایل PDF صفحه‌ای ندارد")
+    return pages
+
+
+def checked_image(data: bytes) -> tuple[bytes, str]:
+    """Reject files that are not real images before spending a model call on them."""
+    from PIL import Image
+
+    try:
+        with Image.open(io.BytesIO(data)) as im:
+            fmt = (im.format or "").lower()
+            im.verify()
+    except Exception:  # noqa: BLE001
+        raise HTTPException(422, "تصویر خوانده نشد؛ عکس یا اسکرین‌شات واضح‌تری بدهید")
+    mime = {"png": "image/png", "jpeg": "image/jpeg", "webp": "image/webp", "gif": "image/gif"}.get(fmt)
+    if mime is None:
+        raise HTTPException(422, "فرمت تصویر پشتیبانی نمی‌شود؛ PNG یا JPG بدهید")
+    return data, mime
 
 
 def extract_from_images(db: Session, bot_id: int, images: list[tuple[bytes, str]]) -> Extracted:
@@ -287,9 +311,15 @@ async def preview(bot_id: int, files: list[UploadFile] = File(default=[]), text:
             if name.endswith(".pdf") or f.content_type == "application/pdf":
                 images += [(im, "image/png") for im in pdf_to_images(data)]
             else:
-                images.append((data, f.content_type if (f.content_type or "").startswith("image/") else "image/jpeg"))
+                images.append(checked_image(data))
         images = images[:MAX_IMAGES]
-        ex = extract_from_images(db, bot_id, images)
+        try:
+            ex = extract_from_images(db, bot_id, images)
+        except HTTPException:
+            raise
+        except Exception:  # noqa: BLE001 - provider error, timeout, unreadable image...
+            log.exception("vision import failed")
+            raise HTTPException(502, "خواندن تصویر ناموفق بود؛ چند لحظه بعد دوباره تلاش کنید")
         products, warnings, kind = [p.model_dump() for p in ex.products][:MAX_ROWS], list(ex.warnings), "vision"
         for pr in products:
             pr["options"] = clean_options(pr["options"])
@@ -310,7 +340,13 @@ async def preview(bot_id: int, files: list[UploadFile] = File(default=[]), text:
             rows = parse_delimited(text)
         if len(rows) < 2:
             raise HTTPException(422, "جدول باید حداقل یک سطر عنوان و یک سطر محصول داشته باشد")
-        m = map_columns(db, bot_id, rows)
+        try:
+            m = map_columns(db, bot_id, rows)
+        except HTTPException:
+            raise
+        except Exception:  # noqa: BLE001
+            log.exception("column mapping failed")
+            raise HTTPException(502, "تشخیص ستون‌ها ناموفق بود؛ چند لحظه بعد دوباره تلاش کنید")
         products, warnings = convert(rows, m)
         notes, kind = m.notes, "table"
     after = float(db.scalar(select(func.coalesce(func.sum(LlmCall.cost_usd), 0.0)).where(LlmCall.bot_id == bot_id)))
@@ -321,6 +357,15 @@ class CommitIn(BaseModel):
     block: str | None = None
     mode: Literal["replace", "append"] = "replace"
     products: list[ProductIn] = Field(max_length=MAX_ROWS)
+
+    @model_validator(mode="after")
+    def _sizes(self):
+        for i, p in enumerate(self.products, 1):
+            if not p.name.strip() or len(p.name) > 300 or len(p.category) > 120 or len(p.description) > 1000:
+                raise ValueError(f"محصول {i}: نام باید ۱ تا ۳۰۰، دسته حداکثر ۱۲۰ و توضیح حداکثر ۱۰۰۰ نویسه باشد")
+            if len(p.options) > 10 or any(len(o.name) > 60 or len(o.choices) > 60 or any(len(c) > 80 for c in o.choices) for o in p.options):
+                raise ValueError(f"محصول {i}: گزینه‌ها بیش از حد بلند یا زیاد است")
+        return self
 
 
 @router.post("/api/bots/{bot_id}/catalog/commit")

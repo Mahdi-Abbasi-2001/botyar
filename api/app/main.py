@@ -17,9 +17,29 @@ from .store import SqlStore
 from .templates import TEMPLATES, load_template
 
 
+INTERRUPTED = {"message": "ساخت بر اثر راه‌اندازی دوباره‌ی سرور متوقف شد. لطفاً درخواستتان را دوباره بفرستید."}
+RUN_TIMEOUT_MIN = 6  # a normal run takes well under a minute
+
+
+def _fail_interrupted_runs(older_than_min: int = 0):
+    """A restart kills background threads and leaves runs 'running' forever; that would lock the bot out of the agent."""
+    from datetime import datetime, timedelta, timezone
+
+    from .db import SessionLocal
+
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=older_than_min)
+    with SessionLocal() as db:
+        for r in db.scalars(select(BuilderRun).where(BuilderRun.status == "running")):
+            created = r.created_at if r.created_at.tzinfo else r.created_at.replace(tzinfo=timezone.utc)
+            if created <= cutoff:
+                r.status, r.result = "failed", INTERRUPTED
+        db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app):
     Base.metadata.create_all(engine)
+    _fail_interrupted_runs()
     import threading
 
     from .bale import ensure_shared_webhook
@@ -28,7 +48,9 @@ async def lifespan(app):
     yield
 
 
-app = FastAPI(title="Botyar", lifespan=lifespan)
+_prod = bool(settings.public_base_url)  # production: do not publish the API schema / interactive docs
+app = FastAPI(title="Botyar", lifespan=lifespan, docs_url=None if _prod else "/docs", redoc_url=None if _prod else "/redoc",
+              openapi_url=None if _prod else "/openapi.json")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in settings.cors_origins.split(",")],
@@ -203,6 +225,7 @@ def builder_send(bot_id: int, body: BuilderIn, tasks: BackgroundTasks, user: Use
     from datetime import datetime, timedelta, timezone
 
     bot = own_bot(bot_id, user, db)
+    _fail_interrupted_runs(RUN_TIMEOUT_MIN)
     running = db.scalar(select(BuilderRun).where(BuilderRun.bot_id == bot.id, BuilderRun.status == "running"))
     if running:
         raise HTTPException(409, "ایجنت هنوز در حال کار روی درخواست قبلی است")
@@ -226,6 +249,15 @@ def builder_run(bot_id: int, run_id: int, user: User = Depends(current_user), db
     if not run or run.bot_id != bot_id:
         raise HTTPException(404, "اجرا یافت نشد")
     return {"id": run.id, "status": run.status, "events": run.events, "result": run.result}
+
+
+@app.get("/api/bots/{bot_id}/builder/active")
+def builder_active(bot_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Lets the page resume the live progress view after a refresh or when reopening the bot mid-build."""
+    own_bot(bot_id, user, db)
+    _fail_interrupted_runs(RUN_TIMEOUT_MIN)
+    run = db.scalar(select(BuilderRun).where(BuilderRun.bot_id == bot_id, BuilderRun.status == "running").order_by(BuilderRun.id.desc()))
+    return {"run_id": run.id if run else None, "events": run.events if run else []}
 
 
 @app.get("/api/bots/{bot_id}/builder/messages")

@@ -132,11 +132,22 @@ def unpublish(bot_id: int, user: User = Depends(current_user), db: Session = Dep
 
 
 # ---------- webhooks (Bale has no webhook secret header, so the secret is in the URL) ----------
+async def _json(request: Request) -> dict:
+    try:
+        data = await request.json()
+    except Exception:  # noqa: BLE001
+        raise HTTPException(400, "bad json")
+    if not isinstance(data, dict):
+        raise HTTPException(400, "bad json")
+    return data
+
+
+
 @router.post("/api/hook/shared/{secret}")
 async def hook_shared(secret: str, request: Request, tasks: BackgroundTasks):
     if not hmac.compare_digest(secret, bale.shared_hook_secret()):
         raise HTTPException(404)
-    tasks.add_task(bale.process_update, "shared", None, await request.json())
+    tasks.add_task(bale.process_update, "shared", None, await _json(request))
     return {"ok": True}
 
 
@@ -145,5 +156,5 @@ async def hook_own(pub_id: int, secret: str, request: Request, tasks: Background
     pub = db.get(Publication, pub_id)
     if pub is None or pub.mode != "own" or not hmac.compare_digest(secret, pub.hook_secret):
         raise HTTPException(404)
-    tasks.add_task(bale.process_update, "own", pub.id, await request.json())
+    tasks.add_task(bale.process_update, "own", pub.id, await _json(request))
     return {"ok": True}

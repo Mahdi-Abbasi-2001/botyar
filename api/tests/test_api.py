@@ -81,3 +81,52 @@ def test_register_is_rate_limited_per_ip_and_global_run_cap(monkeypatch):
     monkeypatch.setattr(settings, "global_daily_runs", 0)
     r = c.post(f"/api/bots/{bot}/builder", json={"text": "سلام ربات"}, headers=H)
     assert r.status_code == 503 and "ظرفیت" in r.json()["detail"]
+
+
+def test_interrupted_agent_run_does_not_lock_the_bot():
+    """A server restart kills the agent thread; the run must not stay 'running' and block the bot forever."""
+    from datetime import datetime, timedelta, timezone
+
+    from app.db import SessionLocal
+    from app.models import BuilderRun
+
+    c = TestClient(app)
+    tok = c.post("/api/auth/register", json={"email": "stuck@b.com", "password": "123456"}).json()["token"]
+    H = {"Authorization": f"Bearer {tok}"}
+    bot = c.post("/api/bots/draft", headers=H).json()["id"]
+    with SessionLocal() as db:
+        db.add(BuilderRun(bot_id=bot, status="running", events=[], result={}, created_at=datetime.now(timezone.utc) - timedelta(hours=2)))
+        db.commit()
+    # (the agent itself is not started here: only the lock matters, so use a text the request validator accepts and stop at 200)
+    from app import agent, main
+    orig = main.run_builder
+    main.run_builder = lambda *a, **k: None
+    try:
+        r = c.post(f"/api/bots/{bot}/builder", json={"text": "یک ربات می‌خوام"}, headers=H)
+    finally:
+        main.run_builder = orig
+    assert r.status_code == 200
+    # while a *fresh* run is in flight the second request is still refused
+    r2 = c.post(f"/api/bots/{bot}/builder", json={"text": "یک ربات دیگر"}, headers=H)
+    assert r2.status_code == 409
+
+
+def test_active_run_endpoint_lets_the_page_resume_after_a_refresh():
+    from app import main
+    from app.db import SessionLocal
+    from app.models import BuilderRun
+
+    c = TestClient(app)
+    tok = c.post("/api/auth/register", json={"email": "resume@b.com", "password": "123456"}).json()["token"]
+    H = {"Authorization": f"Bearer {tok}"}
+    bot = c.post("/api/bots/draft", headers=H).json()["id"]
+    assert c.get(f"/api/bots/{bot}/builder/active", headers=H).json() == {"run_id": None, "events": []}
+    with SessionLocal() as db:
+        run = BuilderRun(bot_id=bot, status="running", events=["در حال طراحی ساختار ربات…"], result={})
+        db.add(run)
+        db.commit()
+        rid = run.id
+    got = c.get(f"/api/bots/{bot}/builder/active", headers=H).json()
+    assert got["run_id"] == rid and got["events"] == ["در حال طراحی ساختار ربات…"]
+    other = c.post("/api/auth/register", json={"email": "resume2@b.com", "password": "123456"}).json()["token"]
+    assert c.get(f"/api/bots/{bot}/builder/active", headers={"Authorization": f"Bearer {other}"}).status_code == 404

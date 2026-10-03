@@ -136,3 +136,21 @@ def test_browse_navigation_is_marked_for_in_place_edit_but_typed_input_is_not():
     say(st, sess, "c:0")
     assert say(st, sess, "پیراهن")[0].get("edit") is None         # typed search: nothing to edit, new message
     assert say(st, sess, "p:1")[0].get("edit") is None            # opening a product starts a new question
+
+
+def test_same_limited_product_twice_in_one_cart_cannot_oversell():
+    """Found by the fuzz test: two cart lines of a stock-1 product used to drive stock to -1."""
+    st, sess = store(), new_session()                      # product 10 has stock 0; product 7 (مانتو) has stock 2
+    say(st, sess, "/start", "m:0", "c:1", "p:7", "n:2")    # all remaining stock goes into the cart
+    out = say(st, sess, "more", "p:7")                     # trying to add it again is refused politely
+    assert "در سبد شماست" in see(out)
+    # defence in depth: even if two lines for the same product reach checkout, reservation is all-or-nothing on the total
+    assert st.reserve("shop", [(7, 2), (7, 1)]) == [7] and st.product("shop", 7)["stock"] == 2
+    assert st.reserve("shop", [(7, 1), (7, 1)]) == [] and st.product("shop", 7)["stock"] == 0
+
+
+def test_quantity_prompt_counts_what_is_already_in_the_cart():
+    st, sess = store(), new_session()
+    say(st, sess, "/start", "m:0", "c:1", "p:7", "n:1", "more", "p:7")  # stock 2, one already in the cart
+    out = say(st, sess, "n:2")
+    assert "حداکثر 1 عدد دیگر" in see(out)

@@ -47,11 +47,12 @@ class SqlStore:
 
     def reserve(self, block_id, lines):
         """All-or-nothing stock check. The sandbox checks but never decrements, so testing can't deplete live stock."""
+        need = engine.total_per_product(lines)  # the same product on two cart lines must be checked as one quantity
         rows = {p.id: p for p in self.db.scalars(select(Product).where(Product.bot_id == self.bot_id, Product.block_id == block_id,
-                                                                       Product.id.in_([pid for pid, _ in lines])))}
-        failed = [pid for pid, qty in lines if pid not in rows or (rows[pid].stock is not None and rows[pid].stock < qty)]
+                                                                       Product.id.in_(list(need))))}
+        failed = [pid for pid, qty in need.items() if pid not in rows or (rows[pid].stock is not None and rows[pid].stock < qty)]
         if not failed and not self.sandbox:
-            for pid, qty in lines:
+            for pid, qty in need.items():
                 if rows[pid].stock is not None:
                     rows[pid].stock -= qty
             self.db.flush()

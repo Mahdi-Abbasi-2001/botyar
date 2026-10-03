@@ -6,12 +6,15 @@ Actions: {"type": "send", "text", "buttons": [{"text","data"}]} | {"type": "noti
 from __future__ import annotations
 
 import re
+import logging
 import math
 from typing import Any, Protocol
 
 from .spec import BotSpec, BookingBlock, CatalogOrderBlock, FormBlock, FormField, MessageBlock
 
 _DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+log = logging.getLogger("botyar.engine")
+STALE_RESETS = {"count": 0}  # tests assert this stays 0 unless a bot really changed under a conversation
 MENU_WORDS = {"/start", "/menu", "منو", "منوی اصلی", "شروع"}
 CANCEL_WORDS = {"/cancel", "انصراف", "لغو"}
 
@@ -48,6 +51,13 @@ def catalog_categories(rows: list[dict]) -> list[str]:
 def catalog_filter(rows: list[dict], category: str | None, query: str | None) -> list[dict]:
     q = fa_norm(query) if query else ""
     return [r for r in rows if (not category or r.get("category") == category) and (not q or q in fa_norm(r["name"]))]
+
+
+def total_per_product(lines: list[tuple[int, int]]) -> dict[int, int]:
+    need: dict[int, int] = {}
+    for pid, qty in lines:
+        need[pid] = need.get(pid, 0) + qty
+    return need
 
 
 class Store(Protocol):
@@ -87,9 +97,10 @@ class MemoryStore:
 
     def reserve(self, block_id, lines):
         rows = {p["id"]: p for p in self.catalog.get(block_id, [])}
-        failed = [pid for pid, qty in lines if pid not in rows or (rows[pid]["stock"] is not None and rows[pid]["stock"] < qty)]
+        need = total_per_product(lines)  # the same product on two cart lines must be checked as one quantity
+        failed = [pid for pid, qty in need.items() if pid not in rows or (rows[pid]["stock"] is not None and rows[pid]["stock"] < qty)]
         if not failed:
-            for pid, qty in lines:
+            for pid, qty in need.items():
                 if rows[pid]["stock"] is not None:
                     rows[pid]["stock"] -= qty
         return failed
@@ -173,13 +184,21 @@ def handle(spec: BotSpec, session: dict, text: str, store: Store) -> list[dict]:
     if session["block"] is None:
         return _from_menu(spec, session, text_n, store)
 
-    block = spec.block(session["block"])
-    if block.type == "form":
-        return _form(spec, session, block, text, store)
-    if block.type == "booking":
-        return _booking(spec, session, block, text, store)
-    if block.type == "catalog_order":
-        return _order(spec, session, block, text, store)
+    try:
+        block = spec.block(session["block"])
+        if block.type == "form":
+            return _form(spec, session, block, text, store)
+        if block.type == "booking":
+            return _booking(spec, session, block, text, store)
+        if block.type == "catalog_order":
+            return _order(spec, session, block, text, store)
+    except (StopIteration, IndexError, KeyError) as e:
+        # The saved state belongs to an older version of the bot (the owner republished mid-conversation:
+        # a block, field, slot or option it points to is gone). Never leave the customer in silence.
+        STALE_RESETS["count"] += 1
+        log.warning("stale chat state reset (%s: %s)", type(e).__name__, e)
+        _reset(session)
+        return [menu_actions(spec, "ربات همین الان به‌روزرسانی شد، برای همین باید از اول شروع کنیم. از منوی زیر ادامه دهید:")]
     _reset(session)
     return [menu_actions(spec)]
 
@@ -294,8 +313,13 @@ def _item_prompt(block: CatalogOrderBlock):
     return send("آیتم مورد نظر را انتخاب کنید:", [_btn(f"{i.name} - {i.price:,} تومان", f"i:{i.id}") for i in block.items])
 
 
+def _short(text: str, n: int = 38) -> str:
+    text = " ".join(str(text).split())
+    return text if len(text) <= n else text[: n - 1].rstrip() + "…"
+
+
 def _cat_prompt(block, store, edit=False):
-    buttons = [_btn(c, f"c:{i}") for i, c in enumerate(store.categories(block.id))]
+    buttons = [_btn(_short(c), f"c:{i}") for i, c in enumerate(store.categories(block.id))]
     buttons += [_btn("همه‌ی محصولات", "all"), _btn("🔎 جستجو", "search")]
     return send("دسته‌بندی را انتخاب کنید:", buttons, edit)
 
@@ -313,7 +337,7 @@ def _list_prompt(block, store, d, edit=False):
         items, _ = store.products(block.id, cat, q, page * PAGE, PAGE)
     d["_page"] = page
     head = f"نتیجه‌ی جستجو برای «{q}»" if q else (cat or "همه‌ی محصولات")
-    buttons = [_btn(f"{p['name']} - {p['price']:,} تومان", f"p:{p['id']}") for p in items]
+    buttons = [_btn(f"{_short(p['name'])} - {p['price']:,} تومان", f"p:{p['id']}") for p in items]
     if page > 0:
         buttons.append(_btn("‹ قبلی", f"pg:{page - 1}"))
     if page + 1 < pages:
@@ -384,8 +408,11 @@ def _pick_product(session, block, store, pid):
     p = store.product(block.id, pid)
     if p is None:
         return [send("این محصول دیگر موجود نیست."), _list_prompt(block, store, d)]
+    in_cart = sum(c.get("qty", 1) for c in d.get("_cart", []) if c["id"] == p["id"])
     if p["stock"] is not None and p["stock"] <= 0:
         return [send(f"«{p['name']}» فعلاً موجود نیست."), _list_prompt(block, store, d)]
+    if p["stock"] is not None and in_cart >= p["stock"]:
+        return [send(f"همه‌ی موجودی «{p['name']}» ({p['stock']} عدد) همین الان در سبد شماست."), _list_prompt(block, store, d)]
     d["_pending"] = {"id": p["id"], "name": p["name"], "price": p["price"], "options": {}, "stock": p["stock"],
                      "_groups": [[o["name"], o["choices"]] for o in p["options"] if o["choices"]]}
     d["_opt_idx"] = 0
@@ -460,11 +487,12 @@ def _order(spec, session, block: CatalogOrderBlock, text, store):
         m = re.fullmatch(r"(?:n:)?(\d+)", text_n)
         n = int(m.group(1)) if m else 0
         stock = d["_pending"].get("stock")
-        top = min(99, stock) if stock is not None else 99
+        already = sum(c.get("qty", 1) for c in d["_cart"] if c["id"] == d["_pending"]["id"])
+        top = min(99, stock - already) if stock is not None else 99
         if n < 1:
             return [send("لطفاً تعداد را به صورت عدد وارد کنید."), _qty_prompt(d["_pending"])]
         if n > top:
-            return [send(f"حداکثر موجودی این محصول {top} عدد است."), _qty_prompt(d["_pending"])]
+            return [send(f"حداکثر {top} عدد دیگر از این محصول موجود است." if already else f"حداکثر موجودی این محصول {top} عدد است."), _qty_prompt(d["_pending"])]
         return _add_to_cart(session, block, n)
 
     if step == "more":
