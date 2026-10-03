@@ -157,7 +157,7 @@ def test_next_page_edits_the_clicked_message_but_typed_text_sends_new(env):
     methods = [m for m, _ in calls]
     assert "editMessageText" in methods and "sendMessage" not in methods
     edit = next(p for m, p in calls if m == "editMessageText")
-    assert edit["message_id"] == 4242 and "صفحه 2" in edit["text"]
+    assert edit["message_id"] == 4242 and "صفحه ۲" in edit["text"]
 
     calls.clear()
     c.post(url, json=msg(777, "کالا 3"))                   # typed search: nothing to edit
@@ -180,3 +180,37 @@ def test_edit_failure_falls_back_to_a_new_message():
     finally:
         bale.api_call = orig
     assert sent == ["editMessageText", "sendMessage"]
+
+
+def test_customers_see_persian_digits_but_callback_data_stays_ascii(env):
+    c, calls = env
+    tok = c.post("/api/auth/register", json={"email": "dg@x.com", "password": "123456"}).json()["token"]
+    H = {"Authorization": f"Bearer {tok}"}
+    bot = c.post("/api/bots", json={"template": "workshop"}, headers=H).json()["id"]
+    code = c.post(f"/api/bots/{bot}/publish", json={"mode": "shared"}, headers=H).json()["code"]
+    url = f"/api/hook/shared/{bale.shared_hook_secret()}"
+    c.post(url, json=msg(333, code))
+    c.post(url, json=cb(333, "m:0"))
+    last = sent(calls, 333)[-1]
+    buttons = [b[0] for b in last["reply_markup"]["inline_keyboard"]]
+    assert any("۱۲ جای خالی" in b["text"] for b in buttons) and not any(ch in b["text"] for b in buttons for ch in "0123456789")
+    assert [b["callback_data"] for b in buttons] == ["s:thu1", "s:thu2"]  # engine input is untouched
+    c.post(url, json=cb(333, "s:thu1"))
+    c.post(url, json=msg(333, "علی"))
+    c.post(url, json=msg(333, "09123456789"))              # the customer's own typing is stored as typed
+    assert c.get(f"/api/bots/{bot}/records?sandbox=false", headers=H).json()[0]["data"]["phone"] == "09123456789"
+
+
+def test_owner_notification_keeps_phone_digits_as_typed(env):
+    c, calls = env
+    tok = c.post("/api/auth/register", json={"email": "nt@x.com", "password": "123456"}).json()["token"]
+    H = {"Authorization": f"Bearer {tok}"}
+    bot = c.post("/api/bots", json={"template": "workshop"}, headers=H).json()["id"]
+    st = c.post(f"/api/bots/{bot}/publish", json={"mode": "shared"}, headers=H).json()
+    url = f"/api/hook/shared/{bale.shared_hook_secret()}"
+    c.post(url, json=msg(555, f"/admin {st['admin_code']}"))
+    c.post(url, json=msg(556, st["code"]))
+    for step in [cb(556, "m:0"), cb(556, "s:thu1"), msg(556, "علی"), msg(556, "09123456789")]:
+        c.post(url, json=step)
+    note = sent(calls, 555)[-1]["text"]
+    assert "09123456789" in note and "۰۹۱۲" not in note

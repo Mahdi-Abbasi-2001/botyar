@@ -110,7 +110,7 @@ def to_markup(buttons: list[dict], cb: dict) -> dict:
             key = f"~{len(cb)}"
             cb[key] = data
             data = key
-        rows.append([{"text": b["text"], "callback_data": data}])
+        rows.append([{"text": engine.fa_digits(b["text"]), "callback_data": data}])
     return {"inline_keyboard": rows}
 
 
@@ -120,7 +120,7 @@ def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_
         try:
             if a["type"] == "send" and n == 0 and a.get("edit") and edit_message_id:
                 # in-place navigation (e.g. next page): edit the clicked message; fall back to a new message if Bale refuses
-                payload = {"chat_id": chat_id, "message_id": edit_message_id, "text": a["text"][:4096] or "…"}
+                payload = {"chat_id": chat_id, "message_id": edit_message_id, "text": engine.fa_digits(a["text"])[:4096] or "…"}
                 if a.get("buttons"):
                     payload["reply_markup"] = to_markup(a["buttons"], cb)
                 try:
@@ -132,7 +132,7 @@ def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_
                     api_call(token, "sendMessage", payload)
                     continue
             if a["type"] == "send":
-                payload = {"chat_id": chat_id, "text": a["text"][:4096] or "…"}
+                payload = {"chat_id": chat_id, "text": engine.fa_digits(a["text"])[:4096] or "…"}
                 if a.get("buttons"):
                     payload["reply_markup"] = to_markup(a["buttons"], cb)
                 api_call(token, "sendMessage", payload)

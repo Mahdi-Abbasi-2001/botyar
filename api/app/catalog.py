@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from . import engine, llm
 from .auth import current_user
+from .config import settings
 from .db import get_db
 from .models import Bot, BotVersion, LlmCall, Product, User
 from .spec import ProductIn, ProductOption
@@ -267,6 +268,9 @@ async def preview(bot_id: int, files: list[UploadFile] = File(default=[]), text:
     _block(bot_id, None, db)
     if _imports_today(user, db) >= DAILY_IMPORTS:
         raise HTTPException(429, "سقف واردسازی روزانه پر شده است")
+    since = datetime.now(timezone.utc) - timedelta(hours=24)
+    if (db.scalar(select(func.count()).select_from(LlmCall).where(LlmCall.step.in_(["catalog_map", "catalog_vision"]), LlmCall.created_at >= since)) or 0) >= settings.global_daily_imports:
+        raise HTTPException(503, "ظرفیت امروز واردسازی تکمیل شده است؛ فردا دوباره تلاش کنید")
     if not files and not text.strip():
         raise HTTPException(400, "یک فایل انتخاب کنید یا جدول را پیست کنید")
     from_vision = bool(files) and any((f.content_type or "").startswith("image/") or (f.filename or "").lower().endswith((".pdf", ".png", ".jpg", ".jpeg", ".webp")) for f in files)

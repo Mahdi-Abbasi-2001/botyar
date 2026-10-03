@@ -16,6 +16,14 @@ MENU_WORDS = {"/start", "/menu", "منو", "منوی اصلی", "شروع"}
 CANCEL_WORDS = {"/cancel", "انصراف", "لغو"}
 
 
+_TO_FA = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+
+
+def fa_digits(text: str) -> str:
+    """Display form for customers: ASCII digits -> Persian digits. Applied by the channels (never to callback data)."""
+    return (text or "").translate(_TO_FA)
+
+
 def norm(text: str) -> str:
     return (text or "").translate(_DIGITS).strip()
 

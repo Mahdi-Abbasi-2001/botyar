@@ -1,5 +1,6 @@
 "use client";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PENDING_KEY, api, getToken } from "@/lib/api";
 import { ErrorNote, Icon, Logo, fa } from "@/components/ui";
@@ -131,7 +132,14 @@ function Workspace() {
     setTimeout(() => inputRef.current?.focus(), 50);
   }
 
-  if (!bot) return <main className="p-10 text-center text-mute">{error || "در حال بارگذاری…"}</main>;
+  if (!bot) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-10 text-center">
+        <p className={error ? "text-lg font-bold" : "text-mute"}>{error || "در حال بارگذاری…"}</p>
+        {error && <Link href="/bots/" className="min-h-11 rounded-xl bg-saffron px-5 py-2.5 font-bold text-ink">بازگشت به ربات‌های من</Link>}
+      </main>
+    );
+  }
   const spec = bot.spec;
   const passed = tests.filter((t) => t.passed).length;
   const hasCatalog = !!spec?.blocks?.some((b: any) => b.type === "catalog_order" && b.source === "table");

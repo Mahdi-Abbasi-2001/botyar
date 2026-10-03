@@ -28,7 +28,7 @@ export const FIELD_KIND: Record<Field["kind"], string> = { text: "متن", phone
 
 export function blockTitle(b: Block): string {
   if (b.type === "message") return b.text.length > 36 ? b.text.slice(0, 36) + "…" : b.text;
-  if (b.type === "admin_notify") return "اعلان به مدیر";
+  if (b.type === "admin_notify") return b.text?.trim() || "اعلان به مدیر";
   return b.title;
 }
 

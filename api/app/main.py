@@ -1,7 +1,7 @@
 import copy
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import delete, func, select
@@ -48,8 +48,23 @@ class Credentials(BaseModel):
     password: str = Field(min_length=6, max_length=128)
 
 
+_reg_hits: dict[str, list[float]] = {}
+
+
+def client_ip(request: Request) -> str:
+    xff = request.headers.get("x-forwarded-for", "")
+    return xff.split(",")[-1].strip() if xff else (request.client.host if request.client else "?")  # rightmost = added by our proxy
+
+
 @app.post("/api/auth/register")
-def register(body: Credentials, db: Session = Depends(get_db)):
+def register(body: Credentials, request: Request, db: Session = Depends(get_db)):
+    import time
+
+    ip, now_ = client_ip(request), time.time()
+    hits = [t for t in _reg_hits.get(ip, []) if now_ - t < 3600]
+    if len(hits) >= settings.register_per_ip_hour:
+        raise HTTPException(429, "تعداد ثبت‌نام از این شبکه زیاد بوده؛ کمی بعد دوباره تلاش کنید")
+    _reg_hits[ip] = hits + [now_]
     email = body.email.lower()
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(409, "این ایمیل قبلاً ثبت شده است")
@@ -195,6 +210,8 @@ def builder_send(bot_id: int, body: BuilderIn, tasks: BackgroundTasks, user: Use
     used = db.scalar(select(func.count()).select_from(BuilderRun).join(Bot, Bot.id == BuilderRun.bot_id).where(Bot.user_id == user.id, BuilderRun.created_at >= since))
     if used >= DAILY_RUN_LIMIT:
         raise HTTPException(429, "سقف درخواست‌های روزانه پر شده است؛ فردا دوباره تلاش کنید")
+    if db.scalar(select(func.count()).select_from(BuilderRun).where(BuilderRun.created_at >= since)) >= settings.global_daily_runs:
+        raise HTTPException(503, "ظرفیت امروز ایجنت تکمیل شده است؛ فردا دوباره تلاش کنید")
     run = BuilderRun(bot_id=bot.id, status="running", events=[], result={})
     db.add(run)
     db.commit()

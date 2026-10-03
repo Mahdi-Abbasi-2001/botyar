@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type Action, type Button } from "@/lib/api";
-import { Icon } from "../ui";
+import { Icon, fa } from "../ui";
 
 type Msg = { from: "bot" | "me" | "admin"; text: string; buttons?: Button[] };
 const rid = () => Math.random().toString(36).slice(2, 10);
@@ -100,7 +100,7 @@ export function PhoneSim({ botId, version, labels, onActivity, className = "" }:
               : m.from === "admin" ? "rounded-xl border border-amber-line bg-amber-bg text-amber-fg"
               : "rounded-[14px_14px_14px_4px] bg-raised"}`}>
               {m.from === "admin" && <div className="mb-0.5 flex items-center gap-1.5 text-xs font-bold"><Icon name="bell" size={14} /> اعلان به مدیر</div>}
-              {m.from === "admin" ? prettyAdmin(m.text, labels) : m.text}
+              {m.from === "admin" ? prettyAdmin(m.text, labels) : m.from === "bot" ? fa(m.text) : m.text}
             </div>
             {m.buttons && m.buttons.length > 0 && (
               <div className="flex flex-col gap-1.5">
@@ -109,7 +109,7 @@ export function PhoneSim({ botId, version, labels, onActivity, className = "" }:
                   return (
                     <button key={b.data} disabled={busy} onClick={() => send(b.data, b.text)}
                       className={`min-h-10 rounded-[10px] border px-2.5 py-1.5 text-[13px] disabled:opacity-50 ${full ? "border-line-2 text-dim" : "border-line-3 hover:border-saffron hover:text-saffron"}`}>
-                      {b.text}
+                      {fa(b.text)}
                     </button>
                   );
                 })}

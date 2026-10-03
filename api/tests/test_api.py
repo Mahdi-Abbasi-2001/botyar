@@ -60,3 +60,24 @@ def test_two_option_groups_in_a_row_survive_persistence():
     assert any("سفارش شما ثبت شد" in a["text"] for a in last["actions"])
     rec = c.get(f"/api/bots/{bid}/records?sandbox=true", headers=H).json()[0]["data"]
     assert rec["items"][0]["options"] == {"سایز": "M", "رنگ": "مشکی"}
+
+
+def test_register_is_rate_limited_per_ip_and_global_run_cap(monkeypatch):
+    from app.config import settings
+    from app import main
+
+    main._reg_hits.clear()
+    monkeypatch.setattr(settings, "register_per_ip_hour", 2)
+    c = TestClient(app)
+    h = {"x-forwarded-for": "9.9.9.9"}
+    codes = [c.post("/api/auth/register", json={"email": f"rl{i}@b.com", "password": "123456"}, headers=h).status_code for i in range(3)]
+    assert codes == [200, 200, 429]
+    # a different IP is unaffected
+    assert c.post("/api/auth/register", json={"email": "rl9@b.com", "password": "123456"}, headers={"x-forwarded-for": "8.8.8.8"}).status_code == 200
+
+    tok = c.post("/api/auth/login", json={"email": "rl0@b.com", "password": "123456"}).json()["token"]
+    H = {"Authorization": f"Bearer {tok}"}
+    bot = c.post("/api/bots/draft", headers=H).json()["id"]
+    monkeypatch.setattr(settings, "global_daily_runs", 0)
+    r = c.post(f"/api/bots/{bot}/builder", json={"text": "سلام ربات"}, headers=H)
+    assert r.status_code == 503 and "ظرفیت" in r.json()["detail"]
