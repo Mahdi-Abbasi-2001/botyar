@@ -5,7 +5,7 @@ import "./globals.css";
 const vazir = localFont({ src: "./fonts/Vazirmatn.woff2", variable: "--font-vazir", weight: "100 900", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "بات‌ساز | ساخت ربات بله با گفتگو",
+  title: "بات‌یار | ساخت ربات بله با گفتگو",
   description: "ربات خود را به زبان فارسی توضیح دهید؛ ایجنت آن را می‌سازد، تست می‌کند و منتشر می‌کند.",
 };
 

@@ -34,7 +34,7 @@ export default function Bots() {
   return (
     <main className="mx-auto max-w-4xl px-5 py-6">
       <header className="mb-8 flex items-center justify-between">
-        <Link href="/" className="text-xl font-extrabold text-indigo-700">بات‌ساز</Link>
+        <Link href="/" className="text-xl font-extrabold text-indigo-700">بات‌یار</Link>
         <button onClick={() => { setToken(null); router.push("/"); }} className="text-sm text-slate-500 hover:text-slate-800">خروج</button>
       </header>
       {error && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}

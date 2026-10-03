@@ -22,7 +22,7 @@ async def lifespan(app):
     yield
 
 
-app = FastAPI(title="BuildX Bot Builder", lifespan=lifespan)
+app = FastAPI(title="Botyar", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in settings.cors_origins.split(",")],

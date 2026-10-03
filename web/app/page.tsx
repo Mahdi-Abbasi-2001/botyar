@@ -11,7 +11,7 @@ export default function Home() {
   return (
     <main>
       <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
-        <span className="text-xl font-extrabold text-indigo-700">بات‌ساز</span>
+        <span className="text-xl font-extrabold text-indigo-700">بات‌یار</span>
         <Link href="/login/" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
           ورود / ثبت‌نام
         </Link>

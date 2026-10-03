@@ -28,7 +28,7 @@ export default function Login() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-5">
-      <h1 className="mb-1 text-center text-2xl font-extrabold text-indigo-700">بات‌ساز</h1>
+      <h1 className="mb-1 text-center text-2xl font-extrabold text-indigo-700">بات‌یار</h1>
       <p className="mb-6 text-center text-sm text-slate-500">{mode === "register" ? "ساخت حساب جدید" : "ورود به حساب"}</p>
       <form onSubmit={submit} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <input dir="ltr" type="email" required placeholder="ایمیل" value={email} onChange={(e) => setEmail(e.target.value)}
