@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { fa } from "@/components/ui";
+import { ExportButtons } from "@/components/workspace/ExportButtons";
 
 type Pub = {
   published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string; webhooks_enabled: boolean;
@@ -128,7 +129,9 @@ export function PublishTab({ botId }: { botId: string }) {
           </div>
 
           <div className={card}>
-            <div className="mb-2 flex items-center justify-between"><h3 className="font-bold">ثبت‌های واقعی ({fa(live.length)})</h3><button onClick={load} className="text-sm text-saffron">تازه‌سازی</button></div>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold">ثبت‌های واقعی ({fa(live.length)})</h3>
+              <span className="flex items-center gap-3"><button onClick={load} className="text-sm text-saffron">تازه‌سازی</button>
+                {live.length > 0 && <ExportButtons path={`/bots/${botId}/export/records`} name="records" onError={setError} />}</span></div>
             {live.length === 0 ? <p className="text-sm text-mute">هنوز مشتری واقعی ثبتی انجام نداده است.</p> : (
               <ul className="space-y-2">
                 {live.slice(0, 20).map((r) => (

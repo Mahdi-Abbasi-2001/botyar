@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, apiUpload } from "@/lib/api";
 import { fa } from "@/components/ui";
+import { ExportButtons } from "@/components/workspace/ExportButtons";
 
 type Opt = { name: string; choices: string[] };
 type Prod = { id: number; name: string; category: string; price: number; stock: number | null; options: Opt[]; description: string; is_sample: boolean };
@@ -133,7 +134,10 @@ export function CatalogTab({ botId }: { botId: string }) {
       )}
 
       <div className={card}>
-        <h3 className="mb-3 font-bold">محصولات ({fa(cat.total)}){cat.total > cat.products.length && <span className="text-sm font-normal text-mute"> — {fa(cat.products.length)} مورد اول</span>}</h3>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-bold">محصولات ({fa(cat.total)}){cat.total > cat.products.length && <span className="text-sm font-normal text-mute"> — {fa(cat.products.length)} مورد اول در این جدول</span>}</h3>
+          {cat.total > 0 && <ExportButtons path={`/bots/${botId}/export/products`} name="products" onError={setError} />}
+        </div>
         {cat.products.length === 0 ? <p className="text-sm text-mute">هنوز محصولی ثبت نشده است.</p> : (
           <div className="overflow-auto">
             <table className="w-full text-sm">

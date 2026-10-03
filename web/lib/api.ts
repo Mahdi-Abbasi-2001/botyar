@@ -64,3 +64,22 @@ export async function apiUpload<T = any>(path: string, form: FormData): Promise<
   if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "خطایی رخ داد");
   return data as T;
 }
+
+/** Download an authenticated file (CSV/XLSX export): a plain link cannot send the Authorization header. */
+export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  const token = getToken();
+  const res = await fetch(BASE + "/api" + path, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(typeof d.detail === "string" ? d.detail : "دریافت فایل ممکن نشد");
+  }
+  const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}

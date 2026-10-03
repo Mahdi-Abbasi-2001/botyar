@@ -256,6 +256,10 @@ from .catalog import router as catalog_router  # noqa: E402
 
 app.include_router(catalog_router)
 
+from .export import router as export_router  # noqa: E402
+
+app.include_router(export_router)
+
 # ---------- static frontend (Next.js export copied to api/static at build time) ----------
 import os  # noqa: E402
 
