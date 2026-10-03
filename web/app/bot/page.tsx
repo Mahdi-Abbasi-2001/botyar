@@ -61,11 +61,33 @@ function Workspace() {
     setEvents([]);
     setTab("build");
     setChat((c) => [...c, { role: "user", content: t }]);
+    let run_id: number;
     try {
-      const { run_id } = await api<{ run_id: number }>(`/bots/${id}/builder`, { body: { text: t } });
-      for (let i = 0; i < 150 && alive.current; i++) {
+      ({ run_id } = await api<{ run_id: number }>(`/bots/${id}/builder`, { body: { text: t } }));
+    } catch (e: any) {
+      // the request never reached the agent: undo the optimistic message and give the text back
+      setChat((c) => c.slice(0, -1));
+      setInput(t);
+      setError(e.message);
+      setRunning(false);
+      return;
+    }
+    let misses = 0;
+    try {
+      for (let i = 0; i < 200 && alive.current; i++) {
         await sleep(1500);
-        const r = await api<{ status: RunStatus; events: string[]; result: RunResult }>(`/bots/${id}/builder/runs/${run_id}`);
+        let r: { status: RunStatus; events: string[]; result: RunResult };
+        try {
+          r = await api<{ status: RunStatus; events: string[]; result: RunResult }>(`/bots/${id}/builder/runs/${run_id}`);
+          misses = 0;
+        } catch (e: any) {
+          // the agent keeps working on the server; tolerate a few failed status checks
+          if (++misses >= 5) {
+            setError("ارتباط قطع شد، اما ایجنت روی سرور به کار ادامه می‌دهد. چند لحظه بعد صفحه را تازه کنید.");
+            break;
+          }
+          continue;
+        }
         setEvents(r.events);
         if (r.status !== "running") {
           setChat((c) => [...c, { role: "assistant", content: r.result.message }]);

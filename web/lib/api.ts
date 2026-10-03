@@ -13,11 +13,22 @@ export const setToken = (t: string | null) => (t ? localStorage.setItem("token",
 
 export async function api<T = any>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
   const token = getToken();
-  const res = await fetch(BASE + "/api" + path, {
+  const init: RequestInit = {
     method: opts.method ?? (opts.body ? "POST" : "GET"),
     headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
-  });
+  };
+  // Transient network failures ("Failed to fetch") are common on unstable links: retry a few times.
+  let res: Response | null = null;
+  for (let attempt = 1; attempt <= 3 && !res; attempt++) {
+    try {
+      res = await fetch(BASE + "/api" + path, init);
+    } catch {
+      if (attempt === 3) throw new Error("ارتباط با سرور برقرار نشد. اینترنت را بررسی کنید و دوباره تلاش کنید.");
+      await new Promise((r) => setTimeout(r, 700 * attempt));
+    }
+  }
+  if (!res) throw new Error("ارتباط با سرور برقرار نشد.");
   if (res.status === 401 && token && !path.startsWith("/auth")) {
     setToken(null);
     window.location.href = "/login/";
