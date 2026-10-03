@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon, Stamp, fa } from "../ui";
 import { BLOCK_KIND, blockTitle, parseQuestions, toSteps, type ChatMsg, type Spec, type TestRes } from "./model";
 
@@ -23,11 +23,58 @@ type Props = {
   onSend: (text: string) => void;
 };
 
+// Height left for the chat once the header, tab bar and page padding are drawn.
+const PANEL_H = "h-[calc(100dvh-11rem)] min-h-[480px]";
+
 export function BuilderTab(p: Props) {
   const lastQ = !p.running && p.chat.length ? parseQuestions(p.chat[p.chat.length - 1].content) : null;
+  const scroller = useRef<HTMLDivElement>(null);
+  const atBottom = useRef(true);
+  const [unseen, setUnseen] = useState(false);
+
+  const toBottom = (smooth = true) => {
+    const el = scroller.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+    setUnseen(false);
+  };
+
+  // Stay pinned to the latest message whenever the content grows (messages loading in, new progress
+  // steps, cards expanding) — unless the owner scrolled up to read something.
+  const content = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scroller.current, inner = content.current;
+    if (!el || !inner) return;
+    let last = inner.offsetHeight;
+    const ro = new ResizeObserver(() => {
+      const grew = inner.offsetHeight > last;
+      last = inner.offsetHeight;
+      if (atBottom.current) el.scrollTop = el.scrollHeight;
+      else if (grew) setUnseen(true);
+    });
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, []);
+  // and directly after each new message / progress step (doesn't wait for a rendering frame)
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    if (atBottom.current) el.scrollTop = el.scrollHeight;
+    else setUnseen(true);
+  }, [p.chat.length, p.events.length, !!lastQ]); // eslint-disable-line react-hooks/exhaustive-deps
+  // sending a message always brings you back down
+  useEffect(() => {
+    if (p.running) { atBottom.current = true; toBottom(); }
+  }, [p.running]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <div className="flex flex-wrap gap-5">
-      <section className="flex min-w-0 flex-[1_1_360px] flex-col gap-3.5">
+    <div className="flex flex-wrap items-start gap-5">
+      <section className={`relative flex min-w-0 flex-[1_1_360px] flex-col overflow-hidden rounded-[20px] border border-line bg-ink ${PANEL_H}`}>
+        <div ref={scroller} onScroll={(e) => {
+          const el = e.currentTarget;
+          atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+          if (atBottom.current) setUnseen(false);
+        }} className="flex-1 overflow-y-auto overscroll-contain">
+        <div ref={content} className="flex flex-col gap-3.5 p-3.5">
         {p.chat.length === 0 && !p.running && (
           <div className="flex flex-col gap-3 rounded-2xl border border-line bg-panel p-4">
             <span className="text-sm leading-7 text-fg-2">{p.spec ? "هر تغییری بخواهی همین‌جا بنویس؛ ایجنت اعمالش می‌کند و همه‌ی تست‌ها را دوباره اجرا می‌کند." : "ربات‌ت را مثل یک پیام معمولی توضیح بده. مثلاً:"}</span>
@@ -56,9 +103,17 @@ export function BuilderTab(p: Props) {
 
         {(p.running || (p.events.length > 0 && !lastQ)) && <Timeline events={p.events} running={p.running} />}
         {p.lastCost !== null && !p.running && <span className="text-xs text-dim">هزینه‌ی هوش مصنوعی این درخواست: <span dir="ltr">${p.lastCost.toFixed(4)}</span></span>}
+        </div>
+        </div>
+
+        {unseen && (
+          <button onClick={() => toBottom()} className="anim-rise absolute bottom-24 left-1/2 flex min-h-10 -translate-x-1/2 items-center gap-1.5 rounded-full border border-saffron bg-panel px-4 text-[13px] text-saffron shadow-lg shadow-black/40">
+            پیام‌های جدید <span aria-hidden>↓</span>
+          </button>
+        )}
 
         {!lastQ && (
-          <form onSubmit={(e) => { e.preventDefault(); p.onSend(p.input); }} className="mt-auto flex items-end gap-2 rounded-2xl border border-line-2 bg-panel p-2">
+          <form onSubmit={(e) => { e.preventDefault(); p.onSend(p.input); }} className="m-2.5 mt-0 flex shrink-0 items-end gap-2 rounded-2xl border border-line-2 bg-panel p-2">
             <label htmlFor="agent-in" className="sr-only">{p.spec ? "تغییر بعدی" : "توضیح ربات"}</label>
             <textarea id="agent-in" ref={p.inputRef} value={p.input} rows={2} disabled={p.running}
               onChange={(e) => p.setInput(e.target.value)}
@@ -149,7 +204,7 @@ function PastQuestions({ questions }: { questions: string[] }) {
 function MiniMap({ spec, tests, running, stamped }: { spec: Spec | null; tests: TestRes[]; running: boolean; stamped: boolean }) {
   const passed = tests.filter((t) => t.passed).length;
   return (
-    <section className="bp relative flex min-w-0 flex-[1.3_1_420px] flex-col gap-3.5 self-start rounded-[20px] border border-line bg-ink-2 p-5">
+    <section className={`bp relative flex min-w-0 flex-[1.3_1_420px] flex-col gap-3.5 overflow-y-auto overscroll-contain rounded-[20px] border border-line bg-ink-2 p-5 lg:max-h-[calc(100dvh-11rem)]`}>
       <div className="flex justify-between text-[13px] text-mute">
         <span>نقشه‌ی ربات</span>
         {running && spec && <span className="text-saffron">ایجنت در حال تغییر…</span>}
