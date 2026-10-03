@@ -19,6 +19,11 @@ from .templates import TEMPLATES, load_template
 @asynccontextmanager
 async def lifespan(app):
     Base.metadata.create_all(engine)
+    import threading
+
+    from .bale import ensure_shared_webhook
+
+    threading.Thread(target=ensure_shared_webhook, daemon=True).start()  # no-op unless PUBLIC_BASE_URL is set
     yield
 
 
@@ -241,6 +246,10 @@ def bot_versions(bot_id: int, user: User = Depends(current_user), db: Session = 
         prev = v.spec
     return list(reversed(out))
 
+
+from .publish import router as publish_router  # noqa: E402
+
+app.include_router(publish_router)
 
 # ---------- static frontend (Next.js export copied to api/static at build time) ----------
 import os  # noqa: E402

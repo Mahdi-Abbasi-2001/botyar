@@ -9,3 +9,5 @@ bcrypt
 email-validator
 openai
 langgraph
+httpx
+cryptography

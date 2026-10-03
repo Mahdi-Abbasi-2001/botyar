@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_base_url: str | None = None
     cors_origins: str = "http://localhost:3000"
+    bale_shared_bot_token: str = ""
+    public_base_url: str = ""  # e.g. https://botyar.liara.run; empty in local dev (no webhooks registered)
 
 
 settings = Settings()

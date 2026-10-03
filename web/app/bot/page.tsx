@@ -5,11 +5,12 @@ import { PENDING_KEY, api, getToken } from "@/lib/api";
 import { ErrorNote, Icon, Logo, fa } from "@/components/ui";
 import { BuilderTab } from "@/components/workspace/BuilderTab";
 import { RecordsTab, StructureTab, TestsTab, VersionsTab } from "@/components/workspace/InspectorTabs";
+import { PublishTab } from "@/components/workspace/PublishTab";
 import { PhoneSim } from "@/components/workspace/PhoneSim";
 import { progressOf, type Bot, type ChatMsg, type Rec, type RunResult, type RunStatus, type TestRes, type Ver } from "@/components/workspace/model";
 
-type Tab = "build" | "spec" | "tests" | "versions" | "records" | "try";
-const TAB_LABEL: Record<Tab, string> = { build: "ساخت با ایجنت", spec: "ساختار", tests: "تست‌ها", versions: "نسخه‌ها", records: "ثبت‌ها", try: "امتحانش کن" };
+type Tab = "build" | "spec" | "tests" | "versions" | "publish" | "records" | "try";
+const TAB_LABEL: Record<Tab, string> = { build: "ساخت با ایجنت", spec: "ساختار", tests: "تست‌ها", versions: "نسخه‌ها", publish: "انتشار", records: "ثبت‌ها", try: "امتحانش کن" };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function Workspace() {
@@ -132,7 +133,7 @@ function Workspace() {
   if (!bot) return <main className="p-10 text-center text-mute">{error || "در حال بارگذاری…"}</main>;
   const spec = bot.spec;
   const passed = tests.filter((t) => t.passed).length;
-  const tabs: Tab[] = spec ? ["build", "spec", "tests", "versions", "records", "try"] : ["build"];
+  const tabs: Tab[] = spec ? ["build", "spec", "tests", "versions", "publish", "records", "try"] : ["build"];
   const phoneTabs = tab === "build" || tab === "spec";
   const fieldLabels: Record<string, string> = { slot_label: "زمان" };
   for (const b of spec?.blocks ?? []) if ("fields" in b) for (const f of b.fields) fieldLabels[f.key] = f.label;
@@ -177,6 +178,7 @@ function Workspace() {
           {tab === "spec" && spec && <StructureTab spec={spec} records={records} onEdit={editPart} />}
           {tab === "tests" && <TestsTab tests={tests} spec={spec} version={bot.version} />}
           {tab === "versions" && <VersionsTab versions={versions} spec={spec} />}
+          {tab === "publish" && spec && <PublishTab botId={id!} />}
           {tab === "records" && spec && <RecordsTab records={records} spec={spec} />}
         </div>
 

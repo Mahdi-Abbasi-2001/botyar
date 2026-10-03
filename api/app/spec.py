@@ -36,8 +36,11 @@ class FormBlock(BaseModel):
     done_text: str = "اطلاعات شما ثبت شد. ممنون!"
 
 
+ShortId = Annotated[str, Field(pattern=r"^[a-z0-9_]{1,24}$")]  # goes into callback_data (Bale max 64 bytes)
+
+
 class Slot(BaseModel):
-    id: str
+    id: ShortId
     label: str
     capacity: int = Field(gt=0)
 
@@ -66,7 +69,7 @@ class OptionGroup(BaseModel):
 
 
 class CatalogItem(BaseModel):
-    id: str
+    id: ShortId
     name: str
     price: int = Field(ge=0)
     options: list[OptionGroup] = []

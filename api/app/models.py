@@ -95,3 +95,27 @@ class VersionTests(Base):
     version: Mapped[int] = mapped_column(Integer)
     scenarios: Mapped[list] = mapped_column(JSON)
     results: Mapped[list] = mapped_column(JSON)
+
+
+class Publication(Base):
+    """A bot published to Bale: either via the shared Botyar bot (code) or the owner's own bot token."""
+    __tablename__ = "publications"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), unique=True, index=True)
+    mode: Mapped[str] = mapped_column(String(8))  # shared | own
+    version: Mapped[int] = mapped_column(Integer)  # the published (live) version
+    code: Mapped[str] = mapped_column(String(12), unique=True, index=True)  # customers send this to the shared bot
+    admin_code: Mapped[str] = mapped_column(String(16), unique=True)  # owner sends "/admin <code>" to get notifications
+    token_enc: Mapped[str] = mapped_column(Text, default="")  # own mode only, encrypted
+    hook_secret: Mapped[str] = mapped_column(String(64), default="")
+    bot_username: Mapped[str] = mapped_column(String(64), default="")
+    admin_chat_id: Mapped[str] = mapped_column(String(32), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class ChatLink(Base):
+    """Which published bot a Bale chat is talking to on the shared bot."""
+    __tablename__ = "chat_links"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    chat_id: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    pub_id: Mapped[int] = mapped_column(ForeignKey("publications.id"), index=True)
