@@ -38,7 +38,11 @@ export default function Bots() {
         <button onClick={() => { setToken(null); router.push("/"); }} className="text-sm text-slate-500 hover:text-slate-800">خروج</button>
       </header>
       {error && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      <h2 className="mb-3 text-lg font-bold">ربات جدید از روی قالب</h2>
+      <button onClick={async () => { try { const b = await api<BotRow>("/bots/draft", { method: "POST", body: {} }); router.push(`/bot/?id=${b.id}`); } catch (e: any) { setError(e.message); } }}
+        className="mb-8 w-full rounded-2xl bg-indigo-600 p-5 text-lg font-bold text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700">
+        ✨ ساخت ربات جدید با توضیح دادن
+      </button>
+      <h2 className="mb-3 text-lg font-bold">یا شروع از روی قالب</h2>
       <div className="mb-10 grid gap-3 sm:grid-cols-2">
         {tpls.map((t) => (
           <button key={t.key} onClick={() => create(t.key)} className="rounded-2xl border border-dashed border-indigo-300 bg-white p-5 text-right hover:border-indigo-500 hover:bg-indigo-50">

@@ -226,6 +226,22 @@ def bot_cost(bot_id: int, user: User = Depends(current_user), db: Session = Depe
     return {"total_usd": sum(r[2] or 0 for r in rows), "by_step": [{"step": r[0], "calls": r[1], "usd": r[2], "in": r[3], "out": r[4]} for r in rows]}
 
 
+@app.get("/api/bots/{bot_id}/versions")
+def bot_versions(bot_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    from .testing import spec_diff
+
+    own_bot(bot_id, user, db)
+    rows = db.scalars(select(BotVersion).where(BotVersion.bot_id == bot_id).order_by(BotVersion.version)).all()
+    tests = {t.version: t.results for t in db.scalars(select(VersionTests).where(VersionTests.bot_id == bot_id))}
+    out, prev = [], None
+    for v in rows:
+        res = tests.get(v.version, [])
+        out.append({"version": v.version, "note": v.note, "created_at": v.created_at.isoformat(),
+                    "diff": spec_diff(prev, v.spec), "tests_passed": sum(r["passed"] for r in res), "tests_total": len(res)})
+        prev = v.spec
+    return list(reversed(out))
+
+
 # ---------- static frontend (Next.js export copied to api/static at build time) ----------
 import os  # noqa: E402
 

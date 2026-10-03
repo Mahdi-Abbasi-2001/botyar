@@ -10,7 +10,7 @@ You NEVER write code. You produce a BotSpec (JSON) that a fixed deterministic ru
 - "/start" shows spec.welcome, then the menu. Menu buttons carry data "m:<index>" (0-based position in spec.menu); typing the exact menu label also works. "/cancel" or "انصراف" returns to the menu.
 - message block: sends its text, then the menu.
 - form block: asks each field in order (the field label IS the question). Kinds: text; phone (must be an Iranian mobile 09xxxxxxxxx, otherwise reply contains «معتبر نیست»); number (digits only); choice (user must send one of `choices` exactly; they are shown as buttons). Saves a record under collection = block id, sends done_text, then the menu.
-- booking block: after the menu pick it sends the title, then slot buttons labelled "<slot label> (<N> جای خالی)" with data "s:<slot id>". A full slot is labelled "(تکمیل)". With waitlist=false choosing a full slot replies full_text. With waitlist=true choosing a full slot continues and the record gets status "waitlisted" and waitlist_text is sent. Then it asks `fields` in order (default: name, phone). Record = fields + slot (slot id) + slot_label + status ("confirmed" or "waitlisted"), stored under collection = block id.
+- booking block: after the menu pick it sends the title, then slot buttons labelled "<slot label> (<N> جای خالی)" with data "s:<slot id>". A full slot is labelled "(تکمیل)" when waitlist=false and "(تکمیل - لیست انتظار)" when waitlist=true. With waitlist=false choosing a full slot replies full_text. With waitlist=true choosing a full slot continues and the record gets status "waitlisted" and waitlist_text is sent. Then it asks `fields` in order (default: name, phone). Record = fields + slot (slot id) + slot_label + status ("confirmed" or "waitlisted"), stored under collection = block id.
 - catalog_order block: item buttons "<name> - <price> تومان" with data "i:<item id>"; for each option group of the item it asks to pick one (exact choice text); then buttons data "more" / "checkout". "checkout" below min_total replies with a message containing «حداقل». At most max_items per order. Then it asks `fields`, stores record = contact fields + items + total + status "new" under collection = block id.
 - admin_notify block: when the watched block (`on`) completes a record, the bot owner is notified with `text` plus the record summary. `on` must be an existing block id.
 - Persian/Arabic digits are normalised to ASCII. Unknown input at the menu re-shows the menu.
@@ -46,7 +46,7 @@ Produce the complete BotSpec for the owner's request. If a current spec is given
 
 TESTS = COMMON + """
 ## Your task now: WRITE TESTS
-Write at most 6 focused test scenarios for the spec below, following the test-writing rules. If a change request is described, write tests for the NEW or CHANGED behaviour only (older tests are re-run separately as regression).
+Write at most 4 focused test scenarios for the spec below, following the test-writing rules. If a change request is described, write tests for the NEW or CHANGED behaviour only (older tests are re-run separately as regression).
 """
 
 REPAIR = COMMON + """

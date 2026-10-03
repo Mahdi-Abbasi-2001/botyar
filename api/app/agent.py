@@ -102,7 +102,7 @@ class Builder:
         payload = f"SPEC:\n{json.dumps(s['spec'], ensure_ascii=False)}\n\nWHAT THE OWNER ASKED FOR:\n{s['summary']}"
         if s.get("current"):
             payload += "\n\n(This is a CHANGE request: write tests only for the new/changed behaviour.)"
-        plan: TestPlan = self.ask("tests", prompts.TESTS, payload, TestPlan, effort="low")
+        plan: TestPlan = self.ask("tests", prompts.TESTS, payload, TestPlan, effort="none")
         return {"scenarios": [x.model_dump() for x in plan.scenarios]}
 
     def run_tests(self, s: S) -> dict:
@@ -127,7 +127,7 @@ class Builder:
         failing = [r for r in s["results"] if not r["passed"]]
         payload = (f"OWNER REQUEST SUMMARY: {s['summary']}\n\nCURRENT SPEC:\n{json.dumps(s['spec'], ensure_ascii=False)}\n\n"
                    f"ALL SCENARIOS:\n{json.dumps(s['scenarios'], ensure_ascii=False)}\n\nFAILING RESULTS (with transcripts):\n{json.dumps(failing, ensure_ascii=False)}")
-        r: RepairResult = self.ask("repair", prompts.REPAIR, payload, RepairResult, effort="medium")
+        r: RepairResult = self.ask("repair", prompts.REPAIR, payload, RepairResult, effort="low")
         try:
             spec = BotSpec.model_validate(r.spec.model_dump())
         except ValidationError:
