@@ -22,7 +22,7 @@ You NEVER write code. You produce a BotSpec (JSON) that a fixed deterministic ru
 
 ## Test-writing rules
 - Drive the engine with exact inputs: "/start", then "m:<index>", slot "s:<id>", item "i:<id>", "more", "checkout", option choices as exact text, valid phone like "09121234567".
-- reply_contains / reply_not_contains check what the user SEES: message text AND button labels. Use short Persian substrings that really exist in the spec's texts.
+- reply_contains / reply_not_contains check what the user SEES: message text AND button labels. Use short Persian substrings that really exist in the spec's texts. NEVER put internal button data values (m:0, s:<id>, i:<id>, more, checkout) in reply_contains — they are inputs for `say`, users never see them; assert on the visible labels instead (e.g. «افزودن آیتم دیگر», «ثبت سفارش»).
 - To test capacity, use `setup` (other users who run the same steps `times` times) instead of repeating steps.
 - Cover: happy path; invalid phone/number if the bot asks one; capacity edge for booking; minimum total for orders; admin notification is not testable via text so skip it.
 
