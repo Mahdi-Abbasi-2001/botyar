@@ -114,10 +114,23 @@ def to_markup(buttons: list[dict], cb: dict) -> dict:
     return {"inline_keyboard": rows}
 
 
-def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_chat_id: str = ""):
+def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_chat_id: str = "", edit_message_id: int | None = None):
     cb: dict = {}
-    for a in actions:
+    for n, a in enumerate(actions):
         try:
+            if a["type"] == "send" and n == 0 and a.get("edit") and edit_message_id:
+                # in-place navigation (e.g. next page): edit the clicked message; fall back to a new message if Bale refuses
+                payload = {"chat_id": chat_id, "message_id": edit_message_id, "text": a["text"][:4096] or "…"}
+                if a.get("buttons"):
+                    payload["reply_markup"] = to_markup(a["buttons"], cb)
+                try:
+                    api_call(token, "editMessageText", payload)
+                    continue
+                except Exception as e:  # noqa: BLE001
+                    log.warning("edit failed, sending a new message: %s", e)
+                    payload.pop("message_id")
+                    api_call(token, "sendMessage", payload)
+                    continue
             if a["type"] == "send":
                 payload = {"chat_id": chat_id, "text": a["text"][:4096] or "…"}
                 if a.get("buttons"):
@@ -179,6 +192,7 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict):
     if chat is None:
         return
     chat_id = str(chat)
+    clicked_message_id = ((cq or {}).get("message") or {}).get("message_id") if cq else None
     if cq_id:  # mandatory per Bale docs
         try:
             api_call(token, "answerCallbackQuery", {"callback_query_id": cq_id})
@@ -248,6 +262,6 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict):
         elif kind == "shared" and t.startswith("/start"):
             t = "/start"
         actions = engine.handle(spec, state, t, SqlStore(db, pub.bot_id, sandbox=False))
-        deliver(token, chat_id, actions, state, pub.admin_chat_id)
+        deliver(token, chat_id, actions, state, pub.admin_chat_id, clicked_message_id)
         row.state = state
         db.commit()

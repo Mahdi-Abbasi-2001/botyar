@@ -91,8 +91,12 @@ def new_session() -> dict:
     return {"block": None, "step": None, "data": {}}
 
 
-def send(text, buttons=None):
-    return {"type": "send", "text": text, "buttons": buttons or []}
+def send(text, buttons=None, edit=False):
+    """edit=True asks the channel to replace the message the user just clicked on (in-place navigation)."""
+    a = {"type": "send", "text": text, "buttons": buttons or []}
+    if edit:
+        a["edit"] = True
+    return a
 
 
 def _btn(text, data=None):
@@ -282,19 +286,19 @@ def _item_prompt(block: CatalogOrderBlock):
     return send("آیتم مورد نظر را انتخاب کنید:", [_btn(f"{i.name} - {i.price:,} تومان", f"i:{i.id}") for i in block.items])
 
 
-def _cat_prompt(block, store):
+def _cat_prompt(block, store, edit=False):
     buttons = [_btn(c, f"c:{i}") for i, c in enumerate(store.categories(block.id))]
     buttons += [_btn("همه‌ی محصولات", "all"), _btn("🔎 جستجو", "search")]
-    return send("دسته‌بندی را انتخاب کنید:", buttons)
+    return send("دسته‌بندی را انتخاب کنید:", buttons, edit)
 
 
-def _list_prompt(block, store, d):
+def _list_prompt(block, store, d, edit=False):
     cats = store.categories(block.id)
     cat, q, page = d.get("_cat"), d.get("_q"), d.get("_page", 0)
     items, total = store.products(block.id, cat, q, page * PAGE, PAGE)
     back = [_btn("بازگشت به دسته‌ها", "back")] if len(cats) > 1 else []
     if total == 0:
-        return send("محصولی پیدا نشد.", [_btn("🔎 جستجوی دیگر", "search")] + back)
+        return send("محصولی پیدا نشد.", [_btn("🔎 جستجوی دیگر", "search")] + back, edit)
     pages = math.ceil(total / PAGE)
     if not items:  # page out of range -> last page
         page = pages - 1
@@ -307,7 +311,7 @@ def _list_prompt(block, store, d):
     if page + 1 < pages:
         buttons.append(_btn("بعدی ›", f"pg:{page + 1}"))
     buttons += [_btn("🔎 جستجو", "search")] + back
-    return send(f"{head} — صفحه {page + 1} از {pages}", buttons)
+    return send(f"{head} — صفحه {page + 1} از {pages}", buttons, edit)
 
 
 def _order_start(spec, session, block: CatalogOrderBlock, store):
@@ -411,7 +415,7 @@ def _order(spec, session, block: CatalogOrderBlock, text, store):
                 return [send("لطفاً یکی از دسته‌ها را انتخاب کنید."), _cat_prompt(block, store)]
             d["_cat"] = hit
         d["_q"], d["_page"], session["step"] = None, 0, "list"
-        return [_list_prompt(block, store, d)]
+        return [_list_prompt(block, store, d, edit=bool(m) or text_n == "all")]  # a clicked category replaces the category menu
 
     if step == "q":
         d["_q"], d["_cat"], d["_page"], session["step"] = text.strip(), None, 0, "list"
@@ -424,14 +428,14 @@ def _order(spec, session, block: CatalogOrderBlock, text, store):
         pg = re.fullmatch(r"pg:(\d+)", text_n)
         if pg:
             d["_page"] = int(pg.group(1))
-            return [_list_prompt(block, store, d)]
+            return [_list_prompt(block, store, d, edit=True)]  # next/previous page edits the same message
         if text_n == "search":
             session["step"] = "q"
             return [send("نام یا بخشی از نام محصول را بنویسید:")]
         if text_n == "back" and len(store.categories(block.id)) > 1:
             d["_q"] = None
             session["step"] = "cat"
-            return [_cat_prompt(block, store)]
+            return [_cat_prompt(block, store, edit=True)]
         d["_q"], d["_cat"], d["_page"] = text.strip(), None, 0  # free text = quick search
         return [_list_prompt(block, store, d)]
 

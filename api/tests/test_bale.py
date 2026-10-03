@@ -125,3 +125,58 @@ def test_cannot_publish_when_tests_fail(env):
         db.commit()
     r = c.post(f"/api/bots/{bot}/publish", json={"mode": "shared"}, headers=H)
     assert r.status_code == 409 and "تست" in r.json()["detail"]
+
+
+def test_next_page_edits_the_clicked_message_but_typed_text_sends_new(env):
+    from app.db import SessionLocal
+    from app.models import Bot, BotVersion, Product, User
+
+    c, calls = env
+    tok = c.post("/api/auth/register", json={"email": "pg@x.com", "password": "123456"}).json()["token"]
+    H = {"Authorization": f"Bearer {tok}"}
+    spec = {"name": "shop", "welcome": "سلام", "menu": [{"label": "خرید", "block": "shop"}],
+            "blocks": [{"type": "catalog_order", "id": "shop", "title": "فروشگاه", "source": "table", "items": []}]}
+    with SessionLocal() as db:
+        uid = db.query(User).filter(User.email == "pg@x.com").one().id
+        bot = Bot(user_id=uid, name="shop")
+        db.add(bot)
+        db.flush()
+        db.add(BotVersion(bot_id=bot.id, version=1, spec=spec, note=""))
+        for i in range(12):
+            db.add(Product(bot_id=bot.id, block_id="shop", name=f"کالا {i}", category="", price=1000 * (i + 1), stock=None, options=[], position=i))
+        db.commit()
+        bid = bot.id
+    code = c.post(f"/api/bots/{bid}/publish", json={"mode": "shared"}, headers=H).json()["code"]
+    url = f"/api/hook/shared/{bale.shared_hook_secret()}"
+    c.post(url, json=msg(777, code))
+    c.post(url, json=cb(777, "m:0"))                       # first list page (a normal new message)
+    calls.clear()
+    click = cb(777, "pg:1")
+    click["callback_query"]["message"]["message_id"] = 4242
+    c.post(url, json=click)
+    methods = [m for m, _ in calls]
+    assert "editMessageText" in methods and "sendMessage" not in methods
+    edit = next(p for m, p in calls if m == "editMessageText")
+    assert edit["message_id"] == 4242 and "صفحه 2" in edit["text"]
+
+    calls.clear()
+    c.post(url, json=msg(777, "کالا 3"))                   # typed search: nothing to edit
+    assert [m for m, _ in calls] == ["sendMessage"]
+
+
+def test_edit_failure_falls_back_to_a_new_message():
+    sent = []
+
+    def fake(token, method, payload=None, timeout=15):
+        sent.append(method)
+        if method == "editMessageText":
+            raise bale.BaleError("message can't be edited")
+        return True
+
+    orig = bale.api_call
+    bale.api_call = fake
+    try:
+        bale.deliver("T", "1", [{"type": "send", "text": "صفحه 2", "buttons": [], "edit": True}], {}, "", 55)
+    finally:
+        bale.api_call = orig
+    assert sent == ["editMessageText", "sendMessage"]

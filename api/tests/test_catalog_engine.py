@@ -125,3 +125,14 @@ def test_spec_inline_still_requires_items():
         assert False
     except ValueError as e:
         assert "at least one item" in str(e)
+
+
+def test_browse_navigation_is_marked_for_in_place_edit_but_typed_input_is_not():
+    st, sess = store(), new_session()
+    say(st, sess, "/start", "m:0")
+    assert say(st, sess, "c:0")[0].get("edit") is True            # clicked category replaces the category menu
+    assert say(st, sess, "pg:1")[0].get("edit") is True           # next page edits the same message
+    assert say(st, sess, "back")[0].get("edit") is True           # back to categories
+    say(st, sess, "c:0")
+    assert say(st, sess, "پیراهن")[0].get("edit") is None         # typed search: nothing to edit, new message
+    assert say(st, sess, "p:1")[0].get("edit") is None            # opening a product starts a new question

@@ -43,7 +43,21 @@ export function PhoneSim({ botId, version, labels, onActivity, className = "" }:
     if (shown !== null) setMsgs((m) => [...m.map((x) => ({ ...x, buttons: undefined })), { from: "me", text: shown ?? t }]);
     try {
       const r = await api<{ actions: Action[] }>(`/bots/${botId}/simulate`, { body: { session_id: session, text: t } });
-      setMsgs((m) => [...m, ...r.actions.map((a): Msg => (a.type === "send" ? { from: "bot", text: a.text, buttons: a.buttons } : { from: "admin", text: a.text }))]);
+      setMsgs((m) => {
+        const mapped = r.actions.map((a): Msg => (a.type === "send" ? { from: "bot", text: a.text, buttons: a.buttons } : { from: "admin", text: a.text }));
+        const first = r.actions[0];
+        // like Bale: navigation (next page, category, back) edits the clicked message instead of adding one
+        if (first?.type === "send" && first.edit && m.length && m[m.length - 1].from === "me") {
+          const base = m.slice(0, -1); // drop the echoed click: a real button press shows no user bubble
+          let i = base.length - 1;
+          while (i >= 0 && base[i].from !== "bot") i--;
+          if (i >= 0) {
+            base[i] = mapped[0];
+            return [...base, ...mapped.slice(1)];
+          }
+        }
+        return [...m, ...mapped];
+      });
       onActivity();
     } catch (e: any) {
       setError(e.message);

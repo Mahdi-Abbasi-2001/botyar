@@ -2,7 +2,7 @@ const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
 export type Button = { text: string; data: string };
 export type Action =
-  | { type: "send"; text: string; buttons: Button[] }
+  | { type: "send"; text: string; buttons: Button[]; edit?: boolean }
   | { type: "notify_admin"; text: string };
 
 /** sessionStorage key for a description typed on /bots, sent to the agent when the workspace opens. */
