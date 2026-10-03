@@ -119,3 +119,28 @@ class ChatLink(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     chat_id: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     pub_id: Mapped[int] = mapped_column(ForeignKey("publications.id"), index=True)
+
+
+class Product(Base):
+    """One row of a store's catalog (a catalog_order block with source='table')."""
+    __tablename__ = "products"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    block_id: Mapped[str] = mapped_column(String(64), index=True)
+    name: Mapped[str] = mapped_column(String(300))
+    category: Mapped[str] = mapped_column(String(120), default="")
+    price: Mapped[int] = mapped_column(Integer, default=0)  # toman
+    stock: Mapped[int | None] = mapped_column(Integer, nullable=True)  # None = unlimited
+    options: Mapped[list] = mapped_column(JSON, default=list)  # [{"name","choices":[...]}]
+    description: Mapped[str] = mapped_column(Text, default="")
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    is_sample: Mapped[bool] = mapped_column(Boolean, default=False)  # agent-made demo rows, replaced on first import
+
+
+class VersionFixture(Base):
+    """Frozen product list the version's tests run against (tests stay hermetic when the live catalog changes)."""
+    __tablename__ = "version_fixtures"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    catalog: Mapped[list] = mapped_column(JSON)

@@ -31,3 +31,32 @@ def test_full_flow():
     # another user cannot see it
     tok2 = c.post("/api/auth/register", json={"email": "x@y.com", "password": "123456"}).json()["token"]
     assert c.get(f"/api/bots/{bot['id']}", headers={"Authorization": f"Bearer {tok2}"}).status_code == 404
+
+
+def test_two_option_groups_in_a_row_survive_persistence():
+    """Regression: consecutive same-step messages used to lose nested state (shallow copy hid in-place edits)."""
+    from app.db import SessionLocal
+    from app.models import Bot, BotVersion, User
+
+    c = TestClient(app)
+    tok = c.post("/api/auth/register", json={"email": "opt@b.com", "password": "123456"}).json()["token"]
+    H = {"Authorization": f"Bearer {tok}"}
+    me = c.get("/api/me", headers=H).json()
+    spec = {"name": "t", "welcome": "سلام", "menu": [{"label": "سفارش", "block": "o"}],
+            "blocks": [{"type": "catalog_order", "id": "o", "title": "منو", "min_total": 0,
+                        "items": [{"id": "tee", "name": "تی‌شرت", "price": 100000,
+                                   "options": [{"name": "سایز", "choices": ["S", "M"]}, {"name": "رنگ", "choices": ["سفید", "مشکی"]}]}]}]}
+    with SessionLocal() as db:
+        uid = db.query(User).filter(User.email == me["email"]).one().id
+        bot = Bot(user_id=uid, name="t")
+        db.add(bot)
+        db.flush()
+        db.add(BotVersion(bot_id=bot.id, version=1, spec=spec, note=""))
+        db.commit()
+        bid = bot.id
+    last = None
+    for t in ["/start", "m:0", "i:tee", "M", "مشکی", "checkout", "علی", "09123456789"]:
+        last = c.post(f"/api/bots/{bid}/simulate", json={"session_id": "q", "text": t}, headers=H).json()
+    assert any("سفارش شما ثبت شد" in a["text"] for a in last["actions"])
+    rec = c.get(f"/api/bots/{bid}/records?sandbox=true", headers=H).json()[0]["data"]
+    assert rec["items"][0]["options"] == {"سایز": "M", "رنگ": "مشکی"}

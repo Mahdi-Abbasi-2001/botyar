@@ -1,7 +1,8 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import Record
+from . import engine
+from .models import Product, Record
 
 
 class SqlStore:
@@ -22,3 +23,36 @@ class SqlStore:
 
     def count(self, collection, **where):
         return sum(all(r.data.get(k) == v for k, v in where.items()) for r in self._rows(collection))
+
+    # ---- product table (catalog_order with source="table") ----
+    def _products(self, block_id):
+        q = select(Product).where(Product.bot_id == self.bot_id, Product.block_id == block_id).order_by(Product.position, Product.id)
+        return [self._dict(p) for p in self.db.scalars(q)]
+
+    @staticmethod
+    def _dict(p: Product) -> dict:
+        return {"id": p.id, "name": p.name, "category": p.category, "price": p.price, "stock": p.stock,
+                "options": p.options or [], "description": p.description}
+
+    def categories(self, block_id):
+        return engine.catalog_categories(self._products(block_id))
+
+    def products(self, block_id, category, query, offset, limit):
+        rows = engine.catalog_filter(self._products(block_id), category, query)
+        return rows[offset:offset + limit], len(rows)
+
+    def product(self, block_id, pid):
+        p = self.db.get(Product, pid)
+        return self._dict(p) if p and p.bot_id == self.bot_id and p.block_id == block_id else None
+
+    def reserve(self, block_id, lines):
+        """All-or-nothing stock check. The sandbox checks but never decrements, so testing can't deplete live stock."""
+        rows = {p.id: p for p in self.db.scalars(select(Product).where(Product.bot_id == self.bot_id, Product.block_id == block_id,
+                                                                       Product.id.in_([pid for pid, _ in lines])))}
+        failed = [pid for pid, qty in lines if pid not in rows or (rows[pid].stock is not None and rows[pid].stock < qty)]
+        if not failed and not self.sandbox:
+            for pid, qty in lines:
+                if rows[pid].stock is not None:
+                    rows[pid].stock -= qty
+            self.db.flush()
+        return failed

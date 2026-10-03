@@ -5,6 +5,8 @@ Facts from docs.bale.ai (verified 2026-10-04): Telegram-style Bot API at tapi.ba
 mandatory after a button press; webhook ports 443/88; /start parameters are not documented."""
 from __future__ import annotations
 
+import copy
+
 import base64
 import hashlib
 import hmac
@@ -238,7 +240,7 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict):
         if row is None:
             row = ChatSession(bot_id=pub.bot_id, key=skey, state=engine.new_session())
             db.add(row)
-        state = dict(row.state)
+        state = copy.deepcopy(row.state)  # a shallow copy would hide in-place edits from SQLAlchemy's change detection
         if t.startswith("~"):
             t = state.get("_cb", {}).get(t, t)
         if welcome_now:

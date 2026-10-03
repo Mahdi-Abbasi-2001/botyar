@@ -11,3 +11,6 @@ openai
 langgraph
 httpx
 cryptography
+python-multipart
+openpyxl
+pymupdf

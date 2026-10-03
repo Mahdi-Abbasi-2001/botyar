@@ -51,8 +51,16 @@ def _texts(actions):
     return "\n".join(parts)
 
 
-def run_scenario(spec: BotSpec, sc: TestScenario) -> dict:
+def _fresh_store(spec: BotSpec, catalog: list[dict] | None) -> engine.MemoryStore:
     store = engine.MemoryStore()
+    for b in spec.blocks:
+        if b.type == "catalog_order" and b.source == "table":
+            store.load_catalog(b.id, [dict(p) for p in (catalog or [])])  # copy: stock is decremented per scenario
+    return store
+
+
+def run_scenario(spec: BotSpec, sc: TestScenario, catalog: list[dict] | None = None) -> dict:
+    store = _fresh_store(spec, catalog)
     failures: list[str] = []
     transcript: list[dict] = []
     try:
@@ -82,8 +90,8 @@ def run_scenario(spec: BotSpec, sc: TestScenario) -> dict:
     return {"name": sc.name, "passed": not failures, "failures": failures, "transcript": transcript}
 
 
-def run_plan(spec: BotSpec, scenarios: list[TestScenario]) -> list[dict]:
-    return [run_scenario(spec, sc) for sc in scenarios]
+def run_plan(spec: BotSpec, scenarios: list[TestScenario], catalog: list[dict] | None = None) -> list[dict]:
+    return [run_scenario(spec, sc, catalog) for sc in scenarios]
 
 
 def spec_diff(old: dict | None, new: dict) -> list[dict]:

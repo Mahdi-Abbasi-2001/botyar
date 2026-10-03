@@ -1,3 +1,4 @@
+import copy
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -138,7 +139,7 @@ def simulate(bot_id: int, body: SimMessage, user: User = Depends(current_user), 
     if row is None:
         row = ChatSession(bot_id=bot.id, key="sim:" + body.session_id, state=bot_engine.new_session())
         db.add(row)
-    state = dict(row.state)
+    state = copy.deepcopy(row.state)  # a shallow copy would hide in-place edits from SQLAlchemy's change detection
     actions = bot_engine.handle(spec, state, body.text, SqlStore(db, bot.id, sandbox=True))
     row.state = state
     db.commit()
@@ -250,6 +251,10 @@ def bot_versions(bot_id: int, user: User = Depends(current_user), db: Session = 
 from .publish import router as publish_router  # noqa: E402
 
 app.include_router(publish_router)
+
+from .catalog import router as catalog_router  # noqa: E402
+
+app.include_router(catalog_router)
 
 # ---------- static frontend (Next.js export copied to api/static at build time) ----------
 import os  # noqa: E402

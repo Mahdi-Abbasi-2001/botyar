@@ -75,15 +75,37 @@ class CatalogItem(BaseModel):
     options: list[OptionGroup] = []
 
 
+class ProductOption(BaseModel):
+    name: str
+    choices: list[str]
+
+
+class ProductIn(BaseModel):
+    """A row of the store's product table (also used as the agent's sample/test fixture)."""
+    name: str
+    category: str
+    price: int = Field(ge=0)  # toman
+    stock: int | None  # None = unlimited
+    options: list[ProductOption]
+    description: str
+
+
 class CatalogOrderBlock(BaseModel):
     type: Literal["catalog_order"] = "catalog_order"
     id: str
     title: str
-    items: list[CatalogItem] = Field(min_length=1)
+    source: Literal["inline", "table"] = "inline"  # table = products live in the database, not in the spec
+    items: list[CatalogItem] = []
     max_items: int = Field(default=10, gt=0)
     min_total: int = Field(default=0, ge=0)
     fields: list[FormField] = Field(default_factory=lambda: [f.model_copy() for f in DEFAULT_CONTACT])
     confirm_text: str = "سفارش شما ثبت شد."
+
+    @model_validator(mode="after")
+    def _items(self):
+        if self.source == "inline" and not self.items:
+            raise ValueError("an inline catalog_order needs at least one item (or use source='table')")
+        return self
 
 
 class AdminNotifyBlock(BaseModel):

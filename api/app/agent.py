@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from . import llm, prompts
 from .llm_schema import LLMBotSpec
-from .models import Bot, BotVersion, BuilderMessage, BuilderRun, LlmCall, VersionTests
+from .models import Bot, BotVersion, BuilderMessage, BuilderRun, LlmCall, Product, VersionFixture, VersionTests
 from .spec import BotSpec
 from .testing import TestPlan, TestScenario, run_plan, spec_diff
 
@@ -48,6 +48,7 @@ class S(TypedDict, total=False):
     questions: list[str]
     version: int
     explanation: str
+    fixture: list[dict]
 
 
 class Builder:
@@ -87,10 +88,18 @@ class Builder:
         r: LLMBotSpec = self.ask("design", prompts.DESIGN, payload, LLMBotSpec, effort="low")
         try:
             spec = BotSpec.model_validate(r.model_dump())
-            return {"spec": spec.model_dump(), "errors": [], "design_attempts": n}
+            has_table = any(b.type == "catalog_order" and b.source == "table" for b in spec.blocks)
+            fixture: list[dict] = []
+            if has_table:
+                fixture = s.get("fixture") or [p.model_dump() for p in r.sample_products]  # a frozen fixture survives changes
+                if len(fixture) < 3:
+                    raise ValueError("sample_products: a catalog_order with source 'table' needs 6-10 realistic sample products")
+            return {"spec": spec.model_dump(), "errors": [], "design_attempts": n, "fixture": fixture}
         except ValidationError as e:
             errs = [f"{'.'.join(map(str, x['loc']))}: {x['msg']}" for x in e.errors()]
             return {"spec": None, "errors": errs, "design_attempts": n}
+        except ValueError as e:  # our own fixture rule (ValidationError is handled above)
+            return {"spec": None, "errors": [str(e)], "design_attempts": n}
 
     def after_design(self, s: S) -> str:
         if s.get("spec"):
@@ -100,6 +109,8 @@ class Builder:
     def write_tests(self, s: S) -> dict:
         self.emit("در حال نوشتن سناریوهای تست…")
         payload = f"SPEC:\n{json.dumps(s['spec'], ensure_ascii=False)}\n\nWHAT THE OWNER ASKED FOR:\n{s['summary']}"
+        if s.get("fixture"):
+            payload += "\n\nFIXTURE PRODUCTS (ids are 1..N in this order):\n" + json.dumps([{"id": i, **p} for i, p in enumerate(s["fixture"], 1)], ensure_ascii=False)
         if s.get("current"):
             payload += "\n\n(This is a CHANGE request: write tests only for the new/changed behaviour.)"
         plan: TestPlan = self.ask("tests", prompts.TESTS, payload, TestPlan, effort="none")
@@ -108,7 +119,7 @@ class Builder:
     def run_tests(self, s: S) -> dict:
         all_sc = [TestScenario.model_validate(x) for x in (s.get("old_scenarios", []) + s["scenarios"])]
         self.emit(f"اجرای {len(all_sc)} تست روی ربات…")
-        results = run_plan(BotSpec.model_validate(s["spec"]), all_sc)
+        results = run_plan(BotSpec.model_validate(s["spec"]), all_sc, s.get("fixture"))
         failed = sum(not r["passed"] for r in results)
         self.emit("همه تست‌ها موفق بود ✅" if not failed else f"{failed} تست ناموفق بود")
         for r in results:
@@ -126,6 +137,7 @@ class Builder:
         self.emit(f"ایجنت در حال رفع خطاهای تست (دور {n})…")
         failing = [r for r in s["results"] if not r["passed"]]
         payload = (f"OWNER REQUEST SUMMARY: {s['summary']}\n\nCURRENT SPEC:\n{json.dumps(s['spec'], ensure_ascii=False)}\n\n"
+                   f"{'FIXTURE PRODUCTS (ids 1..N, fixed): ' + json.dumps([{'id': i, **p} for i, p in enumerate(s['fixture'], 1)], ensure_ascii=False) + chr(10) + chr(10) if s.get('fixture') else ''}"
                    f"ALL SCENARIOS:\n{json.dumps(s['scenarios'], ensure_ascii=False)}\n\nFAILING RESULTS (with transcripts):\n{json.dumps(failing, ensure_ascii=False)}")
         r: RepairResult = self.ask("repair", prompts.REPAIR, payload, RepairResult, effort="low")
         try:
@@ -140,6 +152,16 @@ class Builder:
         passed = sum(r["passed"] for r in s["results"])
         self.db.add(BotVersion(bot_id=self.bot_id, version=v, spec=s["spec"], note=s["summary"]))
         self.db.add(VersionTests(bot_id=self.bot_id, version=v, scenarios=s["scenarios"], results=s["results"]))
+        fixture = s.get("fixture") or []
+        if fixture:
+            self.db.add(VersionFixture(bot_id=self.bot_id, version=v, catalog=fixture))
+            for b in s["spec"]["blocks"]:  # first build of a table catalog: seed demo products so the bot is usable at once
+                if b["type"] == "catalog_order" and b.get("source") == "table":
+                    have = self.db.scalar(select(func.count()).select_from(Product).where(Product.bot_id == self.bot_id, Product.block_id == b["id"]))
+                    if not have:
+                        for i, p in enumerate(fixture):
+                            self.db.add(Product(bot_id=self.bot_id, block_id=b["id"], name=p["name"], category=p["category"], price=p["price"], stock=p["stock"],
+                                                options=[o for o in p["options"] if o["choices"]], description=p["description"], position=i, is_sample=True))
         bot = self.db.get(Bot, self.bot_id)
         bot.name = s["spec"]["name"]
         self.db.commit()
@@ -184,8 +206,10 @@ def run_builder(run_id: int, bot_id: int, request: str):
         hist = history_text(db, bot_id)
         db.add(BuilderMessage(bot_id=bot_id, role="user", content=request))
         db.commit()
+        old_fix = db.scalars(select(VersionFixture).where(VersionFixture.bot_id == bot_id).order_by(VersionFixture.version.desc())).first()
         init: S = {"request": request, "history": hist, "current": last.spec if last else None,
-                   "old_scenarios": old_tests.scenarios if (last and old_tests) else []}
+                   "old_scenarios": old_tests.scenarios if (last and old_tests) else [],
+                   "fixture": old_fix.catalog if (last and old_fix) else []}
         final: S = b.graph().invoke(init, {"recursion_limit": 40})
         run = db.get(BuilderRun, run_id)
         outcome = final.get("outcome")
