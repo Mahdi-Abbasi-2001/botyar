@@ -5,7 +5,10 @@ export type Action =
   | { type: "send"; text: string; buttons: Button[] }
   | { type: "notify_admin"; text: string };
 
-export const getToken = () => (typeof window === "undefined" ? null : localStorage.getItem("token"));
+/** sessionStorage key for a description typed on /bots, sent to the agent when the workspace opens. */
+export const PENDING_KEY = (id: number | string) => `botyar:pending:${id}`;
+
+export const getToken =() => (typeof window === "undefined" ? null : localStorage.getItem("token"));
 export const setToken = (t: string | null) => (t ? localStorage.setItem("token", t) : localStorage.removeItem("token"));
 
 export async function api<T = any>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {

@@ -1,0 +1,196 @@
+"use client";
+import { useState } from "react";
+import { Icon, Stamp, fa } from "../ui";
+import { BLOCK_KIND, blockTitle, parseQuestions, toSteps, type ChatMsg, type Spec, type TestRes } from "./model";
+
+const NEW_EXAMPLES = [
+  "برای کلینیک دندانپزشکی‌ام ربات نوبت‌دهی می‌خوام. شنبه ۹ صبح و دوشنبه ۵ عصر، ظرفیت هر کدوم ۸ نفر. نام و موبایل بیمار رو بگیر و ثبت که شد به من خبر بده.",
+  "برای کافه‌ام ربات سفارش می‌خوام: لاته، اسپرسو و کیک. سفارش که ثبت شد به من اطلاع بده.",
+];
+const CHANGE_EXAMPLES = ["وقتی ظرفیت پر شد، لیست انتظار داشته باشه", "پیام خوش‌آمد رو گرم‌تر کن", "یک سؤال «سن» هم به فرم اضافه کن"];
+
+type Props = {
+  spec: Spec | null;
+  tests: TestRes[];
+  chat: ChatMsg[];
+  events: string[];
+  running: boolean;
+  lastCost: number | null;
+  stamped: boolean;
+  input: string;
+  setInput: (s: string) => void;
+  inputRef: React.RefObject<HTMLTextAreaElement | null>;
+  onSend: (text: string) => void;
+};
+
+export function BuilderTab(p: Props) {
+  const lastQ = !p.running && p.chat.length ? parseQuestions(p.chat[p.chat.length - 1].content) : null;
+  return (
+    <div className="flex flex-wrap gap-5">
+      <section className="flex min-w-0 flex-[1_1_360px] flex-col gap-3.5">
+        {p.chat.length === 0 && !p.running && (
+          <div className="flex flex-col gap-3 rounded-2xl border border-line bg-panel p-4">
+            <span className="text-sm leading-7 text-fg-2">{p.spec ? "هر تغییری بخواهی همین‌جا بنویس؛ ایجنت اعمالش می‌کند و همه‌ی تست‌ها را دوباره اجرا می‌کند." : "ربات‌ت را مثل یک پیام معمولی توضیح بده. مثلاً:"}</span>
+            <div className="flex flex-col gap-2">
+              {(p.spec ? CHANGE_EXAMPLES : NEW_EXAMPLES).map((x) => (
+                <button key={x} onClick={() => { p.setInput(x); p.inputRef.current?.focus(); }}
+                  className="min-h-11 rounded-xl border border-line-2 bg-raised px-3.5 py-2 text-right text-[13px] leading-7 text-fg-2 hover:border-saffron hover:text-fg">{x}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {p.chat.map((m, i) => {
+          const qs = m.role === "assistant" ? parseQuestions(m.content) : null;
+          if (qs && i === p.chat.length - 1 && lastQ) return <QuestionCards key={i} questions={qs} onSend={p.onSend} />;
+          if (qs) return <PastQuestions key={i} questions={qs} />;
+          return m.role === "user" ? (
+            <div key={i} className="max-w-[92%] self-start whitespace-pre-line rounded-[14px_14px_4px_14px] bg-raised px-3.5 py-3 text-sm leading-8">{m.content}</div>
+          ) : (
+            <div key={i} className="flex max-w-[94%] gap-2 self-end">
+              <span className="max-w-full whitespace-pre-line rounded-[14px_14px_14px_4px] border border-line bg-panel px-3.5 py-3 text-sm leading-8">{m.content}</span>
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-saffron text-sm font-black text-ink">ب</span>
+            </div>
+          );
+        })}
+
+        {(p.running || (p.events.length > 0 && !lastQ)) && <Timeline events={p.events} running={p.running} />}
+        {p.lastCost !== null && !p.running && <span className="text-xs text-dim">هزینه‌ی هوش مصنوعی این درخواست: <span dir="ltr">${p.lastCost.toFixed(4)}</span></span>}
+
+        {!lastQ && (
+          <form onSubmit={(e) => { e.preventDefault(); p.onSend(p.input); }} className="mt-auto flex items-end gap-2 rounded-2xl border border-line-2 bg-panel p-2">
+            <label htmlFor="agent-in" className="sr-only">{p.spec ? "تغییر بعدی" : "توضیح ربات"}</label>
+            <textarea id="agent-in" ref={p.inputRef} value={p.input} rows={2} disabled={p.running}
+              onChange={(e) => p.setInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); p.onSend(p.input); } }}
+              placeholder={p.running ? "ایجنت در حال کار است…" : p.spec ? "تغییر بعدی را بنویس…" : "ربات‌ت را توضیح بده…"}
+              className="min-w-0 flex-1 resize-none bg-transparent px-2.5 py-2 text-sm leading-7 outline-none placeholder:text-dim disabled:opacity-60" />
+            <button disabled={p.running || p.input.trim().length < 2} className="min-h-11 rounded-xl bg-saffron px-4 text-sm font-extrabold text-ink hover:bg-saffron-hi disabled:opacity-40">بفرست</button>
+          </form>
+        )}
+      </section>
+
+      <MiniMap spec={p.spec} tests={p.tests} running={p.running} stamped={p.stamped} />
+    </div>
+  );
+}
+
+function Timeline({ events, running }: { events: string[]; running: boolean }) {
+  const steps = toSteps(events);
+  return (
+    <div className="flex flex-col rounded-2xl border border-line bg-panel p-4">
+      <div className="flex items-center gap-2 pb-2.5 text-[13px] text-mute">
+        <span className={`h-2 w-2 rounded-full ${running ? "anim-live bg-saffron" : "bg-mint"}`} />
+        {running ? "ایجنت در حال کار" : "کار ایجنت تمام شد"}
+      </div>
+      {steps.map((s, i) => {
+        const active = running && i === steps.length - 1;
+        const ring = s.fail ? "border-bad bg-bad" : active ? "border-saffron" : "border-mint bg-mint";
+        return (
+          <div key={i} className="anim-rise flex gap-3">
+            <div className="flex flex-col items-center">
+              <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 text-xs font-black text-ink ${ring}`}>{s.fail ? "!" : active ? "" : "✓"}</span>
+              {i < steps.length - 1 && <span className="min-h-3.5 w-0.5 flex-1 bg-line" />}
+            </div>
+            <div className="flex min-w-0 flex-col gap-1.5 pb-3">
+              <span className={`text-sm ${s.fail ? "text-bad-fg" : active ? "font-bold text-fg" : "text-fg-2"}`}>{fa(s.text)}</span>
+              {s.subs.map((x, j) => (
+                <span key={j} className="anim-shake rounded-[10px] border border-bad-line bg-bad-bg px-2.5 py-2 text-[13px] leading-7 text-bad-fg">✗ {x}</span>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function QuestionCards({ questions, onSend }: { questions: string[]; onSend: (t: string) => void }) {
+  const [answers, setAnswers] = useState<string[]>(() => questions.map(() => ""));
+  const filled = answers.filter((a) => a.trim()).length;
+  const submit = (fill: boolean) => {
+    const a = answers.map((x) => x.trim() || (fill ? "هر طور خودت صلاح می‌دانی" : ""));
+    onSend(questions.map((q, i) => `${fa(i + 1)}. ${q}\nجواب: ${a[i]}`).join("\n"));
+  };
+  return (
+    <div className="anim-rise flex flex-col gap-3">
+      <div className="flex gap-2 self-end">
+        <span className="rounded-[14px_14px_14px_4px] border border-line bg-panel px-3.5 py-2.5 text-sm leading-7">قبل از ساخت، {fa(questions.length)} سؤال کوتاه دارم.</span>
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-saffron text-sm font-black text-ink">ب</span>
+      </div>
+      {questions.map((q, i) => {
+        const active = i === answers.findIndex((a) => !a.trim());
+        return (
+          <label key={i} className={`flex flex-col gap-2.5 rounded-2xl border bg-panel p-3.5 ${active ? "border-saffron" : "border-line"}`}>
+            <span className="flex gap-2"><span className="shrink-0 text-xs text-mute">{fa(i + 1)} از {fa(questions.length)}</span><span className="text-[15px] font-bold leading-7">{q}</span></span>
+            <input value={answers[i]} onChange={(e) => setAnswers((a) => a.map((x, j) => (j === i ? e.target.value : x)))}
+              placeholder="جوابت…" className="min-h-11 rounded-xl border border-line-2 bg-ink px-3 text-sm outline-none placeholder:text-dim focus:border-saffron" />
+          </label>
+        );
+      })}
+      <button onClick={() => submit(false)} disabled={filled < questions.length}
+        className="min-h-[52px] rounded-2xl bg-saffron font-extrabold text-ink hover:bg-saffron-hi disabled:bg-raised disabled:text-mute">
+        {filled < questions.length ? `${fa(questions.length - filled)} سؤال مانده` : "بساز با همین جواب‌ها"}
+      </button>
+      <button onClick={() => submit(true)} className="min-h-11 text-[13px] text-mute hover:text-fg">بقیه را خودت تصمیم بگیر</button>
+    </div>
+  );
+}
+
+function PastQuestions({ questions }: { questions: string[] }) {
+  return (
+    <div className="max-w-[94%] self-end rounded-[14px_14px_14px_4px] border border-line bg-panel px-3.5 py-3 text-sm leading-8 text-fg-2">
+      <span className="text-xs text-mute">ایجنت پرسید:</span>
+      <ol className="m-0 list-inside list-decimal p-0">{questions.map((q, i) => <li key={i}>{q}</li>)}</ol>
+    </div>
+  );
+}
+
+function MiniMap({ spec, tests, running, stamped }: { spec: Spec | null; tests: TestRes[]; running: boolean; stamped: boolean }) {
+  const passed = tests.filter((t) => t.passed).length;
+  return (
+    <section className="bp relative flex min-w-0 flex-[1.3_1_420px] flex-col gap-3.5 self-start rounded-[20px] border border-line bg-ink-2 p-5">
+      <div className="flex justify-between text-[13px] text-mute">
+        <span>نقشه‌ی ربات</span>
+        {running && spec && <span className="text-saffron">ایجنت در حال تغییر…</span>}
+      </div>
+      {!spec ? (
+        <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 text-center text-[13px] leading-7 text-dim">
+          <Icon name="tree" size={40} strokeWidth={1.4} className="text-line-3" />
+          {running ? "ایجنت در حال طراحی ساختار ربات است…" : "نقشه‌ی ربات بعد از اولین ساخت اینجا کشیده می‌شود."}
+        </div>
+      ) : (
+        <div className={`flex flex-col gap-3 transition-opacity ${running ? "opacity-60" : ""}`}>
+          <div className="flex flex-col gap-2 rounded-2xl border border-line-2 bg-panel p-3.5">
+            <span className="text-xs text-mute">پیام خوش‌آمد و منو</span>
+            <span className="text-sm leading-7">{spec.welcome}</span>
+            <div className="flex flex-wrap gap-1.5">{spec.menu.map((m) => <span key={m.label} className="rounded-lg border border-line-3 px-2.5 py-0.5 text-[13px]">{m.label}</span>)}</div>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {spec.blocks.map((b) => (
+              <div key={b.id} className={`flex flex-col gap-1 rounded-2xl border p-3.5 ${b.type === "admin_notify" ? "border-amber-line bg-amber-bg" : b.type === "booking" || b.type === "catalog_order" ? "border-saffron bg-panel" : "border-line-2 bg-panel"}`}>
+                <span className={`text-xs ${b.type === "admin_notify" ? "text-amber-fg/80" : "text-mute"}`}>{BLOCK_KIND[b.type]}</span>
+                <span className="text-sm leading-7">{blockTitle(b)}</span>
+                {b.type === "booking" && <span className="text-xs text-mute">{fa(b.slots.length)} زمان{b.waitlist ? " · لیست انتظار" : ""}</span>}
+                {b.type === "catalog_order" && <span className="text-xs text-mute">{fa(b.items.length)} آیتم</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {tests.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <span className="text-[13px] text-mute">سناریوهای تست نسخه‌ی فعلی · {fa(passed)} از {fa(tests.length)}</span>
+          {tests.map((t) => (
+            <div key={t.name} className={`flex items-center gap-2.5 rounded-[10px] border bg-panel px-3 py-2 text-[13px] ${t.passed ? "border-line" : "border-bad-line"}`}>
+              <span className={`h-2 w-2 shrink-0 rounded-full ${t.passed ? "bg-mint" : "bg-bad"}`} />
+              <span className="flex-1">{t.name}</span>
+              <span className={`font-bold ${t.passed ? "text-mint" : "text-bad-soft"}`}>{t.passed ? "قبول" : "رد"}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {stamped && <Stamp settle sub={`${fa(passed)} از ${fa(tests.length)} · قبول`} size={156} className="absolute left-7 top-16" />}
+    </section>
+  );
+}

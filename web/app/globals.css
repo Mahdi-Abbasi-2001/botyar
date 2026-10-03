@@ -4,6 +4,92 @@
   --font-sans: var(--font-vazir), system-ui, sans-serif;
 }
 
+/* Direction A — "Night workshop": ink ground, saffron action, mint = tested/OK. */
+@theme {
+  --color-ink: #0B0D12;
+  --color-ink-2: #0E1117;
+  --color-panel: #12151C;
+  --color-raised: #1A1E28;
+  --color-line: #232836;
+  --color-line-2: #2A3040;
+  --color-line-3: #3A4152;
+  --color-fg: #ECE8DF;
+  --color-fg-2: #B4B9C5;
+  --color-mute: #9AA0AE;
+  --color-dim: #6B7080;
+  --color-saffron: #F2A93B;
+  --color-saffron-hi: #FFC56B;
+  --color-saffron-soft: #FFD48A;
+  --color-mint: #4FD1B5;
+  --color-mint-fg: #A8F0DF;
+  --color-mint-bg: #10241F;
+  --color-mint-line: #2D6B5C;
+  --color-bad: #FF6B5E;
+  --color-bad-soft: #FF8A7E;
+  --color-bad-fg: #FFB4AB;
+  --color-bad-bg: #2A1414;
+  --color-bad-line: #5C2421;
+  --color-amber-bg: #1F1A10;
+  --color-amber-line: #6B4E1D;
+  --color-amber-fg: #FFD27A;
+}
+
+html {
+  color-scheme: dark;
+}
+
 body {
   font-family: var(--font-vazir), system-ui, sans-serif;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-saffron);
+  outline-offset: 2px;
+}
+
+/* faint blueprint grid */
+.bp {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+@keyframes slam {
+  0% { opacity: 0; transform: rotate(-14deg) scale(2.4); }
+  60% { opacity: 1; transform: rotate(-14deg) scale(0.92); }
+  100% { opacity: 1; transform: rotate(-14deg) scale(1); }
+}
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(242, 169, 59, 0.55); }
+  50% { box-shadow: 0 0 0 7px rgba(242, 169, 59, 0); }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes shake {
+  0%, 100% { transform: none; }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+@keyframes blink { 50% { opacity: 0; } }
+@keyframes ring {
+  from { transform: scale(0.6); opacity: 0.7; }
+  to { transform: scale(1.9); opacity: 0; }
+}
+
+.anim-stamp { animation: slam 0.5s cubic-bezier(0.3, 1.4, 0.5, 1) both; transform: rotate(-14deg); }
+/* lands, holds, then steps back so it doesn't hide the content under it */
+@keyframes settle { to { opacity: 0.18; } }
+.anim-stamp-settle { animation: slam 0.5s cubic-bezier(0.3, 1.4, 0.5, 1) both, settle 0.8s ease 3.5s forwards; transform: rotate(-14deg); }
+.anim-live { animation: pulse-dot 1.4s infinite; }
+.anim-rise { animation: rise 0.4s ease both; }
+.anim-shake { animation: shake 0.35s ease 2; }
+.anim-caret { animation: blink 0.9s steps(1) infinite; }
+.anim-ring { animation: ring 2.4s ease-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-stamp-settle { animation: none; opacity: 0.18; }
+  .anim-stamp, .anim-live, .anim-rise, .anim-shake, .anim-caret, .anim-ring { animation: none; }
+  * { transition: none !important; }
 }

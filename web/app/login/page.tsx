@@ -1,48 +1,100 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, setToken } from "@/lib/api";
+import { ErrorNote, Logo, Stamp } from "@/components/ui";
 
-export default function Login() {
+type Mode = "login" | "register";
+
+function LoginForm() {
   const router = useRouter();
-  const [mode, setMode] = useState<"login" | "register">("register");
+  const [mode, setMode] = useState<Mode>(useSearchParams().get("mode") === "login" ? "login" : "register");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<{ text: string; taken?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
+  const isReg = mode === "register";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       const r = await api<{ token: string }>(`/auth/${mode}`, { body: { email, password } });
       setToken(r.token);
       router.push("/bots/");
     } catch (err: any) {
-      setError(err.message);
+      const taken = isReg && /ثبت شده/.test(err.message);
+      setError({ text: taken ? "این ایمیل قبلاً ثبت شده." : err.message, taken });
     } finally {
       setBusy(false);
     }
   }
 
+  const field = (bad: boolean) =>
+    `min-h-13 rounded-xl border bg-panel px-3.5 text-left text-base text-fg outline-none focus:border-saffron ${bad ? "border-bad" : "border-line-2"}`;
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-5">
-      <h1 className="mb-1 text-center text-2xl font-extrabold text-indigo-700">بات‌یار</h1>
-      <p className="mb-6 text-center text-sm text-slate-500">{mode === "register" ? "ساخت حساب جدید" : "ورود به حساب"}</p>
-      <form onSubmit={submit} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <input dir="ltr" type="email" required placeholder="ایمیل" value={email} onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-left outline-none focus:border-indigo-500" />
-        <input dir="ltr" type="password" required minLength={6} placeholder="رمز عبور (حداقل ۶ کاراکتر)" value={password}
-          onChange={(e) => setPassword(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-left outline-none focus:border-indigo-500" />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button disabled={busy} className="w-full rounded-lg bg-indigo-600 py-2.5 font-bold text-white hover:bg-indigo-700 disabled:opacity-60">
-          {busy ? "..." : mode === "register" ? "ثبت‌نام" : "ورود"}
-        </button>
-      </form>
-      <button onClick={() => setMode(mode === "register" ? "login" : "register")} className="mt-4 text-sm text-indigo-700 hover:underline">
-        {mode === "register" ? "حساب دارید؟ وارد شوید" : "حساب ندارید؟ ثبت‌نام کنید"}
+    <form onSubmit={submit} className="mx-auto flex w-full max-w-[420px] flex-col gap-5">
+      <Logo />
+      <h1 className="m-0 text-[32px] font-black leading-snug">{isReg ? "یک حساب بساز، ربات اولت منتظر است." : "خوش برگشتی."}</h1>
+
+      <div role="tablist" className="grid grid-cols-2 rounded-2xl border border-line bg-panel p-1">
+        {(["register", "login"] as Mode[]).map((m) => (
+          <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => { setMode(m); setError(null); }}
+            className={`min-h-11 rounded-xl text-[15px] font-bold ${mode === m ? "bg-saffron text-ink" : "text-fg-2 hover:text-fg"}`}>
+            {m === "register" ? "ثبت‌نام" : "ورود"}
+          </button>
+        ))}
+      </div>
+
+      <label className="flex flex-col gap-2">
+        <span className="text-sm text-fg-2">ایمیل</span>
+        <input dir="ltr" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className={field(!!error)} />
+      </label>
+      <label className="flex flex-col gap-2">
+        <span className="text-sm text-fg-2">رمز عبور</span>
+        <input dir="ltr" type="password" required minLength={6} autoComplete={isReg ? "new-password" : "current-password"} value={password}
+          onChange={(e) => setPassword(e.target.value)} className={field(!!error && !error.taken)} />
+        {isReg && <span className="text-[13px] text-mute">حداقل ۶ حرف</span>}
+      </label>
+
+      {error && (
+        <ErrorNote>
+          {error.text}{" "}
+          {error.taken && <button type="button" onClick={() => { setMode("login"); setError(null); }} className="font-bold text-saffron underline">وارد شو</button>}
+        </ErrorNote>
+      )}
+
+      <button disabled={busy} className="flex min-h-[54px] items-center justify-center gap-2.5 rounded-xl bg-saffron text-[17px] font-extrabold text-ink hover:bg-saffron-hi disabled:bg-[#B98330]">
+        {busy && <span className="h-[18px] w-[18px] animate-spin rounded-full border-[3px] border-ink/30 border-t-ink" />}
+        {busy ? (isReg ? "در حال ساخت حساب…" : "در حال ورود…") : isReg ? "ساخت حساب" : "ورود"}
       </button>
+      <span className="text-center text-[13px] leading-7 text-dim">بعد از ورود، مستقیم سراغ ساخت ربات می‌روی.</span>
+    </form>
+  );
+}
+
+export default function Login() {
+  return (
+    <main className="flex min-h-screen flex-wrap">
+      <div className="flex flex-[1_1_480px] flex-col justify-center px-4 py-12 sm:px-6">
+        <Suspense>
+          <LoginForm />
+        </Suspense>
+      </div>
+      <div className="bp hidden flex-[1_1_520px] items-center justify-center border-r border-line bg-ink-2 px-6 py-12 md:flex">
+        <div className="relative flex w-[460px] max-w-full flex-col gap-3.5">
+          <span className="text-[30px] font-black leading-[1.5]">«بگو چی می‌خوای،<br />ربات رو <span className="text-saffron">می‌سازم.</span>»</span>
+          <div className="rounded-2xl border border-line-2 bg-panel px-4 py-3.5 text-sm">سلام! به کلینیک دندانپزشکی خوش آمدید.</div>
+          <div className="flex flex-col gap-1.5 rounded-2xl border border-saffron bg-panel px-4 py-3.5 text-sm">
+            <div className="flex justify-between"><span>شنبه ساعت ۹ صبح</span><span className="text-saffron">۸ جا</span></div>
+            <div className="flex justify-between"><span>دوشنبه ساعت ۵ عصر</span><span className="text-saffron">۸ جا</span></div>
+          </div>
+          <div className="rounded-2xl border border-mint-line bg-mint-bg px-4 py-3.5 text-sm font-bold text-mint-fg">۶ از ۶ تست قبول</div>
+          <Stamp size={130} className="absolute -bottom-8 -left-2.5" />
+        </div>
+      </div>
     </main>
   );
 }
