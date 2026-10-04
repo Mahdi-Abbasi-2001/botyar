@@ -134,8 +134,15 @@ PRICING_CASES = [
      lambda s, m: None if _orders(s) and any(c["code"].upper() == "WELCOME" and c["amount"] == 50000 and c["max_uses"] == 10 for c in _orders(s)[0]["discount_codes"]) else "amount code with max_uses not captured"),
 ]
 
+FEEDBACK_CASES = [
+    ("feedback-basic", "ربات رستوران که مشتری‌ها بتوانند به غذا امتیاز ۱ تا ۵ بدهند و نظرشان را بنویسند، و به من اطلاع بدهد", "done",
+     lambda s, m: None if blocks(s, "feedback") and any(b["on"] == blocks(s, "feedback")[0]["id"] for b in blocks(s, "admin_notify")) else "expected feedback + notify"),
+    ("feedback-with-booking", "ربات آرایشگاه: نوبت‌دهی شنبه تا چهارشنبه ۹ تا ۱۷ هر ۳۰ دقیقه و بخش ثبت نظر مشتری", "done",
+     lambda s, m: None if blocks(s, "feedback") and sched(s) else "expected feedback AND schedule booking"),
+]
+
 # appended by later features (appointment calendars, FAQ, owner chat, delivery/discounts) — see EXTRA_CASES below
-EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES]
+EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES]
 
 
 def run_case(c, i, name, text, want_status, check):

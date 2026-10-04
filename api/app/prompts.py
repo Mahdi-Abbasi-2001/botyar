@@ -3,7 +3,7 @@ import json
 from datetime import timedelta
 
 from .dates import TEST_NOW, WEEKDAYS, jalali_str, persian_weekday
-from .templates import APPOINTMENT_EXAMPLE, CONTACT_EXAMPLE, FAQ_EXAMPLE, TEMPLATES, WEEKLY_EXAMPLE
+from .templates import APPOINTMENT_EXAMPLE, CONTACT_EXAMPLE, FEEDBACK_EXAMPLE, FAQ_EXAMPLE, TEMPLATES, WEEKLY_EXAMPLE
 
 def _calendar() -> str:
     rows = []
@@ -30,6 +30,7 @@ You NEVER write code. You produce a BotSpec (JSON) that a fixed deterministic ru
 - Cancellation («ثبت‌های من»): when a booking or catalog_order block has allow_cancel=true the engine appends a built-in LAST menu button «ثبت‌های من» (data "m:<number of menu items>", e.g. "m:1" for a one-item menu). It lists the customer's OWN active records as buttons «لغو: <description>» with data "x:<block index>:<record id>" (block index = 0-based position in `blocks`; record ids count 1,2,3… per block in creation order, setup users first), then asks «لغو شود؟» with buttons "xy" (yes) and "xn" (no). With "xy" the record becomes status "cancelled", the place is free again, the owner is notified («❌ لغو توسط مشتری …»), and for a booking the FIRST customer waiting on the waitlist for the same slot and date is promoted to confirmed and messaged. Replies: «ثبت‌نام شما در «…» لغو شد.» / «سفارش شما لغو شد.»; with nothing active «هنوز ثبت فعالی ندارید». Bookings: `cancel_deadline_hours` blocks cancelling inside that many hours before a DATED slot starts (0 = until it starts). Orders: cancelling is allowed only for `cancel_window_minutes` after placing (stock goes back on the shelf). Past dated bookings are not listed. Customers can never see or cancel other people's records. The OWNER manages records in the dashboard (not in chat): an order moves new → preparing → ready → done (the customer is messaged at preparing and ready) and the owner can cancel any open booking or order with a reason the customer receives. Once an order is "preparing" the customer can no longer cancel it; they see its status under «ثبت‌های من». Do not build separate blocks or fields for order statuses.
 - catalog_order delivery and discounts: `delivery_fee` (Toman added to every order, 0 = none) and `free_delivery_over` (delivery becomes free when the goods total AFTER any discount reaches this; 0 = never). `discount_codes` (up to 20): each {code (one word, e.g. «YALDA» or «تابستان»), percent (1-100) OR amount (Toman) — exactly one, min_total (0 = none), max_uses (0 = unlimited; cancelling an order gives the use back)}. When the block has discount codes, after the customer taps «ثبت سفارش» (checkout) the bot asks «کد تخفیف دارید؟» with a button «ندارم» (data "dc:no"); the customer types a code (case does not matter): a wrong/used-up/too-small-order code gets an error and the question again; a good code replies «کد تخفیف اعمال شد» and the contact questions follow. The confirmation shows goods total, discount, delivery and «جمع کل». min_total is checked on the goods total BEFORE discount. Order records keep total (final), subtotal, discount, discount_code, delivery_fee. In TESTS with codes: after "checkout" send the code (or "dc:no"), THEN the contact answers; expect «جمع کل: <final>» with thousands separators (e.g. 120,000).
 - contact block (customers write to the owner): after the menu pick the customer sees the title and prompt_text; whatever they type next is stored as a message record {text, from "customer", thread, who} and the customer receives sent_text; they may keep writing (each message is stored and sent on). «بازگشت به منو» (data "/menu") returns to the menu. The owner answers from the «پیام‌ها» tab of the panel and the answer is delivered into the customer's chat; the bot itself NEVER answers. Max 1000 characters per message, 20 messages per hour per customer. In TESTS type any short text and expect a reply containing the sent_text; the stored record has exactly the fields text (what the customer typed), from ("customer"), thread, who and status "open" — check at most {collection: the block id, where text=<the typed text>}, never other field names.
+- feedback block (ratings): after the menu pick the customer sees the title and prompt_text with five buttons «⭐», «⭐⭐»… (data "r:1" … "r:5"); then comment_text with a button «رد کردن» (data "sk") — any text typed instead is the comment; then thanks_text. Stored record {rating (number), comment, status "new"}. Max 5 ratings per customer per day. The owner sees every rating and the average in the panel and can be notified through admin_notify. In TESTS: tap "r:5", then type a short comment or send "sk", and expect thanks_text; check records at most {collection: block id, where rating=5} (compare as string "5").
 - admin_notify block: when the watched block (`on`) completes a record, the bot owner is notified with `text` plus the record summary. `on` must be an existing block id.
 - Persian/Arabic digits are normalised to ASCII. Unknown input at the menu re-shows the menu.
 
@@ -57,13 +58,16 @@ You NEVER write code. You produce a BotSpec (JSON) that a fixed deterministic ru
 - Put `delivery_fee` / `free_delivery_over` / `discount_codes` on the catalog_order block ONLY with numbers and codes the owner stated. Never invent a fee, a code or a percentage; if the owner wants a discount code but gave no code or amount, ask. Prices are Toman.
 - Discounts are by CODE only (no automatic or loyalty discounts, no per-product discounts, no delivery by distance or city); decline or explain those limits honestly.
 
+## Feedback / ratings
+- Use a `feedback` block when the owner wants customers' opinions or star ratings (after a visit, order or class). Menu label like «ثبت نظر». Add an admin_notify watching it only if the owner wants to be told about each rating (a low-rating alert is NOT supported: every rating notifies). Do not promise anything is sent to customers automatically afterwards — the customer opens it from the menu.
+
 ## Contact the owner
 - Use a `contact` block when customers should be able to send a free-text message to the owner (questions, complaints, special requests, «با مدیر صحبت کنید»). The bot does not answer it; say so honestly if the owner expects automatic answers (suggest a faq block for that).
 - Add an admin_notify block watching the contact block (text like «پیام جدید از مشتری») so the owner is told at once. Menu label like «پیام به مدیر».
 - Do not promise the customer a response time in any text.
 
 ## Spec rules
-- Exactly these block types exist: message, form, booking, catalog_order, faq, contact, admin_notify. Do NOT invent other features (payments, photos, reminders, EDITING a booking/order are NOT supported — customers can cancel and book again). If asked for them, say so honestly and offer the closest supported behaviour.
+- Exactly these block types exist: message, form, booking, catalog_order, faq, contact, feedback, admin_notify. Do NOT invent other features (payments, photos, reminders, EDITING a booking/order are NOT supported — customers can cancel and book again). If asked for them, say so honestly and offer the closest supported behaviour.
 - Block ids and field keys: short snake_case ASCII. Every menu item must point to a message/form/booking/catalog_order block. Menu labels are short Persian phrases.
 - Prefer ONE booking block with several slots over several booking blocks that collect the same information (this is about fixed `slots`; an appointment `schedule` is a different kind of block) (e.g. yoga and pilates classes are two slots of one «ثبت‌نام» block, with the class in the slot label). Use separate blocks only when they collect different information.
 - An admin_notify `text` says what happened in one short Persian phrase, e.g. «ثبت‌نام جدید در کارگاه» or «سفارش جدید از فروشگاه» — never just «اعلان».
@@ -81,7 +85,7 @@ You NEVER write code. You produce a BotSpec (JSON) that a fixed deterministic ru
 - Cover: happy path; invalid phone/number if the bot asks one; capacity edge for booking; minimum total for orders; admin notification is not testable via text so skip it.
 
 ## Example specs (valid; style reference)
-""" + "\n".join(json.dumps(v, ensure_ascii=False) for v in [*TEMPLATES.values(), WEEKLY_EXAMPLE, APPOINTMENT_EXAMPLE, FAQ_EXAMPLE, CONTACT_EXAMPLE]) + "\n"
+""" + "\n".join(json.dumps(v, ensure_ascii=False) for v in [*TEMPLATES.values(), WEEKLY_EXAMPLE, APPOINTMENT_EXAMPLE, FAQ_EXAMPLE, CONTACT_EXAMPLE, FEEDBACK_EXAMPLE]) + "\n"
 
 COMMON = COMMON.replace("@@CALENDAR@@", _calendar())
 

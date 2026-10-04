@@ -22,7 +22,7 @@ TEHRAN = ZoneInfo("Asia/Tehran")
 CSV_TYPE = "text/csv; charset=utf-8"
 XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-KEY_LABEL = {"question": "سؤال", "note": "یادداشت", "time": "ساعت", "staff": "کارمند", "date": "تاریخ (میلادی)", "name": "نام", "phone": "موبایل", "status": "وضعیت", "slot_label": "زمان", "items": "اقلام", "total": "جمع (تومان)", "subtotal": "مبلغ کالاها (تومان)", "discount": "تخفیف (تومان)", "discount_code": "کد تخفیف", "delivery_fee": "هزینه ارسال (تومان)"}
+KEY_LABEL = {"question": "سؤال", "note": "یادداشت", "time": "ساعت", "staff": "کارمند", "date": "تاریخ (میلادی)", "name": "نام", "phone": "موبایل", "status": "وضعیت", "slot_label": "زمان", "items": "اقلام", "total": "جمع (تومان)", "rating": "امتیاز", "comment": "نظر", "subtotal": "مبلغ کالاها (تومان)", "discount": "تخفیف (تومان)", "discount_code": "کد تخفیف", "delivery_fee": "هزینه ارسال (تومان)"}
 STATUS_LABEL = {"confirmed": "تأیید شده", "waitlisted": "لیست انتظار", "new": "جدید", "preparing": "در حال آماده‌سازی", "ready": "آماده", "done": "تحویل شد", "cancelled": "لغو شده", "unanswered": "بدون پاسخ", "handled": "رسیدگی شد"}
 
 

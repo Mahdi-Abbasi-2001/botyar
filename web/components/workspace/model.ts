@@ -13,6 +13,7 @@ export type Block =
   | { type: "form"; id: string; title: string; fields: Field[]; done_text: string }
   | { type: "booking"; id: string; title: string; slots: Slot[]; waitlist: boolean; schedule?: Schedule | null; allow_cancel?: boolean; cancel_deadline_hours?: number; occurrences?: number; fields: Field[]; confirm_text: string; full_text: string; waitlist_text: string }
   | { type: "catalog_order"; id: string; title: string; items: Item[]; max_items: number; min_total: number; fields: Field[]; confirm_text: string; delivery_fee?: number; free_delivery_over?: number; discount_codes?: { code: string; percent: number; amount: number; min_total: number; max_uses: number }[] }
+  | { type: "feedback"; id: string; title: string; prompt_text?: string; comment_text?: string; thanks_text?: string }
   | { type: "contact"; id: string; title: string; prompt_text?: string; sent_text?: string }
   | { type: "faq"; id: string; title: string; entries: { question: string; answer: string }[]; prompt_text?: string; not_found_text?: string }
   | { type: "admin_notify"; id: string; on: string; text: string };
@@ -28,7 +29,7 @@ export type RunResult = { message: string; version?: number; tests?: TestRes[]; 
 export type RunStatus = "running" | "needs_input" | "done" | "failed" | "declined";
 
 export const BLOCK_KIND: Record<Block["type"], string> = {
-  message: "پیام", form: "فرم", booking: "نوبت‌دهی", catalog_order: "سفارش", admin_notify: "اعلان به مدیر", faq: "پرسش‌های متداول", contact: "پیام به مدیر",
+  message: "پیام", form: "فرم", booking: "نوبت‌دهی", catalog_order: "سفارش", admin_notify: "اعلان به مدیر", faq: "پرسش‌های متداول", contact: "پیام به مدیر", feedback: "نظرسنجی",
 };
 export const FIELD_KIND: Record<Field["kind"], string> = { text: "متن", phone: "موبایل · بررسی قالب", number: "عدد", choice: "انتخابی" };
 

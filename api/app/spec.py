@@ -226,6 +226,16 @@ class ContactBlock(BaseModel):
     sent_text: str = "پیام شما برای مدیر ارسال شد. پاسخ را همین‌جا دریافت می‌کنید."
 
 
+class FeedbackBlock(BaseModel):
+    """Customers rate the service 1-5 and may add a comment; the owner sees every rating and the average in the panel."""
+    type: Literal["feedback"] = "feedback"
+    id: str
+    title: str
+    prompt_text: str = "به تجربه‌ی خود امتیاز دهید:"
+    comment_text: str = "اگر نظر یا پیشنهادی دارید بنویسید، یا «رد کردن» را بزنید:"
+    thanks_text: str = "ممنون از نظر شما 🌟"
+
+
 class AdminNotifyBlock(BaseModel):
     type: Literal["admin_notify"] = "admin_notify"
     id: str
@@ -234,7 +244,7 @@ class AdminNotifyBlock(BaseModel):
 
 
 Block = Annotated[
-    Union[MessageBlock, FormBlock, BookingBlock, CatalogOrderBlock, FaqBlock, ContactBlock, AdminNotifyBlock],
+    Union[MessageBlock, FormBlock, BookingBlock, CatalogOrderBlock, FaqBlock, ContactBlock, FeedbackBlock, AdminNotifyBlock],
     Field(discriminator="type"),
 ]
 

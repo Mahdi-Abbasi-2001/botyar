@@ -69,6 +69,16 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
     const on = spec.blocks.find((x) => x.id === b.on);
     return <span className="text-sm leading-7 text-amber-fg">بعد از هر ثبت در «{on ? blockTitle(on) : b.on}»: «{b.text}»</span>;
   }
+  if (b.type === "feedback") {
+    const rs = records.filter((r) => r.collection === b.id && typeof r.data.rating === "number");
+    const avg = rs.length ? rs.reduce((a, r) => a + (r.data.rating as number), 0) / rs.length : 0;
+    return (
+      <span className="text-sm leading-7 text-fg-2">
+        مشتری با ۱ تا ۵ ستاره امتیاز می‌دهد و در صورت تمایل نظر می‌نویسد.{" "}
+        {rs.length ? `میانگین تا الان: ${fa(avg.toFixed(1))} از ۵ (${fa(rs.length)} نظر).` : "هنوز نظری ثبت نشده است."}
+      </span>
+    );
+  }
   if (b.type === "contact")
     return <span className="text-sm leading-7 text-fg-2">مشتری پیامش را می‌نویسد و برای شما می‌آید؛ پاسخ را از بخش «پیام‌ها» می‌نویسید و در همان گفتگوی مشتری می‌رسد. ربات خودش جواب نمی‌دهد.</span>;
   if (b.type === "faq") {
@@ -297,6 +307,7 @@ export function RecordsTab({ records, spec, botId, onChanged }: { records: Rec[]
   const detail = (r: Rec) => {
     const d = r.data;
     if (d.question) return `سؤال: ${d.question}${d.note ? ` (${d.note})` : ""}`;
+    if (typeof d.rating === "number") return `${"⭐".repeat(d.rating)}${d.comment ? ` · ${d.comment}` : ""}`;
     if (d.slot_label) return d.slot_label;
     if (Array.isArray(d.items)) return `${d.items.map((i: any) => i.name).join("، ")} · ${toman(d.total ?? 0)}`;
     return Object.entries(d).filter(([k]) => !k.startsWith("_") && !["name", "phone", "status"].includes(k)).map(([, v]) => String(v)).join(" · ") || "—";

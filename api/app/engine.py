@@ -14,7 +14,7 @@ from typing import Any, Protocol
 from . import dates
 from .engine_text import fa_digits, fa_norm, norm  # noqa: F401  (re-exported: engine.norm / engine.fa_norm / engine.fa_digits)
 from .faq_match import LexicalMatcher, MatcherUnavailable, RateLimited, decide
-from .spec import norm_code, BotSpec, BookingBlock, CatalogOrderBlock, ContactBlock, FaqBlock, FormBlock, FormField, MessageBlock
+from .spec import norm_code, BotSpec, BookingBlock, CatalogOrderBlock, ContactBlock, FaqBlock, FeedbackBlock, FormBlock, FormField, MessageBlock
 
 log = logging.getLogger("botyar.engine")
 STALE_RESETS = {"count": 0}  # tests assert this stays 0 unless a bot really changed under a conversation
@@ -213,6 +213,8 @@ def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matc
             return _faq(spec, session, block, text, store, now, matcher or LexicalMatcher())
         if block.type == "contact":
             return _contact(spec, session, block, text, store, now)
+        if block.type == "feedback":
+            return _feedback(spec, session, block, text, store, now)
     except (StopIteration, IndexError, KeyError) as e:
         # The saved state belongs to an older version of the bot (the owner republished mid-conversation:
         # a block, field, slot or option it points to is gone). Never leave the customer in silence.
@@ -244,6 +246,9 @@ def _from_menu(spec, session, text_n, store, now):
         return [send(block.title), _ask(block.fields[0])]
     if block.type == "faq":
         return _faq_start(session, block)
+    if block.type == "feedback":
+        session.update(block=block.id, step="rate", data={})
+        return [send(block.title), _rate_prompt(block)]
     if block.type == "contact":
         session.update(block=block.id, step="msg", data={})
         return [send(block.title), send(block.prompt_text, _faq_nav())]
@@ -894,6 +899,38 @@ def _faq(spec, session, block: FaqBlock, text, store, now, matcher):
     if kind == "suggest":
         return [send("منظورتان یکی از این سؤال‌هاست؟", [_btn(_short(block.entries[i].question, 50), f"fq:{i}") for i in idx] + [_btn("هیچ‌کدام", "fn")])]
     return _faq_unanswered(spec, session, block, store, now, query)
+
+
+# ---------- feedback (1-5 stars + optional comment) ----------
+FEEDBACK_PER_DAY = 5
+
+
+def _rate_prompt(block: FeedbackBlock):
+    return send(block.prompt_text, [_btn("⭐" * n, f"r:{n}") for n in range(1, 6)] + [_btn("بازگشت به منو", "/menu")])
+
+
+def _feedback(spec, session, block: FeedbackBlock, text, store, now):
+    text_n, d = norm(text), session["data"]
+    if session["step"] == "rate":
+        m = re.fullmatch(r"r:([1-5])", text_n)
+        if not m:
+            return [send("لطفاً با یکی از دکمه‌ها امتیاز دهید."), _rate_prompt(block)]
+        d["rating"], session["step"] = int(m.group(1)), "comment"
+        return [send(block.comment_text, [_btn("رد کردن", "sk"), _btn("بازگشت به منو", "/menu")])]
+    comment = "" if text_n == "sk" else text.strip()[:500]
+    cust = session.get("cust")
+    if cust:  # a customer can't flood the averages
+        day_ago = now - timedelta(days=1)
+        recent = sum(1 for r in store.find(block.id, _cust=cust) if datetime.fromisoformat(r["_at"]) > day_ago)
+        if recent >= FEEDBACK_PER_DAY:
+            _reset(session)
+            return [send("امتیازهای امروز شما ثبت شده است؛ ممنون!"), menu_actions(spec)]
+    row = store.add(block.id, {"rating": d["rating"], "comment": comment, "status": "new", **_ident(session, now)})
+    actions = [send(block.thanks_text)]
+    _notify(spec, block.id, f"{'⭐' * d['rating']}" + (f"\n{comment}" if comment else ""), actions, prefix=f"⭐ نظر جدید · {block.title}")
+    _reset(session)
+    actions.append(menu_actions(spec))
+    return actions
 
 
 # ---------- talk to the owner (messages go to the dashboard inbox; the owner's replies come back to this chat) ----------

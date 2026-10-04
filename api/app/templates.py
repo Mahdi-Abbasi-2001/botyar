@@ -108,6 +108,16 @@ CONTACT_EXAMPLE = {
     ],
 }
 
+FEEDBACK_EXAMPLE = {
+    "name": "ربات نظرسنجی رستوران",
+    "welcome": "سلام! نظر شما برای ما ارزشمند است.",
+    "menu": [{"label": "ثبت نظر", "block": "fb"}],
+    "blocks": [
+        {"type": "feedback", "id": "fb", "title": "نظرسنجی رستوران"},
+        {"type": "admin_notify", "id": "notify_fb", "on": "fb", "text": "نظر جدید ثبت شد"},
+    ],
+}
+
 TEMPLATES = {"workshop": WORKSHOP, "cafe": CAFE}
 
 
