@@ -69,6 +69,22 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
     const on = spec.blocks.find((x) => x.id === b.on);
     return <span className="text-sm leading-7 text-amber-fg">بعد از هر ثبت در «{on ? blockTitle(on) : b.on}»: «{b.text}»</span>;
   }
+  if (b.type === "faq") {
+    const open = records.filter((r) => r.collection === b.id && r.data.status === "unanswered").length;
+    return (
+      <>
+        <div className="flex flex-col gap-1.5 text-sm">
+          {b.entries.map((e, i) => (
+            <div key={i} className="flex flex-col gap-0.5 rounded-[10px] bg-raised px-3 py-2">
+              <span className="font-semibold">{e.question}</span>
+              <span className="text-mute">{e.answer}</span>
+            </div>
+          ))}
+        </div>
+        <span className="text-xs text-mute">مشتری سؤالش را با کلمات خودش می‌نویسد و همین پاسخ‌های شما را می‌بیند؛ چیزی ساخته نمی‌شود. {open ? `${fa(open)} سؤال بدون پاسخ در انتظار شماست.` : "سؤال‌های بدون پاسخ برای شما ثبت می‌شود."}</span>
+      </>
+    );
+  }
   if (b.type === "catalog_order")
     return (
       <>
@@ -255,6 +271,8 @@ const STATUS: Record<string, [string, string]> = {
   preparing: ["در حال آماده‌سازی", "border border-saffron bg-saffron/10 text-saffron"],
   ready: ["آماده", "bg-mint text-ink font-bold"],
   done: ["تحویل شد", "border border-line-3 text-mute"],
+  unanswered: ["بدون پاسخ", "border border-saffron bg-saffron/10 text-saffron"],
+  handled: ["رسیدگی شد", "border border-line-3 text-mute"],
 };
 const mask = (p?: string) => (p && p.length >= 8 ? `${p.slice(0, 4)} ••• ${p.slice(-4)}` : p ?? "—");
 
@@ -268,6 +286,7 @@ export function RecordsTab({ records, spec, botId, onChanged }: { records: Rec[]
 
   const detail = (r: Rec) => {
     const d = r.data;
+    if (d.question) return `سؤال: ${d.question}${d.note ? ` (${d.note})` : ""}`;
     if (d.slot_label) return d.slot_label;
     if (Array.isArray(d.items)) return `${d.items.map((i: any) => i.name).join("، ")} · ${toman(d.total ?? 0)}`;
     return Object.entries(d).filter(([k]) => !k.startsWith("_") && !["name", "phone", "status"].includes(k)).map(([, v]) => String(v)).join(" · ") || "—";

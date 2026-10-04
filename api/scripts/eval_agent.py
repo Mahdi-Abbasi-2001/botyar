@@ -23,6 +23,7 @@ from app.main import app  # noqa: E402
 settings.register_per_ip_hour = 10_000  # one machine registers many throw-away accounts
 
 ANSWER = "بقیه‌ی جزئیات رو خودت تصمیم بگیر و بساز."
+INSIST = "همین الان بساز، هر چی خودت صلاح می‌دونی."  # sent when the agent still asks after ANSWER
 MAX_COST, MAX_SECONDS = 0.02, 150
 
 
@@ -98,8 +99,23 @@ APPOINTMENT_CASES = [
      lambda s, m: None if sched(s) and sched(s)[0]["duration_minutes"] and ("۳۰" in m or "30" in m or "مدت" in m) else "should assume a duration and say so"),
 ]
 
+def faqs(spec):
+    return [b for b in blocks(spec, "faq")]
+
+
+FAQ_CASES = [
+    ("faq-with-facts", "ربات پرسش‌های متداول برای کلینیک دندانپزشکی: ساعت کاری شنبه تا چهارشنبه ۹ تا ۱۸، آدرس خیابان ولیعصر پلاک ۱۲، هزینه ویزیت ۲۵۰ هزار تومان، پارکینگ اختصاصی داریم و بیمه تکمیلی قبول می‌کنیم.", "done",
+     lambda s, m: None if faqs(s) and len(faqs(s)[0]["entries"]) >= 4 and "ولیعصر" in json.dumps(faqs(s)[0]["entries"], ensure_ascii=False) and "۲۵۰" in json.dumps(faqs(s)[0]["entries"], ensure_ascii=False)
+     and any(b["on"] == faqs(s)[0]["id"] for b in blocks(s, "admin_notify")) else "expected an FAQ with the owner's facts and a notification block"),
+    ("faq-no-invented-facts", "یه ربات پرسش و پاسخ برای کافه‌م بساز", "needs_input", lambda s, m: None),
+    ("faq-forced-build-no-invention", "ربات سؤال‌های متداول برای باشگاه ورزشی", "done",
+     lambda s, m: None if faqs(s) and not any(ch in json.dumps(faqs(s)[0]["entries"], ensure_ascii=False) for ch in "0123456789۰۱۲۳۴۵۶۷۸۹") else "answers contain digits although the owner gave no facts: invented hours/prices?"),
+    ("faq-plus-booking", "ربات کلینیک: نوبت‌دهی دوشنبه‌ها از ۴ تا ۸ عصر هر ۲۰ دقیقه، و بخش سؤال‌های متداول: آدرس ما خیابان آزادی پلاک ۵ است و ویزیت ۳۰۰ هزار تومان.", "done",
+     lambda s, m: None if faqs(s) and sched(s) else "expected an FAQ block AND an appointment schedule"),
+]
+
 # appended by later features (appointment calendars, FAQ, owner chat, delivery/discounts) — see EXTRA_CASES below
-EXTRA_CASES: list = [*APPOINTMENT_CASES]
+EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES]
 
 
 def run_case(c, i, name, text, want_status, check):
@@ -107,7 +123,7 @@ def run_case(c, i, name, text, want_status, check):
     H = {"Authorization": f"Bearer {tok}"}
     bot = c.post("/api/bots/draft", headers=H).json()["id"]
     t0, cost, repairs, status, msg = time.time(), 0.0, 0, "?", ""
-    for m in (text, ANSWER):
+    for m in (text, ANSWER, INSIST):
         rid = c.post(f"/api/bots/{bot}/builder", headers=H, json={"text": m}).json()["run_id"]
         r = c.get(f"/api/bots/{bot}/builder/runs/{rid}", headers=H).json()
         cost += r["result"].get("cost_usd", 0)

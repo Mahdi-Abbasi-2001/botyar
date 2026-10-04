@@ -177,6 +177,21 @@ class CatalogOrderBlock(BaseModel):
         return self
 
 
+class FaqEntry(BaseModel):
+    question: str = Field(min_length=3, max_length=200)
+    answer: str = Field(min_length=1, max_length=1500)
+
+
+class FaqBlock(BaseModel):
+    """Customers type a question in their own words; the bot returns the owner's EXACT answer (retrieval only, nothing is generated)."""
+    type: Literal["faq"] = "faq"
+    id: str
+    title: str
+    entries: list[FaqEntry] = Field(min_length=1, max_length=40)
+    prompt_text: str = "سؤال خود را بنویسید تا پاسخش را پیدا کنم، یا از فهرست انتخاب کنید:"
+    not_found_text: str = "پاسخ این سؤال را پیدا نکردم. سؤالتان برای مدیر ثبت شد و به‌زودی پاسخ می‌دهیم."
+
+
 class AdminNotifyBlock(BaseModel):
     type: Literal["admin_notify"] = "admin_notify"
     id: str
@@ -185,7 +200,7 @@ class AdminNotifyBlock(BaseModel):
 
 
 Block = Annotated[
-    Union[MessageBlock, FormBlock, BookingBlock, CatalogOrderBlock, AdminNotifyBlock],
+    Union[MessageBlock, FormBlock, BookingBlock, CatalogOrderBlock, FaqBlock, AdminNotifyBlock],
     Field(discriminator="type"),
 ]
 

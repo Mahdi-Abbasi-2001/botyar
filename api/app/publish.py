@@ -8,11 +8,12 @@ from pydantic import BaseModel
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from . import bale
+from . import bale, faq_index
 from .auth import current_user
 from .config import settings
 from .db import get_db
 from .models import Bot, BotVersion, ChatLink, Publication, User, VersionTests
+from .spec import BotSpec
 
 router = APIRouter()
 
@@ -75,6 +76,10 @@ def publish(bot_id: int, body: PublishIn, user: User = Depends(current_user), db
     if not settings.public_base_url:
         raise HTTPException(503, "آدرس عمومی سرور تنظیم نشده است")
     pub = db.scalars(select(Publication).where(Publication.bot_id == bot_id)).first()
+    try:  # a failed first indexing is retried here, before any customer can use the FAQ (cheap no-op when already indexed)
+        faq_index.ensure(db, bot_id, BotSpec.model_validate(latest.spec))
+    except Exception:  # noqa: BLE001
+        db.rollback()
 
     token_enc, username = "", ""
     if body.mode == "own":

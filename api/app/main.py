@@ -8,6 +8,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from . import engine as bot_engine
+from . import faq_index
 from .auth import check_password, current_user, hash_password, make_token
 from .config import settings
 from .db import Base, engine, get_db
@@ -178,7 +179,7 @@ def simulate(bot_id: int, body: SimMessage, user: User = Depends(current_user), 
         db.add(row)
     state = copy.deepcopy(row.state)  # a shallow copy would hide in-place edits from SQLAlchemy's change detection
     state["cust"] = "sim:" + body.session_id
-    actions = bot_engine.handle(spec, state, body.text, SqlStore(db, bot.id, sandbox=True))
+    actions = bot_engine.handle(spec, state, body.text, SqlStore(db, bot.id, sandbox=True), matcher=faq_index.matcher_for(db, bot.id, spec))
     row.state = state
     db.commit()
     return {"actions": actions}

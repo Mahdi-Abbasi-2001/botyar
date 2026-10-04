@@ -81,6 +81,22 @@ APPOINTMENT_EXAMPLE = {
     ],
 }
 
+# Style reference for the agent only: an FAQ bot. Facts come ONLY from what the owner said.
+FAQ_EXAMPLE = {
+    "name": "ربات پرسش‌های متداول کلینیک",
+    "welcome": "سلام! پاسخ سؤال‌های رایج را اینجا پیدا کنید.",
+    "menu": [{"label": "سؤال دارید؟", "block": "faq"}],
+    "blocks": [
+        {"type": "faq", "id": "faq", "title": "پرسش‌های متداول",
+         "entries": [
+             {"question": "ساعت کاری کلینیک چیست؟", "answer": "شنبه تا چهارشنبه از ۹ صبح تا ۶ عصر."},
+             {"question": "آدرس کلینیک کجاست؟", "answer": "خیابان ولیعصر، پلاک ۱۲."},
+             {"question": "هزینه ویزیت چقدر است؟", "answer": "ویزیت اولیه ۲۵۰ هزار تومان است."},
+         ]},
+        {"type": "admin_notify", "id": "notify_faq", "on": "faq", "text": "سؤال جدید بدون پاسخ"},
+    ],
+}
+
 TEMPLATES = {"workshop": WORKSHOP, "cafe": CAFE}
 
 

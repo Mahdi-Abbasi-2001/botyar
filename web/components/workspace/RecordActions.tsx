@@ -17,13 +17,14 @@ const btn = "min-h-8 rounded-lg border border-line-3 px-2.5 text-xs hover:border
 /** Owner actions for one booking/order: move an order along, or cancel (the reason is sent to the customer). */
 export function RecordActions({ botId, rec, onChanged }: { botId: string | number; rec: Rec; onChanged: () => void }) {
   const isOrder = Array.isArray(rec.data.items);
+  const isFaq = "question" in rec.data;
   const st: string = rec.data.status;
   const [busy, setBusy] = useState(false);
   const [asking, setAsking] = useState(false);
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
-  const open = isOrder ? st in NEXT : st === "confirmed" || st === "waitlisted";
+  const open = isFaq ? st === "unanswered" : isOrder ? st in NEXT : st === "confirmed" || st === "waitlisted";
   if (!open && !note) return null;
 
   async function go(body: Record<string, unknown>) {
@@ -34,7 +35,8 @@ export function RecordActions({ botId, rec, onChanged }: { botId: string | numbe
       const m = r.customer_messages;
       const parts: string[] = [];
       if (r.promoted) parts.push(`${r.promoted.name ?? "نفر بعدی"} از لیست انتظار تأیید شد`);
-      if (m.sandbox) parts.push("در شبیه‌ساز پیامی به مشتری ارسال نمی‌شود");
+      if (isFaq) { /* closing a question messages nobody */ }
+      else if (m.sandbox) parts.push("در شبیه‌ساز پیامی به مشتری ارسال نمی‌شود");
       else if (m.wanted && m.sent === m.wanted) parts.push(`به ${fa(m.sent)} مشتری پیام داده شد ✓`);
       else if (m.wanted) parts.push("پیام به مشتری ارسال نشد (شاید ربات را مسدود کرده است)");
       else parts.push("این ثبت مشتری قابل پیام‌دادن ندارد");
@@ -50,7 +52,12 @@ export function RecordActions({ botId, rec, onChanged }: { botId: string | numbe
 
   return (
     <div className="flex flex-col gap-1.5">
-      {open && !asking && (
+      {open && isFaq && (
+        <div className="flex flex-wrap gap-1.5">
+          <button className={btn} disabled={busy} onClick={() => go({ action: "status", status: "handled" })}>رسیدگی شد</button>
+        </div>
+      )}
+      {open && !isFaq && !asking && (
         <div className="flex flex-wrap gap-1.5">
           {isOrder && NEXT[st].map(([s, label]) => <button key={s} className={btn} disabled={busy} onClick={() => go({ action: "status", status: s })}>{label}</button>)}
           <button className={btn + " hover:!border-bad hover:!text-bad-soft"} disabled={busy} onClick={() => setAsking(true)}>لغو</button>

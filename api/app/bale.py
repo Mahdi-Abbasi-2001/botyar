@@ -21,7 +21,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import engine
+from . import engine, faq_index
 from .config import settings
 from .db import SessionLocal
 from .models import BotVersion, ChatLink, ChatSession, Publication
@@ -288,7 +288,7 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict):
         elif kind == "shared" and t.startswith("/start"):
             t = "/start"
         state["cust"] = f"bale:{chat_id}"  # stable customer identity (set last: the welcome path above replaces the whole state)
-        actions = engine.handle(spec, state, t, SqlStore(db, pub.bot_id, sandbox=False))
+        actions = engine.handle(spec, state, t, SqlStore(db, pub.bot_id, sandbox=False), matcher=faq_index.matcher_for(db, pub.bot_id, spec))
         deliver(token, chat_id, actions, state, pub.admin_chat_id, clicked_message_id)
         row.state = state
         db.commit()

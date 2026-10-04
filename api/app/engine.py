@@ -12,37 +12,25 @@ from datetime import date, datetime, time, timedelta
 from typing import Any, Protocol
 
 from . import dates
-from .spec import BotSpec, BookingBlock, CatalogOrderBlock, FormBlock, FormField, MessageBlock
+from .engine_text import fa_digits, fa_norm, norm  # noqa: F401  (re-exported: engine.norm / engine.fa_norm / engine.fa_digits)
+from .faq_match import LexicalMatcher, MatcherUnavailable, RateLimited, decide
+from .spec import BotSpec, BookingBlock, CatalogOrderBlock, FaqBlock, FormBlock, FormField, MessageBlock
 
-_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 log = logging.getLogger("botyar.engine")
 STALE_RESETS = {"count": 0}  # tests assert this stays 0 unless a bot really changed under a conversation
 MY_LABEL = "ثبت‌های من"  # built-in menu entry, present when a block allows cancelling
 MY_BLOCK = "__my__"
-STATUS_FA = {"confirmed": "تأیید شده", "waitlisted": "در لیست انتظار", "new": "سفارش جدید", "preparing": "در حال آماده‌سازی", "ready": "آماده", "done": "تحویل داده شد", "cancelled": "لغو شده"}
+STATUS_FA = {"confirmed": "تأیید شده", "waitlisted": "در لیست انتظار", "new": "سفارش جدید", "preparing": "در حال آماده‌سازی", "ready": "آماده", "done": "تحویل داده شد", "cancelled": "لغو شده", "unanswered": "بدون پاسخ", "handled": "رسیدگی شد"}
 ORDER_FLOW = ["new", "preparing", "ready", "done"]  # the owner moves an order forward; the customer is told at each step
 MENU_WORDS = {"/start", "/menu", "منو", "منوی اصلی", "شروع"}
 CANCEL_WORDS = {"/cancel", "انصراف", "لغو"}
 
 
-_TO_FA = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
 
 
-def fa_digits(text: str) -> str:
-    """Display form for customers: ASCII digits -> Persian digits. Applied by the channels (never to callback data)."""
-    return (text or "").translate(_TO_FA)
 
 
-def norm(text: str) -> str:
-    return (text or "").translate(_DIGITS).strip()
 
-
-_FA = str.maketrans({"ي": "ی", "ك": "ک", "ة": "ه", "\u200c": " "})
-
-
-def fa_norm(text: str) -> str:
-    """Search-friendly form: ASCII digits, Persian ی/ک, no ZWNJ, lowercase, single spaces."""
-    return " ".join(norm(text).translate(_FA).lower().split())
 
 
 def catalog_categories(rows: list[dict]) -> list[str]:
@@ -198,7 +186,7 @@ def _summary(data: dict) -> str:
     return "\n".join(f"{k}: {v}" for k, v in data.items() if not k.startswith("_"))
 
 
-def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None) -> list[dict]:
+def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matcher=None) -> list[dict]:
     now = now or dates.now_tehran()  # injectable so tests run on a fixed clock
     text_n = norm(text)
     if text_n in MENU_WORDS:
@@ -221,6 +209,8 @@ def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None) -> l
             return _booking(spec, session, block, text, store, now)
         if block.type == "catalog_order":
             return _order(spec, session, block, text, store, now)
+        if block.type == "faq":
+            return _faq(spec, session, block, text, store, now, matcher or LexicalMatcher())
     except (StopIteration, IndexError, KeyError) as e:
         # The saved state belongs to an older version of the bot (the owner republished mid-conversation:
         # a block, field, slot or option it points to is gone). Never leave the customer in silence.
@@ -250,6 +240,8 @@ def _from_menu(spec, session, text_n, store, now):
     session.update(block=block.id, step=0, data={})
     if block.type == "form":
         return [send(block.title), _ask(block.fields[0])]
+    if block.type == "faq":
+        return _faq_start(session, block)
     if block.type == "booking" and block.schedule:
         return _appt_start(spec, session, block, store, now)
     if block.type == "booking":
@@ -747,6 +739,91 @@ def _order(spec, session, block: CatalogOrderBlock, text, store, now):
     actions.append(menu_actions(spec))
     return actions
 
+
+
+# ---------- FAQ (retrieval only: the customer always receives the owner's own answer text) ----------
+FAQ_PAGE = 8
+
+
+def _faq_nav():
+    return [_btn("بازگشت به منو", "/menu")]
+
+
+def _faq_prompt(block: FaqBlock):
+    if len(block.entries) <= 6:
+        return send(block.prompt_text, [_btn(_short(e.question, 50), f"fq:{i}") for i, e in enumerate(block.entries)] + _faq_nav())
+    return send(block.prompt_text, [_btn("📋 فهرست سؤال‌ها", "fl")] + _faq_nav())
+
+
+def _faq_start(session, block: FaqBlock):
+    session.update(block=block.id, step="ask", data={})
+    return [send(block.title), _faq_prompt(block)]
+
+
+def _faq_list(block: FaqBlock, page: int, edit: bool = False):
+    pages = max(1, math.ceil(len(block.entries) / FAQ_PAGE))
+    page = min(max(page, 0), pages - 1)
+    chunk = block.entries[page * FAQ_PAGE:(page + 1) * FAQ_PAGE]
+    buttons = [_btn(_short(e.question, 50), f"fq:{page * FAQ_PAGE + k}") for k, e in enumerate(chunk)]
+    if page > 0:
+        buttons.append(_btn("‹ قبلی", f"fp:{page - 1}"))
+    if page + 1 < pages:
+        buttons.append(_btn("بعدی ›", f"fp:{page + 1}"))
+    return send(f"فهرست سؤال‌ها — صفحه {page + 1} از {pages}", buttons + [_btn("بازگشت", "fa")], edit)
+
+
+def _faq_answer(session, block: FaqBlock, i: int):
+    session["data"]["_last_i"] = i
+    return [send(block.entries[i].answer, [_btn("👍 مفید بود", "fh1"), _btn("👎 مفید نبود", "fh0"), _btn("سؤال دیگر", "fa")] + _faq_nav())]
+
+
+def _faq_unanswered(spec, session, block: FaqBlock, store, now, question: str, note: str = ""):
+    cust = session.get("cust")
+    duplicate = cust and store.find(block.id, question=question, status="unanswered", _cust=cust)
+    actions = [send(block.not_found_text, [_btn("📋 فهرست سؤال‌ها", "fl"), _btn("سؤال دیگر", "fa")] + _faq_nav())]  # the list rescues a valid question that was worded unusually
+    if not duplicate:  # the same customer repeating a question must not spam the owner
+        row = store.add(block.id, {"question": question, "status": "unanswered", **({"note": note} if note else {}), **_ident(session, now)})
+        _notify(spec, block.id, f"سؤال: {question}" + (f"\n({note})" if note else ""), actions, prefix=f"❓ سؤال بدون پاسخ · {block.title}")
+    return actions
+
+
+def _faq(spec, session, block: FaqBlock, text, store, now, matcher):
+    text_n = norm(text)
+    d = session["data"]
+    m = re.fullmatch(r"fq:(\d+)", text_n)
+    if m and int(m.group(1)) < len(block.entries):
+        return _faq_answer(session, block, int(m.group(1)))
+    if text_n == "fl":
+        return [_faq_list(block, 0)]
+    mp = re.fullmatch(r"fp:(\d+)", text_n)
+    if mp:
+        return [_faq_list(block, int(mp.group(1)), edit=True)]
+    if text_n == "fa":
+        return [_faq_prompt(block)]
+    if text_n == "fh1":
+        return [send("خوشحالم که کمک کرد 🌟", [_btn("سؤال دیگر", "fa")] + _faq_nav())]
+    if text_n in ("fh0", "fn"):  # the answer did not help / none of the suggestions was right
+        q = d.get("_last_q")
+        if not q:
+            return [_faq_prompt(block)]
+        return _faq_unanswered(spec, session, block, store, now, q, note="پاسخ پیشنهادی کمک نکرد")
+    query = text.strip()[:300]
+    if len(query) < 2 or re.fullmatch(r"(?:fq|fp)(?::\S*)?|fh\d|fl|fa|fn", text_n):  # a stale / forged button is never a customer's question
+        return [_faq_prompt(block)]
+    try:
+        ranked, th = matcher.rank(block.id, block.entries, query, session.get("cust")), matcher.thresholds
+    except RateLimited:
+        return [send("تعداد جست‌وجوها در این ساعت زیاد شده است؛ کمی بعد دوباره امتحان کنید یا از فهرست سؤال‌ها استفاده کنید.", [_btn("📋 فهرست سؤال‌ها", "fl")] + _faq_nav())]
+    except MatcherUnavailable:  # provider down / index not ready: degrade to word matching instead of failing
+        lex = LexicalMatcher()
+        ranked, th = lex.rank(block.id, block.entries, query), lex.thresholds
+    d["_last_q"] = query
+    kind, idx = decide(ranked, th)
+    if kind == "answer":
+        return _faq_answer(session, block, idx[0])
+    if kind == "suggest":
+        return [send("منظورتان یکی از این سؤال‌هاست؟", [_btn(_short(block.entries[i].question, 50), f"fq:{i}") for i in idx] + [_btn("هیچ‌کدام", "fn")])]
+    return _faq_unanswered(spec, session, block, store, now, query)
 
 
 # ---------- customer cancellation («ثبت‌های من») ----------

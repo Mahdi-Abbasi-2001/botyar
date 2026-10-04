@@ -37,7 +37,7 @@ def act_on_record(bot_id: int, record_id: int, body: RecordAction, user: User = 
         raise HTTPException(404, "ثبت یافت نشد")
     ver = db.scalars(select(BotVersion).where(BotVersion.bot_id == bot_id).order_by(BotVersion.version.desc())).first()
     spec = BotSpec.model_validate(ver.spec)
-    block = next((b for b in spec.blocks if b.id == rec.collection and b.type in ("booking", "catalog_order")), None)
+    block = next((b for b in spec.blocks if b.id == rec.collection and b.type in ("booking", "catalog_order", "faq")), None)
     if block is None:
         raise HTTPException(409, "بخش مربوط به این ثبت دیگر در ربات نیست")
 
@@ -48,10 +48,17 @@ def act_on_record(bot_id: int, record_id: int, body: RecordAction, user: User = 
         status_now = row.get("status")
         promoted = None
         try:
+            if body.action == "cancel" and block.type == "faq":
+                raise ValueError("سؤال را لغو نمی‌کنند؛ پاسخ را در ربات اضافه کنید یا «رسیدگی شد» بزنید.")
             if body.action == "cancel":
                 if status_now in ("cancelled", "done"):
                     raise ValueError("این ثبت قبلاً بسته یا لغو شده است.")
                 actions, promoted = engine.cancel_record(spec, store, now, block, row, by="owner", reason=body.reason)
+            elif block.type == "faq":
+                if body.status != "handled" or status_now != "unanswered":
+                    raise ValueError("سؤال‌ها را فقط می‌توان «رسیدگی شد» کرد.")
+                store.update(rec.collection, rec.id, status="handled", _handled_at=now.isoformat())
+                actions = []
             else:
                 if not body.status:
                     raise ValueError("وضعیت جدید را مشخص کنید.")

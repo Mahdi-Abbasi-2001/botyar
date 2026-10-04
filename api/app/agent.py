@@ -9,12 +9,15 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from . import llm, prompts
+import logging
+
+from . import faq_index, llm, prompts
 from .llm_schema import LLMBotSpec
 from .models import Bot, BotVersion, BuilderMessage, BuilderRun, LlmCall, Product, VersionFixture, VersionTests
 from .spec import BotSpec
 from .testing import TestPlan, TestScenario, run_plan, spec_diff
 
+log = logging.getLogger("botyar.agent")
 MAX_DESIGN, MAX_REPAIR, MAX_CLARIFY_ROUNDS = 3, 3, 2
 
 
@@ -169,6 +172,13 @@ class Builder:
         bot = self.db.get(Bot, self.bot_id)
         bot.name = s["spec"]["name"]
         self.db.commit()
+        if any(b["type"] == "faq" for b in s["spec"]["blocks"]):
+            self.emit("در حال ساخت فهرست جست‌وجوی سؤال‌ها…")
+            try:  # best effort: without an index the bot still works (word matching) and publishing retries it
+                faq_index.ensure(self.db, self.bot_id, BotSpec.model_validate(s["spec"]), self.run_id)
+            except Exception:  # noqa: BLE001
+                self.db.rollback()
+                log.exception("faq indexing failed")
         self.emit(f"نسخه {v} ذخیره شد ({passed}/{len(s['results'])} تست موفق)")
         return {"version": v, "outcome": "done"}
 

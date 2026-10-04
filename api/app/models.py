@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -144,3 +144,15 @@ class VersionFixture(Base):
     bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
     version: Mapped[int] = mapped_column(Integer)
     catalog: Mapped[list] = mapped_column(JSON)
+
+
+class FaqIndex(Base):
+    """One searchable phrasing of one FAQ entry: the question itself plus LLM-written informal variants, with its embedding."""
+    __tablename__ = "faq_index"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    block_id: Mapped[str] = mapped_column(String(64), index=True)
+    entry_hash: Mapped[str] = mapped_column(String(40), index=True)  # sha1(question + answer): an edited entry gets re-indexed
+    doc: Mapped[str] = mapped_column(Text)
+    vector: Mapped[bytes] = mapped_column(LargeBinary)  # float16, L2-normalised
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

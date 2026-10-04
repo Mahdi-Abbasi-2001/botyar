@@ -103,6 +103,14 @@ appears as an amber bubble.
 **Expect:** a time you book disappears for that stylist but stays free for the other; times that already started are never offered; a long day pages its times (8 per page, edited in place); booking the same time from two phones leaves the second customer with "someone just took it" and the time list again.
 **Break it:** book the last free time of a day (the day disappears); ask for 2 customers at once («ظرفیت ۲ نفر همزمان»); ask for appointments AND a group class in one bot (the agent should create two booking blocks).
 
+### Station 4e — FAQ bot: customers ask in their own words (new)
+
+**What it is:** a `faq` block answers common questions with the owner's EXACT text (nothing is generated). Customers tap a question, or type it in their own words; the bot finds the closest entry (embeddings), asks "did you mean…?" when unsure, and logs what it cannot answer for the owner.
+**Do:** describe `ربات پرسش‌های متداول برای کلینیک: ساعت کاری شنبه تا چهارشنبه ۹ تا ۱۸، آدرس خیابان ولیعصر پلاک ۱۲، ویزیت ۲۵۰ هزار تومان، پارکینگ داریم`. In the simulator type: «کجا هستید؟», «چنده ویزیت؟», «جای پارک دارید؟» — then something unrelated: «قیمت طلا امروز چنده».
+**Expect:** the first three return the owner's sentences; the last says it could not find an answer, offers the question list, and appears in the **ثبت‌ها** tab as «بدون پاسخ» with a «رسیدگی شد» button (and a notification on Bale if you linked `/admin`).
+**Break it (important):** ask the agent for an FAQ and give it NO facts, then keep saying «خودت تصمیم بگیر». It must never invent hours/prices/addresses — it should ask, and when finally forced it writes «اطلاعات … هنوز ثبت نشده است». Also try questions in slang, with typos, in English, and very long text.
+**Honest numbers:** see `docs/faq-evaluation.md` — about 63% answered at once, ~90% right within one tap, rare wrong answers (0–1% in our samples).
+
 ### Station 4c — Customers cancelling («ثبت‌های من») (new)
 
 **What it is:** when a booking or order block allows it (the agent turns it on by default; say «مشتری نتونه لغو کنه» to turn it off), the bot's menu gets a built-in last button **«ثبت‌های من»**. The customer sees only their OWN active bookings/orders, taps one, confirms, and it is cancelled.
