@@ -20,7 +20,7 @@ log = logging.getLogger("botyar.engine")
 STALE_RESETS = {"count": 0}  # tests assert this stays 0 unless a bot really changed under a conversation
 MY_LABEL = "ثبت‌های من"  # built-in menu entry, present when a block allows cancelling
 MY_BLOCK = "__my__"
-STATUS_FA = {"confirmed": "تأیید شده", "waitlisted": "در لیست انتظار", "new": "سفارش جدید", "preparing": "در حال آماده‌سازی", "ready": "آماده", "done": "تحویل داده شد", "cancelled": "لغو شده", "unanswered": "بدون پاسخ", "handled": "رسیدگی شد"}
+STATUS_FA = {"confirmed": "تأیید شده", "waitlisted": "در لیست انتظار", "new": "سفارش جدید", "preparing": "در حال آماده‌سازی", "ready": "آماده", "done": "تحویل داده شد", "cancelled": "لغو شده", "unanswered": "بدون پاسخ", "awaiting_payment": "در انتظار پرداخت", "handled": "رسیدگی شد"}
 ORDER_FLOW = ["new", "preparing", "ready", "done"]  # the owner moves an order forward; the customer is told at each step
 MENU_WORDS = {"/start", "/menu", "منو", "منوی اصلی", "شروع"}
 CANCEL_WORDS = {"/cancel", "انصراف", "لغو"}
@@ -195,6 +195,10 @@ def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matc
     if text_n in CANCEL_WORDS:
         _reset(session)
         return [menu_actions(spec, "انصراف انجام شد.")]
+
+    m = re.fullmatch(r"pay:(\d+)", text_n)
+    if m and session.get("pay_sim"):  # test payment button: the simulator and the agent's tests only, never a real chat
+        return _test_pay(spec, session, int(m.group(1)), store, now)
 
     if session["block"] is None:
         return _from_menu(spec, session, text_n, store, now)
@@ -837,7 +841,8 @@ def _order(spec, session, block: CatalogOrderBlock, text, store, now):
     total = price["total"]
     contact = {f.key: d[f.key] for f in block.fields}
     extra = {"subtotal": subtotal, "discount": price["discount"], "discount_code": code.code if code else None, "delivery_fee": price["delivery_fee"]} if (code or dropped or block.delivery_fee or block.discount_codes) else {}
-    row = store.add(block.id, {**contact, "items": cart, "total": total, "status": "new", **extra, **_ident(session, now)})
+    online = block.payment == "online" and bool(session.get("pay_ok")) and total > 0
+    row = store.add(block.id, {**contact, "items": cart, "total": total, "status": "awaiting_payment" if online else "new", **extra, **_ident(session, now)})
     lines = "\n".join(f"- {c['name']} {' '.join(c['options'].values())}".strip() + (f" × {c['qty']}" if "qty" in c else "") for c in cart)
     breakdown = ""
     if price["discount"] or price["delivery_fee"] or block.delivery_fee:
@@ -847,6 +852,17 @@ def _order(spec, session, block: CatalogOrderBlock, text, store, now):
         breakdown += f"\nهزینه ارسال: {price['delivery_fee']:,} تومان" if price["delivery_fee"] else "\nهزینه ارسال: رایگان"
     if dropped:
         breakdown += "\n⚠️ ظرفیت کد تخفیف در همین فاصله تمام شد و اعمال نشد."
+    if online:  # the owner is notified when the money arrives, not when the cart is filled
+        invoice_text = f"{lines}{breakdown}\nمبلغ قابل پرداخت: {total:,} تومان\nبرای ثبت نهایی سفارش، پرداخت را انجام دهید (تا {PAY_WINDOW_MINUTES} دقیقه فرصت دارید)."
+        if session.get("pay_sim"):
+            actions = [send(invoice_text + "\n(پرداخت آزمایشی؛ در بله فاکتور واقعی ارسال می‌شود)", [_btn("💳 پرداخت (آزمایشی)", f"pay:{row['id']}")])]
+        else:
+            actions = [{"type": "invoice", "rid": row["id"], "amount": total, "title": f"سفارش شماره {row['id']}"[:32], "text": invoice_text}]
+        _reset(session)
+        actions.append(menu_actions(spec))
+        return actions
+    if block.payment == "online" and not session.get("pay_ok"):
+        breakdown += "\nپرداخت آنلاین هنوز برای این ربات فعال نشده؛ مدیر درباره‌ی پرداخت با شما هماهنگ می‌کند."
     actions = [send(f"{block.confirm_text}\n{lines}{breakdown}\nجمع کل: {total:,} تومان")]
     _notify(spec, block.id, f"سفارش #{row['id']} - جمع {total:,} تومان" + (f" (کد {code.code})" if code else "") + f"\n{lines}", actions)
     _reset(session)
@@ -1032,6 +1048,66 @@ def _describe(b, r: dict) -> str:
     return f"سفارش {r['id']} — {r.get('total', 0):,} تومان"
 
 
+def booking_start(b, r: dict, tz) -> datetime | None:
+    """When the booked session starts, or None for one-off events without a clock time."""
+    if not r.get("date"):
+        return None
+    slot = next((s for s in b.slots if s.id == r.get("slot")), None)
+    hhmm = r.get("time") or (slot.time if slot else None)
+    if not hhmm:
+        return None
+    h, m = (int(x) for x in hhmm.split(":"))
+    return datetime.combine(date.fromisoformat(r["date"]), time(h, m), tzinfo=tz)
+
+
+PAY_WINDOW_MINUTES = 15
+
+
+def _order_lines(r: dict) -> str:
+    return "\n".join(f"- {c['name']} {' '.join(c['options'].values())}".strip() + (f" × {c['qty']}" if "qty" in c else "") for c in r.get("items", []))
+
+
+def mark_paid(spec: BotSpec, store, now, block, row: dict, charge: str = "") -> list[dict]:
+    """Payment arrived: the order becomes a normal new order and the owner finds out. Idempotent (a repeated delivery does nothing)."""
+    if row.get("status") != "awaiting_payment":
+        return []
+    store.update(block.id, row["id"], status="new", paid=True, _paid_at=now.isoformat(), _charge=charge)
+    actions = [send(f"✅ پرداخت انجام شد. {block.confirm_text}\nشماره‌ی سفارش: {row['id']}")]
+    _notify(spec, block.id, f"سفارش #{row['id']} - {row['total']:,} تومان (پرداخت‌شده ✅)\n{_order_lines(row)}", actions)
+    return actions
+
+
+def _test_pay(spec, session, rid: int, store, now):
+    cust = session.get("cust")
+    for b in spec.blocks:
+        if b.type == "catalog_order" and b.payment == "online":
+            rows = store.find(b.id, id=rid, _cust=cust) if cust else []
+            if rows:
+                out = mark_paid(spec, store, now, b, rows[0], "test")
+                if out:
+                    out.append(menu_actions(spec))
+                    return out
+    return [send("این پرداخت دیگر معتبر نیست."), menu_actions(spec)]
+
+
+def expire_unpaid(spec: BotSpec, store, now) -> list[dict]:
+    """Cancel orders whose payment window ran out (stock and discount-code use come back). Returns the customer notices."""
+    actions: list[dict] = []
+    for b in spec.blocks:
+        if b.type != "catalog_order" or b.payment != "online":
+            continue
+        for r in store.find(b.id, status="awaiting_payment"):
+            try:
+                placed = datetime.fromisoformat(r.get("_at", ""))
+            except ValueError:
+                continue
+            if now - placed > timedelta(minutes=PAY_WINDOW_MINUTES):
+                cancel_record(spec, store, now, b, r, by="system")
+                if r.get("_cust"):
+                    actions.append({"type": "notify_customer", "cust": r["_cust"], "text": f"مهلت پرداخت سفارش {r['id']} تمام شد و سفارش لغو شد. برای سفارش دوباره از منو اقدام کنید."})
+    return actions
+
+
 def _why_not(b, r: dict, now) -> str | None:
     """None = may cancel now; otherwise a polite Persian reason."""
     if b.type == "booking":
@@ -1044,6 +1120,8 @@ def _why_not(b, r: dict, now) -> str | None:
                 if now >= start - timedelta(hours=b.cancel_deadline_hours):
                     return f"لغو فقط تا {b.cancel_deadline_hours} ساعت پیش از شروع ممکن است و این مهلت گذشته است. لطفاً با مدیر تماس بگیرید."
         return None
+    if r.get("paid"):
+        return "این سفارش پرداخت شده است؛ برای لغو و بازگشت وجه با مدیر تماس بگیرید."
     try:
         placed = datetime.fromisoformat(r.get("_at", ""))
     except ValueError:
@@ -1177,6 +1255,8 @@ def set_order_status(store, now, b, r: dict, status: str) -> list[dict]:
     if b.type != "catalog_order":
         raise ValueError("وضعیت فقط برای سفارش‌ها قابل تغییر است.")
     cur = r.get("status")
+    if cur == "awaiting_payment":
+        raise ValueError("این سفارش هنوز پرداخت نشده است.")
     if cur in ("cancelled", "done"):
         raise ValueError("این سفارش بسته شده و دیگر قابل تغییر نیست.")
     if status not in ORDER_FLOW[1:]:

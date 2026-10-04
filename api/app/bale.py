@@ -21,10 +21,10 @@ from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import engine, faq_index
+from . import dates, engine, faq_index
 from .config import settings
 from .db import SessionLocal
-from .models import BotVersion, ChatLink, ChatSession, Publication
+from .models import BotVersion, ChatLink, ChatSession, PaymentConfig, Publication, Record
 from .spec import BotSpec
 from .store import SqlStore
 
@@ -114,8 +114,10 @@ def to_markup(buttons: list[dict], cb: dict) -> dict:
     return {"inline_keyboard": rows}
 
 
-def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_chat_id: str = "", edit_message_id: int | None = None):
+def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_chat_id: str = "", edit_message_id: int | None = None, wallet: str = "") -> list[int]:
+    """Send the actions. Returns the record ids whose invoice could not be sent."""
     cb: dict = {}
+    failed_invoices: list[int] = []
     for n, a in enumerate(actions):
         try:
             if a["type"] == "send" and n == 0 and a.get("edit") and edit_message_id:
@@ -136,6 +138,12 @@ def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_
                 if a.get("buttons"):
                     payload["reply_markup"] = to_markup(a["buttons"], cb)
                 api_call(token, "sendMessage", payload)
+            elif a["type"] == "invoice":
+                if not wallet:
+                    raise BaleError("no wallet token")
+                api_call(token, "sendInvoice", {"chat_id": chat_id, "title": a["title"], "description": engine.fa_digits(a["text"])[:255] or "سفارش",
+                                                 "payload": f"o:{a['rid']}", "provider_token": wallet,
+                                                 "prices": [{"label": a["title"], "amount": int(a["amount"]) * 10}]})  # Bale amounts are rials
             elif a["type"] == "notify_customer":
                 # a message for ANOTHER customer (e.g. promoted from the waitlist); only Bale customers are reachable
                 if str(a.get("cust", "")).startswith("bale:"):
@@ -144,7 +152,69 @@ def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_
                 api_call(token, "sendMessage", {"chat_id": admin_chat_id, "text": ("🔔 " + a["text"])[:4096]})
         except Exception as e:  # noqa: BLE001
             log.warning("send failed: %s", e)
+            if a["type"] == "invoice":
+                failed_invoices.append(a["rid"])
     session["_cb"] = cb
+    return failed_invoices
+
+
+def wallet_token(db: Session, pub: Publication) -> str:
+    """The owner's wallet token, or "" when payments are not available for this bot.
+    On the shared bot only Bale's published TEST token is allowed: real money must reach the owner's own wallet, never Botyar's."""
+    cfg = db.scalars(select(PaymentConfig).where(PaymentConfig.bot_id == pub.bot_id)).first()
+    if cfg is None:
+        return ""
+    try:
+        tok = decrypt(cfg.token_enc)
+    except BaleError:
+        return ""
+    return tok if pub.mode == "own" or tok.startswith("WALLET-TEST-") else ""
+
+
+def _payload_record(db: Session, payload: str) -> Record | None:
+    if not isinstance(payload, str) or not re.fullmatch(r"o:\d{1,12}", payload):
+        return None
+    rec = db.get(Record, int(payload[2:]))
+    return rec if rec is not None and not rec.sandbox else None
+
+
+def _pre_checkout(db: Session, token: str, q: dict):
+    """Bale asks (10 s limit) whether this payment may go ahead: only for a live, unpaid order of this very customer and amount."""
+    rec = _payload_record(db, q.get("invoice_payload"))
+    ok = bool(rec) and rec.data.get("status") == "awaiting_payment" and rec.data.get("_cust") == f"bale:{(q.get('from') or {}).get('id')}" \
+        and q.get("total_amount") == int(rec.data.get("total", -1)) * 10 and q.get("currency", "IRR") == "IRR"
+    body = {"pre_checkout_query_id": q.get("id"), "ok": ok}
+    if not ok:
+        body["error_message"] = "این سفارش دیگر معتبر نیست؛ لطفاً دوباره سفارش دهید."
+    try:
+        api_call(token, "answerPreCheckoutQuery", body)
+    except Exception as e:  # noqa: BLE001
+        log.warning("answerPreCheckoutQuery failed: %s", e)
+
+
+def _paid(db: Session, token: str, msg: dict):
+    pay = msg["successful_payment"]
+    chat_id = str((msg.get("chat") or {}).get("id", ""))
+    rec = _payload_record(db, pay.get("invoice_payload"))
+    if rec is None or rec.data.get("_cust") != f"bale:{chat_id}":
+        log.warning("payment for an unknown order: %s", pay.get("invoice_payload"))
+        return
+    pub = db.scalars(select(Publication).where(Publication.bot_id == rec.bot_id)).first()
+    ver = db.scalars(select(BotVersion).where(BotVersion.bot_id == rec.bot_id, BotVersion.version == (pub.version if pub else 0))).first()
+    if pub is None or ver is None:
+        return
+    spec = BotSpec.model_validate(ver.spec)
+    with _locks[rec.bot_id]:
+        store = SqlStore(db, rec.bot_id, sandbox=False)
+        row = store.find(rec.collection, id=rec.id)[0]
+        if pay.get("total_amount") != int(row.get("total", -1)) * 10:
+            log.error("payment amount mismatch for record %s", rec.id)
+            return
+        block = spec.block(rec.collection)
+        actions = engine.mark_paid(spec, store, dates.now_tehran(), block, row, str(pay.get("provider_payment_charge_id") or pay.get("telegram_payment_charge_id") or ""))
+        db.commit()
+    if actions:
+        deliver(token, chat_id, actions + [engine.menu_actions(spec)], {}, pub.admin_chat_id)
 
 
 def say(token: str, chat_id: str, text: str):
@@ -204,6 +274,13 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict):
     if kind == "own" and own_pub is None:
         return
     token = settings.bale_shared_bot_token if kind == "shared" else decrypt(own_pub.token_enc)
+
+    if update.get("pre_checkout_query"):
+        _pre_checkout(db, token, update["pre_checkout_query"])
+        return
+    if (update.get("message") or {}).get("successful_payment"):
+        _paid(db, token, update["message"])
+        return
 
     cq, msg = update.get("callback_query"), update.get("message")
     if cq:
@@ -283,15 +360,33 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict):
         state = copy.deepcopy(row.state)  # a shallow copy would hide in-place edits from SQLAlchemy's change detection
         if t.startswith("~"):
             t = state.get("_cb", {}).get(t, t)
+        if t in ("/stop", "/resume"):  # announcements and reminders opt-out
+            state["muted"] = t == "/stop"
+            row.state = state
+            db.commit()
+            say(token, chat_id, "اطلاعیه‌های این ربات دیگر برایتان نمی‌آید (یادآوری نوبت‌ها همچنان ارسال می‌شود). برای فعال‌سازی دوباره: /resume" if t == "/stop" else "اطلاعیه‌ها دوباره فعال شد ✅")
+            return
         if welcome_now:
+            muted = state.get("muted")
             state, t = engine.new_session(), "/start"
+            if muted:
+                state["muted"] = True
         elif kind == "shared" and t.startswith("/start"):
             t = "/start"
         frm = (msg or cq or {}).get("from") or {}
         if frm.get("first_name"):
             state["cust_name"] = str(frm["first_name"])[:40]
         state["cust"] = f"bale:{chat_id}"  # stable customer identity (set last: the welcome path above replaces the whole state)
-        actions = engine.handle(spec, state, t, SqlStore(db, pub.bot_id, sandbox=False), matcher=faq_index.matcher_for(db, pub.bot_id, spec))
-        deliver(token, chat_id, actions, state, pub.admin_chat_id, clicked_message_id)
+        wallet = wallet_token(db, pub)
+        state["pay_ok"], state["pay_sim"] = bool(wallet), False  # pay_sim (the fake pay button) must never be on in a real chat
+        store = SqlStore(db, pub.bot_id, sandbox=False)
+        actions = engine.handle(spec, state, t, store, matcher=faq_index.matcher_for(db, pub.bot_id, spec))
+        for rid in deliver(token, chat_id, actions, state, pub.admin_chat_id, clicked_message_id, wallet):
+            rec = db.get(Record, rid)  # the invoice could not be sent: keep the order as an ordinary one and tell both sides
+            if rec:
+                rec.data = {**rec.data, "status": "new", "_pay_failed": True}
+                say(token, chat_id, "ارسال فاکتور پرداخت ناموفق بود؛ سفارش شما ثبت شد و مدیر درباره‌ی پرداخت با شما هماهنگ می‌کند.")
+                if pub.admin_chat_id:
+                    say(token, pub.admin_chat_id, f"⚠️ فاکتور پرداخت سفارش {rid} ارسال نشد؛ سفارش بدون پرداخت آنلاین ثبت شد.")
         row.state = state
         db.commit()

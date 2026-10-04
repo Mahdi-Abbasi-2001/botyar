@@ -156,3 +156,25 @@ class FaqIndex(Base):
     doc: Mapped[str] = mapped_column(Text)
     vector: Mapped[bytes] = mapped_column(LargeBinary)  # float16, L2-normalised
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class Broadcast(Base):
+    """An announcement the owner sent to every customer who has talked to the bot."""
+    __tablename__ = "broadcasts"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    text: Mapped[str] = mapped_column(Text)
+    audience: Mapped[int] = mapped_column(Integer, default=0)
+    sent: Mapped[int] = mapped_column(Integer, default=0)
+    failed: Mapped[int] = mapped_column(Integer, default=0)
+    done: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class PaymentConfig(Base):
+    """The owner's Bale wallet token for taking payments in their bot (encrypted). Money goes to the wallet behind this token, never to Botyar."""
+    __tablename__ = "payment_configs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), unique=True, index=True)
+    token_enc: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

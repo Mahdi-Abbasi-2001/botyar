@@ -72,6 +72,7 @@ def act_on_record(bot_id: int, record_id: int, body: RecordAction, user: User = 
     wanted = sum(a["type"] == "notify_customer" for a in actions)
     new_status = store.find(rec.collection, id=rec.id)[0]["status"]
     return {"id": rec.id, "status": new_status, "customer_messages": {"wanted": wanted, "sent": sent, "sandbox": rec.sandbox},
+            "refund_needed": bool(row.get("paid")) and body.action == "cancel",
             "promoted": {"id": promoted["id"], "name": promoted.get("name")} if promoted else None}
 
 

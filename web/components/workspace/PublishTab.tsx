@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { fa } from "@/components/ui";
 import { ExportButtons } from "@/components/workspace/ExportButtons";
 import { RecordActions } from "@/components/workspace/RecordActions";
+import { PaymentCard } from "@/components/workspace/PaymentCard";
 
 type Pub = {
   published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string; webhooks_enabled: boolean;
@@ -128,6 +129,8 @@ export function PublishTab({ botId }: { botId: string }) {
                 <button onClick={load} className="mr-2 text-saffron underline">بررسی دوباره</button></p>
             )}
           </div>
+
+          <PaymentCard botId={botId} mode={pub.mode} />
 
           <div className={card}>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold">ثبت‌های واقعی ({fa(live.length)})</h3>

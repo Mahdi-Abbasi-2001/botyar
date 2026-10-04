@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import { fa } from "@/components/ui";
 
 type Rec = { id: number; collection: string; data: Record<string, any> };
-type Reply = { status: string; customer_messages: { wanted: number; sent: number; sandbox: boolean }; promoted: { name?: string } | null };
+type Reply = { status: string; customer_messages: { wanted: number; sent: number; sandbox: boolean }; promoted: { name?: string } | null; refund_needed?: boolean };
 
 /** Orders move forward one step at a time; the customer is told at "preparing" and "ready". */
 const NEXT: Record<string, [string, string][]> = {
@@ -34,6 +34,7 @@ export function RecordActions({ botId, rec, onChanged }: { botId: string | numbe
       const r = await api<Reply>(`/bots/${botId}/records/${rec.id}`, { method: "PATCH", body });
       const m = r.customer_messages;
       const parts: string[] = [];
+      if (r.refund_needed) parts.push("⚠️ این سفارش پرداخت شده بود؛ بازگشت وجه را خودتان از کیف پول انجام دهید");
       if (r.promoted) parts.push(`${r.promoted.name ?? "نفر بعدی"} از لیست انتظار تأیید شد`);
       if (isFaq) { /* closing a question messages nobody */ }
       else if (m.sandbox) parts.push("در شبیه‌ساز پیامی به مشتری ارسال نمی‌شود");

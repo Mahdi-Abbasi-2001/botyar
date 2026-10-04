@@ -46,6 +46,10 @@ async def lifespan(app):
     from .bale import ensure_shared_webhook
 
     threading.Thread(target=ensure_shared_webhook, daemon=True).start()  # no-op unless PUBLIC_BASE_URL is set
+    if settings.public_base_url:  # production only: tests and local dev must not send reminders
+        from .outreach import start_scheduler
+
+        start_scheduler()
     yield
 
 
@@ -179,6 +183,7 @@ def simulate(bot_id: int, body: SimMessage, user: User = Depends(current_user), 
         db.add(row)
     state = copy.deepcopy(row.state)  # a shallow copy would hide in-place edits from SQLAlchemy's change detection
     state["cust"] = "sim:" + body.session_id
+    state["pay_ok"] = state["pay_sim"] = True  # the simulator shows a fake "pay" button; real invoices exist only in Bale
     actions = bot_engine.handle(spec, state, body.text, SqlStore(db, bot.id, sandbox=True), matcher=faq_index.matcher_for(db, bot.id, spec))
     row.state = state
     db.commit()
@@ -315,6 +320,14 @@ app.include_router(export_router)
 from .records_ops import router as records_ops_router  # noqa: E402
 
 app.include_router(records_ops_router)
+
+from .outreach import router as outreach_router  # noqa: E402
+
+app.include_router(outreach_router)
+
+from .payments import router as payments_router  # noqa: E402
+
+app.include_router(payments_router)
 
 # ---------- static frontend (Next.js export copied to api/static at build time) ----------
 import os  # noqa: E402

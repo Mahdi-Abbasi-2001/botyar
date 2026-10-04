@@ -135,6 +135,14 @@ PRICING_CASES = [
 ]
 
 FEEDBACK_CASES = [
+    ("payment-online-order", "ربات کافه: لاته ۹۵ هزار تومان و کیک ۱۱۰ هزار تومان. مشتری باید سفارشش را همان‌جا آنلاین پرداخت کند.", "done",
+     lambda s, m: None if _orders(s) and _orders(s)[0].get("payment") == "online" and ("توکن" in m or "کیف پول" in m or "انتشار" in m) else "payment=online and a note about the wallet token/own bot expected: " + m[:200]),
+    ("payment-for-booking-declined-honestly", "ربات نوبت‌دهی دندانپزشکی دوشنبه‌ها ۹ تا ۱۳ هر ۳۰ دقیقه، و مشتری برای رزرو نوبت بیعانه آنلاین بپردازد", "done",
+     lambda s, m: None if "پشتیبانی نمی" in m else "must say booking deposits are not supported: " + m[:200]),
+    ("reminder-24h", "ربات آرایشگاه: نوبت‌دهی شنبه تا چهارشنبه ۹ تا ۱۷ هر ۳۰ دقیقه. ۲۴ ساعت قبل از نوبت به مشتری یادآوری بده.", "done",
+     lambda s, m: None if sched(s) and all(b.get("reminder_hours") == 24 for b in blocks(s, "booking")) else "reminder_hours should be 24"),
+    ("reminder-one-off-event-honest", "ربات ثبت‌نام همایش یک‌روزه ۱۵ مهر، ظرفیت ۱۰۰ نفر. یک روز قبل یادآوری بفرست.", "done",
+     lambda s, m: None if ("یادآوری" in m and ("ساعت" in m or "پشتیبانی نمی" in m)) or all(not b.get("reminder_hours") for b in blocks(s, "booking")) else "must not silently promise a reminder for an event without a clock time"),
     ("order-edit-not-promised", "ربات کافه با لاته ۹۵ هزار تومان. مشتری بتواند سفارشش را ویرایش کند و آیتم‌هایش را عوض کند", "done",
      lambda s, m: None if ("پشتیبانی نمی" in m) else "should say order editing is not supported: " + m[:300]),
     ("feedback-basic", "ربات رستوران که مشتری‌ها بتوانند به غذا امتیاز ۱ تا ۵ بدهند و نظرشان را بنویسند، و به من اطلاع بدهد", "done",

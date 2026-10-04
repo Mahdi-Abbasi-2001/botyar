@@ -118,6 +118,7 @@ class BookingBlock(BaseModel):
     waitlist: bool = False
     allow_cancel: bool = False  # customers may cancel their own booking from «ثبت‌های من»
     cancel_deadline_hours: int = Field(default=0, ge=0, le=168)  # no cancelling inside this many hours before a dated slot starts
+    reminder_hours: int = Field(default=0, ge=0, le=72)  # remind the customer this many hours before the start (0 = no reminder); needs a dated slot with a time
     fields: list[FormField] = Field(default_factory=lambda: [f.model_copy() for f in DEFAULT_CONTACT])
     confirm_text: str = "ثبت‌نام شما با موفقیت انجام شد."
     full_text: str = "متأسفانه ظرفیت این زمان تکمیل است."
@@ -189,6 +190,7 @@ class CatalogOrderBlock(BaseModel):
     cancel_window_minutes: int = Field(default=30, ge=1, le=1440)
     fields: list[FormField] = Field(default_factory=lambda: [f.model_copy() for f in DEFAULT_CONTACT])
     confirm_text: str = "سفارش شما ثبت شد."
+    payment: Literal["none", "online"] = "none"      # online: the customer pays inside Bale (needs the owner's own bot + wallet token)
     delivery_fee: int = Field(default=0, ge=0)       # Toman added to every order (0 = none)
     free_delivery_over: int = Field(default=0, ge=0)  # goods total (after discount) from which delivery is free (0 = never)
     discount_codes: list[DiscountCode] = Field(default_factory=list, max_length=20)

@@ -108,8 +108,9 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
             </div>
           ))}
         </div>
-        {(!!b.delivery_fee || !!b.discount_codes?.length) && (
+        {(b.payment === "online" || !!b.delivery_fee || !!b.discount_codes?.length) && (
           <div className="flex flex-col gap-1 text-sm text-fg-2">
+            {b.payment === "online" && <span>پرداخت آنلاین داخل بله (با کیف پول خود شما)</span>}
             {!!b.delivery_fee && <span>هزینه ارسال: {toman(b.delivery_fee)}{b.free_delivery_over ? ` · رایگان از ${toman(b.free_delivery_over)}` : ""}</span>}
             {b.discount_codes?.map((c) => (
               <span key={c.code}>کد <b dir="ltr">{c.code}</b>: {c.percent ? `${fa(c.percent)}٪` : toman(c.amount)} تخفیف{c.min_total ? ` · حداقل ${toman(c.min_total)}` : ""}{c.max_uses ? ` · ${fa(c.max_uses)} بار` : ""}</span>
@@ -123,7 +124,7 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
   const mine = records.filter((r) => r.collection === b.id);
   return (
     <>
-      <p className="mb-2 text-xs text-mute">{b.allow_cancel ? `مشتری می‌تواند لغو کند${b.cancel_deadline_hours ? ` · تا ${fa(b.cancel_deadline_hours)} ساعت پیش از شروع` : ""}` : "لغو توسط مشتری غیرفعال است"}</p>
+      <p className="mb-2 text-xs text-mute">{b.allow_cancel ? `مشتری می‌تواند لغو کند${b.cancel_deadline_hours ? ` · تا ${fa(b.cancel_deadline_hours)} ساعت پیش از شروع` : ""}` : "لغو توسط مشتری غیرفعال است"}{b.reminder_hours ? ` · یادآوری ${fa(b.reminder_hours)} ساعت قبل` : ""}</p>
       {b.schedule && (
         <div className="flex flex-col gap-1 rounded-xl bg-raised p-3 text-sm">
           <span className="text-xs text-mint-fg">نوبت‌دهی با ساعت کاری · زمان‌ها خودکار ساخته می‌شوند</span>
@@ -288,6 +289,7 @@ const STATUS: Record<string, [string, string]> = {
   waitlisted: ["لیست انتظار", "bg-mint text-ink font-bold"],
   new: ["سفارش جدید", "border border-saffron text-saffron"],
   cancelled: ["لغو شده", "border border-line-3 text-dim line-through"],
+  awaiting_payment: ["در انتظار پرداخت", "border border-line-2 text-mute"],
   preparing: ["در حال آماده‌سازی", "border border-saffron bg-saffron/10 text-saffron"],
   ready: ["آماده", "bg-mint text-ink font-bold"],
   done: ["تحویل شد", "border border-line-3 text-mute"],

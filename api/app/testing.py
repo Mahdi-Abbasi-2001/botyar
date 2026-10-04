@@ -68,10 +68,12 @@ def run_scenario(spec: BotSpec, sc: TestScenario, catalog: list[dict] | None = N
             for n in range(max(0, min(s.times, 60))):
                 sess = engine.new_session()
                 sess["cust"] = f"t:setup{n}"
+                sess["pay_ok"] = sess["pay_sim"] = True
                 for msg in s.steps:
                     engine.handle(spec, sess, msg, store, dates.TEST_NOW)
         sess = engine.new_session()
         sess["cust"] = "t:main"
+        sess["pay_ok"] = sess["pay_sim"] = True
         for i, st in enumerate(sc.steps, 1):
             actions = engine.handle(spec, sess, st.say, store, dates.TEST_NOW)
             text = _texts(actions)
