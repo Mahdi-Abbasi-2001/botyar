@@ -121,8 +121,21 @@ CONTACT_CASES = [
      lambda s, m: None if blocks(s, "contact") and blocks(s, "catalog_order") else "expected contact AND catalog_order"),
 ]
 
+def _orders(s):
+    return blocks(s, "catalog_order")
+
+
+PRICING_CASES = [
+    ("pricing-fee-and-code", "ربات کافه: لاته ۱۰۰ هزار تومان، کیک ۵۰ هزار تومان. هزینه ارسال ۳۰ هزار تومان، رایگان برای سفارش بالای ۲۰۰ هزار تومان. کد تخفیف YALDA ده درصد.", "done",
+     lambda s, m: None if _orders(s) and _orders(s)[0]["delivery_fee"] == 30000 and _orders(s)[0]["free_delivery_over"] == 200000
+     and any(c["code"].upper() == "YALDA" and c["percent"] == 10 for c in _orders(s)[0]["discount_codes"]) else "fee/free-over/code not captured exactly"),
+    ("pricing-no-invented-code", "ربات سفارش شیرینی با کد تخفیف", "needs_input", lambda s, m: None),
+    ("pricing-amount-code-limited", "ربات کافه با لاته ۹۰ هزار تومان. کد تخفیف WELCOME پنجاه هزار تومان تخفیف می‌دهد، فقط برای ۱۰ نفر اول.", "done",
+     lambda s, m: None if _orders(s) and any(c["code"].upper() == "WELCOME" and c["amount"] == 50000 and c["max_uses"] == 10 for c in _orders(s)[0]["discount_codes"]) else "amount code with max_uses not captured"),
+]
+
 # appended by later features (appointment calendars, FAQ, owner chat, delivery/discounts) — see EXTRA_CASES below
-EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES]
+EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES]
 
 
 def run_case(c, i, name, text, want_status, check):

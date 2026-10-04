@@ -12,7 +12,7 @@ export type Block =
   | { type: "message"; id: string; text: string }
   | { type: "form"; id: string; title: string; fields: Field[]; done_text: string }
   | { type: "booking"; id: string; title: string; slots: Slot[]; waitlist: boolean; schedule?: Schedule | null; allow_cancel?: boolean; cancel_deadline_hours?: number; occurrences?: number; fields: Field[]; confirm_text: string; full_text: string; waitlist_text: string }
-  | { type: "catalog_order"; id: string; title: string; items: Item[]; max_items: number; min_total: number; fields: Field[]; confirm_text: string }
+  | { type: "catalog_order"; id: string; title: string; items: Item[]; max_items: number; min_total: number; fields: Field[]; confirm_text: string; delivery_fee?: number; free_delivery_over?: number; discount_codes?: { code: string; percent: number; amount: number; min_total: number; max_uses: number }[] }
   | { type: "contact"; id: string; title: string; prompt_text?: string; sent_text?: string }
   | { type: "faq"; id: string; title: string; entries: { question: string; answer: string }[]; prompt_text?: string; not_found_text?: string }
   | { type: "admin_notify"; id: string; on: string; text: string };

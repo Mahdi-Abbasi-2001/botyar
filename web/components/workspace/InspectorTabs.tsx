@@ -98,6 +98,14 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
             </div>
           ))}
         </div>
+        {(!!b.delivery_fee || !!b.discount_codes?.length) && (
+          <div className="flex flex-col gap-1 text-sm text-fg-2">
+            {!!b.delivery_fee && <span>هزینه ارسال: {toman(b.delivery_fee)}{b.free_delivery_over ? ` · رایگان از ${toman(b.free_delivery_over)}` : ""}</span>}
+            {b.discount_codes?.map((c) => (
+              <span key={c.code}>کد <b dir="ltr">{c.code}</b>: {c.percent ? `${fa(c.percent)}٪` : toman(c.amount)} تخفیف{c.min_total ? ` · حداقل ${toman(c.min_total)}` : ""}{c.max_uses ? ` · ${fa(c.max_uses)} بار` : ""}</span>
+            ))}
+          </div>
+        )}
         <span className="text-xs text-mute">حداکثر {fa(b.max_items)} آیتم{b.min_total ? ` · حداقل سفارش ${toman(b.min_total)}` : ""}</span>
         <Fields fields={b.fields} />
       </>

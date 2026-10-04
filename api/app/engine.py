@@ -14,7 +14,7 @@ from typing import Any, Protocol
 from . import dates
 from .engine_text import fa_digits, fa_norm, norm  # noqa: F401  (re-exported: engine.norm / engine.fa_norm / engine.fa_digits)
 from .faq_match import LexicalMatcher, MatcherUnavailable, RateLimited, decide
-from .spec import BotSpec, BookingBlock, CatalogOrderBlock, ContactBlock, FaqBlock, FormBlock, FormField, MessageBlock
+from .spec import norm_code, BotSpec, BookingBlock, CatalogOrderBlock, ContactBlock, FaqBlock, FormBlock, FormField, MessageBlock
 
 log = logging.getLogger("botyar.engine")
 STALE_RESETS = {"count": 0}  # tests assert this stays 0 unless a bot really changed under a conversation
@@ -570,6 +570,37 @@ def _cart_total(cart):
     return sum(c["price"] * c.get("qty", 1) for c in cart)
 
 
+def _price(block: CatalogOrderBlock, subtotal: int, code) -> dict:
+    """goods - discount + delivery. Delivery is free once the goods total AFTER the discount reaches free_delivery_over."""
+    disc = 0
+    if code is not None:
+        disc = min(subtotal, round(subtotal * code.percent / 100) if code.percent else code.amount)
+    goods = subtotal - disc
+    fee = 0 if (block.free_delivery_over and goods >= block.free_delivery_over) else block.delivery_fee
+    return {"subtotal": subtotal, "discount": disc, "delivery_fee": fee, "total": goods + fee}
+
+
+def _code_error(block: CatalogOrderBlock, store, subtotal: int, code) -> str | None:
+    if code is None:
+        return "این کد تخفیف معتبر نیست."
+    if code.min_total and subtotal < code.min_total:
+        return f"این کد برای سفارش‌های حداقل {code.min_total:,} تومان است."
+    if code.max_uses:
+        used = sum(1 for r in store.find(block.id) if norm_code(fa_norm(str(r.get("discount_code") or ""))) == norm_code(fa_norm(code.code)) and r.get("status") != "cancelled")
+        if used >= code.max_uses:
+            return "ظرفیت استفاده از این کد تمام شده است."
+    return None
+
+
+def _find_code(block: CatalogOrderBlock, text: str):
+    want = norm_code(fa_norm(text))
+    return next((c for c in block.discount_codes if norm_code(fa_norm(c.code)) == want), None)
+
+
+def _code_prompt():
+    return send("کد تخفیف دارید؟ آن را بنویسید، وگرنه «ندارم» را بزنید.", [_btn("ندارم", "dc:no")])
+
+
 def _more_prompt():
     return send("آیتم دیگری اضافه می‌کنید؟", [_btn("افزودن آیتم دیگر", "more"), _btn("ثبت سفارش", "checkout")])
 
@@ -700,6 +731,21 @@ def _order(spec, session, block: CatalogOrderBlock, text, store, now):
             return [send(f"حداکثر {top} عدد دیگر از این محصول موجود است." if already else f"حداکثر موجودی این محصول {top} عدد است."), _qty_prompt(d["_pending"])]
         return _add_to_cart(session, block, n)
 
+    if step == "code":
+        if text_n in ("dc:no", "ندارم") or not block.discount_codes:
+            d["_code"] = None
+            session["step"] = 0
+            return [_ask(block.fields[0])]
+        subtotal = _cart_total(d["_cart"])
+        code = _find_code(block, text)
+        err = _code_error(block, store, subtotal, code)
+        if err:
+            return [send(err), _code_prompt()]
+        d["_code"] = code.code
+        session["step"] = 0
+        saved = _price(block, subtotal, code)["discount"]
+        return [send(f"✅ کد تخفیف اعمال شد؛ {saved:,} تومان کمتر می‌پردازید."), _ask(block.fields[0])]
+
     if step == "more":
         if text_n == "more":
             if table:
@@ -712,6 +758,10 @@ def _order(spec, session, block: CatalogOrderBlock, text, store, now):
                 return [send("سبد سفارش خالی است."), _more_prompt()]
             if _cart_total(d["_cart"]) < block.min_total:
                 return [send(f"حداقل مبلغ سفارش {block.min_total:,} تومان است. لطفاً آیتم بیشتری اضافه کنید."), _more_prompt()]
+            d.pop("_code", None)
+            if block.discount_codes:
+                session["step"] = "code"
+                return [_code_prompt()]
             session["step"] = 0
             return [_ask(block.fields[0])]
         return [_more_prompt()]
@@ -734,12 +784,27 @@ def _order(spec, session, block: CatalogOrderBlock, text, store, now):
             d["_cart"] = [c for c in cart if c["id"] not in failed]
             session["step"] = "more"
             return [send("متأسفانه موجودی این مورد کافی نیست و از سفارش حذف شد: " + "، ".join(gone)), _more_prompt()]
-    total = _cart_total(cart)
+    subtotal = _cart_total(cart)
+    code = _find_code(block, d["_code"]) if d.get("_code") else None
+    dropped = False
+    if code is not None and _code_error(block, store, subtotal, code):
+        code, dropped = None, True  # its last uses were taken while this customer filled in the form
+    price = _price(block, subtotal, code)
+    total = price["total"]
     contact = {f.key: d[f.key] for f in block.fields}
-    row = store.add(block.id, {**contact, "items": cart, "total": total, "status": "new", **_ident(session, now)})
+    extra = {"subtotal": subtotal, "discount": price["discount"], "discount_code": code.code if code else None, "delivery_fee": price["delivery_fee"]} if (code or dropped or block.delivery_fee or block.discount_codes) else {}
+    row = store.add(block.id, {**contact, "items": cart, "total": total, "status": "new", **extra, **_ident(session, now)})
     lines = "\n".join(f"- {c['name']} {' '.join(c['options'].values())}".strip() + (f" × {c['qty']}" if "qty" in c else "") for c in cart)
-    actions = [send(f"{block.confirm_text}\n{lines}\nجمع کل: {total:,} تومان")]
-    _notify(spec, block.id, f"سفارش #{row['id']} - جمع {total:,} تومان\n{lines}", actions)
+    breakdown = ""
+    if price["discount"] or price["delivery_fee"] or block.delivery_fee:
+        breakdown = f"\nمبلغ کالاها: {subtotal:,} تومان"
+        if price["discount"]:
+            breakdown += f"\nتخفیف ({code.code}): {price['discount']:,} تومان"
+        breakdown += f"\nهزینه ارسال: {price['delivery_fee']:,} تومان" if price["delivery_fee"] else "\nهزینه ارسال: رایگان"
+    if dropped:
+        breakdown += "\n⚠️ ظرفیت کد تخفیف در همین فاصله تمام شد و اعمال نشد."
+    actions = [send(f"{block.confirm_text}\n{lines}{breakdown}\nجمع کل: {total:,} تومان")]
+    _notify(spec, block.id, f"سفارش #{row['id']} - جمع {total:,} تومان" + (f" (کد {code.code})" if code else "") + f"\n{lines}", actions)
     _reset(session)
     actions.append(menu_actions(spec))
     return actions

@@ -157,6 +157,26 @@ class ProductIn(BaseModel):
     description: str
 
 
+def norm_code(code: str) -> str:
+    return code.strip().casefold()
+
+
+class DiscountCode(BaseModel):
+    code: str = Field(min_length=2, max_length=20)
+    percent: int = Field(default=0, ge=0, le=100)  # exactly one of percent / amount
+    amount: int = Field(default=0, ge=0)           # fixed Toman off
+    min_total: int = Field(default=0, ge=0)        # minimum goods total for the code to apply
+    max_uses: int = Field(default=0, ge=0)         # 0 = unlimited; cancelled orders give their use back
+
+    @model_validator(mode="after")
+    def _one_kind(self):
+        if (self.percent > 0) == (self.amount > 0):
+            raise ValueError("a discount code needs either percent or amount (exactly one)")
+        if " " in self.code.strip():
+            raise ValueError("a discount code is a single word")
+        return self
+
+
 class CatalogOrderBlock(BaseModel):
     type: Literal["catalog_order"] = "catalog_order"
     id: str
@@ -169,9 +189,14 @@ class CatalogOrderBlock(BaseModel):
     cancel_window_minutes: int = Field(default=30, ge=1, le=1440)
     fields: list[FormField] = Field(default_factory=lambda: [f.model_copy() for f in DEFAULT_CONTACT])
     confirm_text: str = "سفارش شما ثبت شد."
+    delivery_fee: int = Field(default=0, ge=0)       # Toman added to every order (0 = none)
+    free_delivery_over: int = Field(default=0, ge=0)  # goods total (after discount) from which delivery is free (0 = never)
+    discount_codes: list[DiscountCode] = Field(default_factory=list, max_length=20)
 
     @model_validator(mode="after")
     def _items(self):
+        if len({norm_code(c.code) for c in self.discount_codes}) != len(self.discount_codes):
+            raise ValueError("duplicate discount code")
         if self.source == "inline" and not self.items:
             raise ValueError("an inline catalog_order needs at least one item (or use source='table')")
         return self
