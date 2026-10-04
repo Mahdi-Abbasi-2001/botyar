@@ -106,7 +106,7 @@ def test_bale_unanswered_question_notifies_the_owner_and_the_owner_can_mark_it_h
         return {"update_id": counter[0], "callback_query": {"id": "q", "from": {"id": chat}, "data": data, "message": {"message_id": 7, "chat": {"id": chat, "type": "private"}}}}
 
     c.post(url, json=msg(900, f"/admin {st['admin_code']}"))
-    c.post(url, json=msg(901, st["code"]))
+    c.post(url, json=msg(901, f"/start {st['code']}"))
     c.post(url, json=tap(901, "m:0"))
     sent.clear()
     c.post(url, json=msg(901, "پیتزا سفارش میدم"))

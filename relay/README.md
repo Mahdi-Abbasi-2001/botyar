@@ -32,8 +32,8 @@ as CPU.
    in the playground's `RELAY_KEY`, deploy the playground again, then run `./deploy.sh` once more.
 
 Without `TELEGRAM_SHARED_BOT_TOKEN` owners can still publish to Telegram with their own bot token. With it, the shared
-Telegram bot accepts the same 6-character codes as the shared Bale bot, and `t.me/<bot>?start=<code>` links open a
-bot directly.
+Telegram bot works like the shared Bale bot: each published bot gets a `t.me/<bot>?start=<code>` link and QR that open
+it directly, and customers who arrive without a link pick a business from the directory.
 
 ## Check it
 

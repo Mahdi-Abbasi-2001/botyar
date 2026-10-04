@@ -21,6 +21,9 @@ const FEATURES: { icon: React.ComponentProps<typeof Icon>["name"]; title: string
   { icon: "chart", title: "مدیریت و خروجی", text: "لغو با دلیل، وضعیت سفارش (آماده‌سازی، آماده، تحویل) و خروجی اکسل از همه‌ی ثبت‌ها." },
 ];
 
+// a decorative 5×5 "QR" for the landing mock-up (real QR codes are generated in the publish tab)
+const QR_DOTS = [1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1].map(Boolean);
+
 const PROOF_NUMBERS: [string, string][] = [
   ["۸ از ۸", "درخواست متنوع به ربات کامل و تست‌شده رسید"],
   ["۱۲ تا ۴۳ ثانیه", "از پیام صاحب کسب‌وکار تا ربات آماده"],
@@ -124,16 +127,24 @@ export default function Home() {
             <Kicker mint>۳ · روی بله، همین امروز</Kicker>
             <h2 className="m-0 text-3xl font-black leading-snug sm:text-[44px]">نسخه‌ی تست‌شده با یک دکمه به دست مشتری‌ها می‌رسد.</h2>
             <p className="m-0 text-[17px] leading-8 text-fg-2">
-              ساده‌ترین راه: مشتری‌ها ربات مشترک <span dir="ltr" className="font-bold text-fg">@botyar_ai_bot</span> را در بله باز می‌کنند و کد ۶حرفی ربات تو را می‌فرستند.
-              یا توکن ربات خودت را بگذار تا با اسم و عکس خودت جواب بدهد. نوبت‌ها و سفارش‌ها همان لحظه در پنل و در چت بله‌ی خودت می‌رسند.
+
+              یک لینک و یک QR می‌گیری؛ در اینستاگرام بگذار یا روی پیشخوان بچسبان. مشتری با یک لمس مستقیم وارد ربات تو می‌شود.
+              ربات اختصاصی با اسم و عکس خودت، یا بدون هیچ تنظیمی روی <span dir="ltr" className="font-bold text-fg">@botyar_ai_bot</span>. روی تلگرام هم.
+              نوبت‌ها و سفارش‌ها همان لحظه در پنل و در چت خودت می‌رسند.
             </p>
             <p className="m-0 flex items-center gap-2 text-sm text-mute"><Icon name="lock" size={16} className="text-mint" /> تا وقتی حتی یک تست رد شده باشد، انتشار قفل است.</p>
           </div>
           <div className="flex min-w-0 flex-[1_1_520px] flex-col gap-2.5 rounded-[20px] border border-line bg-panel p-5 text-sm">
-            <span className="flex items-center gap-2 border-b border-line pb-2.5 text-[13px] text-mute"><span className="h-2 w-2 rounded-full bg-mint" />بله · <span dir="ltr">@botyar_ai_bot</span></span>
-            <span className="self-end rounded-[14px_14px_4px_14px] bg-saffron px-3 py-2 text-ink" dir="ltr">/start</span>
-            <span className="self-start rounded-[14px_14px_14px_4px] bg-raised px-3 py-2">سلام! برای شروع، «کد ربات» را بفرستید.</span>
-            <span className="self-end rounded-[14px_14px_4px_14px] bg-saffron px-3 py-2 font-bold tracking-widest text-ink" dir="ltr">K7M2QX</span>
+            <div className="flex items-center gap-3 border-b border-line pb-3">
+              <span aria-hidden className="grid h-14 w-14 shrink-0 grid-cols-5 gap-0.5 rounded-lg bg-white p-1.5">
+                {QR_DOTS.map((on, i) => <span key={i} className={on ? "bg-ink" : ""} />)}
+              </span>
+              <span className="flex flex-col gap-0.5">
+                <span className="font-bold">لینک ربات کلینیک</span>
+                <span className="text-[13px] text-mute" dir="ltr">ble.ir/…?start=…</span>
+              </span>
+              <span className="mr-auto rounded-full bg-mint-bg px-2.5 py-1 text-xs text-mint-fg">یک لمس</span>
+            </div>
             <span className="self-start rounded-[14px_14px_14px_4px] bg-raised px-3 py-2">سلام! به کلینیک دندانپزشکی خوش آمدید.</span>
             <span className="self-start rounded-[10px] border border-line-3 px-3 py-2">دریافت نوبت</span>
             <span className="flex items-center gap-2 self-stretch rounded-xl border border-amber-line bg-amber-bg px-3 py-2 text-amber-fg"><Icon name="bell" size={16} /> برای تو: نوبت جدید · دوشنبه ۵ عصر</span>

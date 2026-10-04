@@ -58,11 +58,16 @@ def test_shared_bot_full_journey(env):
 
     assert c.post("/api/hook/shared/wrong", json=msg(1, "hi")).status_code == 404
 
-    # unknown chat is asked for the code
+    # a chat without a link gets the directory of published bots
     c.post(url, json=msg(111, "/start"))
-    assert "کد ربات" in sent(calls, 111)[-1]["text"]
-    # sending the code opens the bot: welcome + menu with inline buttons
-    c.post(url, json=msg(111, st["code"].lower()))
+    directory = sent(calls, 111)[-1]
+    assert "کدام کسب‌وکار" in directory["text"]
+    assert [b[0]["callback_data"] for b in directory["reply_markup"]["inline_keyboard"]] == ["bdir:1"]
+    # a code TYPED as a message no longer opens a bot (only the link does)
+    c.post(url, json=msg(111, st["code"]))
+    assert "کدام کسب‌وکار" in sent(calls, 111)[-1]["text"]
+    # the link (ble.ir/<bot>?start=CODE arrives as "/start CODE") opens the bot: welcome + menu with inline buttons
+    c.post(url, json=msg(111, f"/start {st['code'].lower()}"))
     out = sent(calls, 111)
     assert "خوش آمدید" in out[-2]["text"] and len(out[-1]["reply_markup"]["inline_keyboard"]) == 2
 
@@ -83,10 +88,13 @@ def test_shared_bot_full_journey(env):
     assert len(live) == 1 and live[0]["data"]["phone"] == "09123456789"
     assert c.get(f"/api/bots/{bot}/records?sandbox=true", headers=H).json() == []
 
-    # /switch forgets the link
+    # /switch forgets the link and shows the directory; picking from it opens the bot again
     c.post(url, json=msg(111, "/switch"))
+    assert "کدام کسب‌وکار" in sent(calls, 111)[-1]["text"]
     c.post(url, json=msg(111, "m:0"))
-    assert "کد ربات" in sent(calls, 111)[-1]["text"]
+    assert "کدام کسب‌وکار" in sent(calls, 111)[-1]["text"]
+    c.post(url, json=cb(111, "bdir:1"))
+    assert "خوش آمدید" in sent(calls, 111)[-2]["text"]
 
 
 def test_duplicate_delivery_is_ignored(env):
@@ -96,7 +104,7 @@ def test_duplicate_delivery_is_ignored(env):
     bot = c.post("/api/bots", json={"template": "cafe"}, headers=H).json()["id"]
     code = c.post(f"/api/bots/{bot}/publish", json={"mode": "shared"}, headers=H).json()["code"]
     url = f"/api/hook/shared/{bale.shared_hook_secret()}"
-    same = msg(222, code)
+    same = msg(222, f"/start {code}")
     c.post(url, json=same)
     n = len(sent(calls, 222))
     c.post(url, json=same)  # Bale retry of the very same update
@@ -148,7 +156,7 @@ def test_next_page_edits_the_clicked_message_but_typed_text_sends_new(env):
         bid = bot.id
     code = c.post(f"/api/bots/{bid}/publish", json={"mode": "shared"}, headers=H).json()["code"]
     url = f"/api/hook/shared/{bale.shared_hook_secret()}"
-    c.post(url, json=msg(777, code))
+    c.post(url, json=msg(777, f"/start {code}"))
     c.post(url, json=cb(777, "m:0"))                       # first list page (a normal new message)
     calls.clear()
     click = cb(777, "pg:1")
@@ -189,7 +197,7 @@ def test_customers_see_persian_digits_but_callback_data_stays_ascii(env):
     bot = c.post("/api/bots", json={"template": "workshop"}, headers=H).json()["id"]
     code = c.post(f"/api/bots/{bot}/publish", json={"mode": "shared"}, headers=H).json()["code"]
     url = f"/api/hook/shared/{bale.shared_hook_secret()}"
-    c.post(url, json=msg(333, code))
+    c.post(url, json=msg(333, f"/start {code}"))
     c.post(url, json=cb(333, "m:0"))
     last = sent(calls, 333)[-1]
     buttons = [b[0] for b in last["reply_markup"]["inline_keyboard"]]
@@ -209,7 +217,7 @@ def test_owner_notification_keeps_phone_digits_as_typed(env):
     st = c.post(f"/api/bots/{bot}/publish", json={"mode": "shared"}, headers=H).json()
     url = f"/api/hook/shared/{bale.shared_hook_secret()}"
     c.post(url, json=msg(555, f"/admin {st['admin_code']}"))
-    c.post(url, json=msg(556, st["code"]))
+    c.post(url, json=msg(556, f"/start {st['code']}"))
     for step in [cb(556, "m:0"), cb(556, "s:thu1"), msg(556, "علی"), msg(556, "09123456789")]:
         c.post(url, json=step)
     note = sent(calls, 555)[-1]["text"]
@@ -239,7 +247,7 @@ def test_cancel_on_bale_promotes_the_waiting_customer_and_messages_them(env):
     url = f"/api/hook/shared/{bale.shared_hook_secret()}"
     c.post(url, json=msg(900, f"/admin {st['admin_code']}"))                      # the owner
     for chat, phone in ((901, "09120000001"), (902, "09120000002")):               # 901 gets the place, 902 waits
-        c.post(url, json=msg(chat, st["code"]))
+        c.post(url, json=msg(chat, f"/start {st['code']}"))
         for step in (cb(chat, "m:0"), cb(chat, "s:once"), msg(chat, "مشتری"), msg(chat, phone)):
             c.post(url, json=step)
     assert "لیست انتظار" in sent(calls, 902)[-2]["text"]

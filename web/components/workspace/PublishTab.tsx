@@ -6,9 +6,10 @@ import { ExportButtons } from "@/components/workspace/ExportButtons";
 import { RecordActions } from "@/components/workspace/RecordActions";
 import { PaymentCard } from "@/components/workspace/PaymentCard";
 import { TelegramCard } from "@/components/workspace/TelegramCard";
+import { ShareLink } from "@/components/workspace/ShareLink";
 
 type Pub = {
-  published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string; webhooks_enabled: boolean;
+  published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string; webhooks_enabled: boolean; listed: boolean;
   mode?: "shared" | "own"; version?: number; code?: string; admin_code?: string; bot_username?: string; admin_linked?: boolean; up_to_date?: boolean;
 };
 type Live = { id: number; collection: string; data: Record<string, any>; created_at: string };
@@ -50,6 +51,18 @@ export function PublishTab({ botId }: { botId: string }) {
     }
   }
 
+  async function setListed(listed: boolean) {
+    setBusy(true);
+    setError("");
+    try {
+      setPub(await api<Pub>(`/bots/${botId}/listing`, { method: "PUT", body: { listed } }));
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function unpublish() {
     if (!confirm("انتشار ربات لغو شود؟ کاربران دیگر پاسخی نمی‌گیرند.")) return;
     setBusy(true);
@@ -76,7 +89,7 @@ export function PublishTab({ botId }: { botId: string }) {
           <p className="mb-4 text-sm leading-7 text-mute">ربات شما همین‌جا آزمایش شده است. با انتشار، مشتری‌هایتان می‌توانند در بله با آن گفتگو کنند و ثبت‌ها به‌صورت واقعی ذخیره می‌شود.</p>
           {!pub.tests_ok && <p className="mb-3 rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-bad">نسخه‌ی فعلی هنوز همه‌ی تست‌ها را نگذرانده؛ ابتدا با ایجنت اصلاحش کنید.</p>}
           <div className="mb-4 grid gap-3 sm:grid-cols-2">
-            {([["shared", "ربات بات‌یار", "سریع‌ترین راه. مشتری کد ربات شما را برای @" + (pub.shared_bot_username || "botyar") + " می‌فرستد."], ["own", "ربات اختصاصی شما", "با نام و عکس خودتان. توکن را از @botfather بله می‌گیرید."]] as const).map(([m, t, d]) => (
+            {([["shared", "ربات بات‌یار", "سریع‌ترین راه، بدون ساختن ربات. یک لینک و QR می‌گیرید که مشتری را مستقیم به ربات شما در @" + (pub.shared_bot_username || "botyar") + " می‌برد."], ["own", "ربات اختصاصی شما (پیشنهادی)", "با نام و عکس خودتان. توکن را از @botfather بله می‌گیرید."]] as const).map(([m, t, d]) => (
               <button key={m} onClick={() => setMode(m)} aria-pressed={mode === m}
                 className={`rounded-xl border p-4 text-right ${mode === m ? "border-saffron bg-saffron/10" : "border-line-2 hover:border-mute"}`}>
                 <div className="font-bold">{t}</div>
@@ -112,14 +125,16 @@ export function PublishTab({ botId }: { botId: string }) {
               </div>
             )}
             {pub.mode === "shared" ? (
-              <ol className="list-decimal space-y-2 pr-5 text-sm leading-7">
-                <li>در بله ربات <a className="font-bold text-saffron underline" dir="ltr" href={`https://ble.ir/${handle}`} target="_blank" rel="noreferrer">@{handle}</a> را باز کنید.</li>
-                <li>این کد را برایش بفرستید (همین کد را به مشتری‌ها بدهید):
-                  <div dir="ltr" className="my-2 inline-block rounded-xl border border-saffron bg-ink px-5 py-2 text-2xl font-black tracking-[0.3em] text-saffron">{pub.code}</div>
-                </li>
-              </ol>
+              <div className="flex flex-col gap-4">
+                <ShareLink url={`https://ble.ir/${handle}?start=${pub.code}`} fileName={`bale-${pub.code}`}
+                  hint="این لینک را در اینستاگرام، واتس‌اپ یا روی پیشخوان بگذارید؛ مشتری با یک لمس مستقیم وارد ربات شما می‌شود." />
+                <label className="flex items-start gap-3 rounded-xl border border-line-2 p-3 text-sm leading-7">
+                  <input type="checkbox" checked={pub.listed} onChange={(e) => setListed(e.target.checked)} disabled={busy} className="mt-1.5 h-5 w-5 accent-[var(--color-saffron)]" />
+                  <span>نمایش در فهرست <span dir="ltr">@{handle}</span><span className="block text-mute">مشتری‌ای که بدون لینک وارد ربات بات‌یار شود، ربات شما را در فهرست کسب‌وکارها می‌بیند. لینک شما در هر حال کار می‌کند.</span></span>
+                </label>
+              </div>
             ) : (
-              <p className="text-sm leading-7">ربات شما فعال است: <a className="font-bold text-saffron underline" dir="ltr" href={`https://ble.ir/${handle}`} target="_blank" rel="noreferrer">@{handle}</a></p>
+              <ShareLink url={`https://ble.ir/${handle}`} fileName={`bale-${handle}`} hint="ربات اختصاصی شما فعال است. این لینک را به مشتری‌ها بدهید." />
             )}
           </div>
 

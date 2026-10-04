@@ -105,6 +105,7 @@ def _status(bot_id: int, db: Session) -> dict:
         "latest_version": latest.version if latest else 0,
         "tests_ok": _tests_ok(bot_id, latest.version, db) if latest else False,
         "shared_bot_username": shared_username() if settings.telegram_shared_bot_token else "",
+        "listed": not bale._hidden(db, bot_id),
     }
     if pub:
         out |= {"mode": pub.mode, "version": pub.version, "code": pub.code, "admin_code": pub.admin_code,

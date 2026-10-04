@@ -114,7 +114,7 @@ def test_owner_reply_from_the_inbox_reaches_the_customer_on_bale(world):
                                                       "message": {"message_id": 7, "chat": {"id": chat_id, "type": "private"}}}}
 
     c.post(url, json=msg(900, f"/admin {st['admin_code']}"))
-    c.post(url, json=msg(901, st["code"]))
+    c.post(url, json=msg(901, f"/start {st['code']}"))
     c.post(url, json=tap(901, "m:0"))
     sent.clear()
     c.post(url, json=msg(901, "ارسال به شیراز هم دارید؟"))

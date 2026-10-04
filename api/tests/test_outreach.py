@@ -115,7 +115,7 @@ def test_broadcast_reaches_active_customers_only_and_stop_works(world):
     c, H, bid, pub, sent = world
     msg, tap = hook(c)
     for chat in (601, 602, 603):
-        msg(chat, pub["code"])
+        msg(chat, f"/start {pub['code']}")
     msg(602, "/stop")
     assert c.get(f"/api/bots/{bid}/broadcasts", headers=H).json()["audience"] == 2
     sent.clear()
@@ -137,7 +137,7 @@ def test_broadcast_limits_and_authorization(world):
     c, H, bid, pub, sent = world
     msg, _ = hook(c)
     assert c.post(f"/api/bots/{bid}/broadcasts", json={"text": "سلام"}, headers=H).status_code == 409      # nobody yet
-    msg(701, pub["code"])
+    msg(701, f"/start {pub['code']}")
     for i in range(3):
         assert c.post(f"/api/bots/{bid}/broadcasts", json={"text": f"پیام {i}"}, headers=H).status_code == 200
     assert c.post(f"/api/bots/{bid}/broadcasts", json={"text": "چهارم"}, headers=H).status_code == 429

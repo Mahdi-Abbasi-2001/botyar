@@ -121,6 +121,14 @@ class ChatLink(Base):
     pub_id: Mapped[int] = mapped_column(ForeignKey("publications.id"), index=True)
 
 
+class BotListing(Base):
+    """Owner's choice to keep a bot OUT of the shared bots' directory (no row = listed). Separate table: no migrations."""
+    __tablename__ = "bot_listings"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), unique=True, index=True)
+    hidden: Mapped[bool] = mapped_column(default=False)
+
+
 class TgPublication(Base):
     """The same bot published to Telegram (separate table: a bot can be live on Bale and Telegram at once, and the
     app has no migrations, so the Bale tables are never altered). Fields mean the same as in Publication."""

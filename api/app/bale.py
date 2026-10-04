@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 from . import dates, engine, faq_index
 from .config import settings
 from .db import SessionLocal
-from .models import BotVersion, ChatLink, ChatSession, PaymentConfig, Publication, Record
+from .models import Bot, BotListing, BotVersion, ChatLink, ChatSession, PaymentConfig, Publication, Record
 from .spec import BotSpec
 from .store import SqlStore
 
@@ -279,6 +279,35 @@ def send_customer_actions(db: Session, bot_id: int, actions: list[dict]) -> int:
     return sent
 
 
+# ---------- shared bot directory ----------
+DIRECTORY_PAGE = 8
+
+
+def _hidden(db: Session, bot_id: int) -> bool:
+    row = db.scalars(select(BotListing).where(BotListing.bot_id == bot_id)).first()
+    return bool(row and row.hidden)
+
+
+def directory(db: Session, ch: Channel, page: int, edit: bool = False) -> dict:
+    """The list a customer sees on a shared bot without a business picked: every bot published there whose owner did
+    not hide it, newest first, DIRECTORY_PAGE per page. Buttons: bdir:<publication id>, paging bdirp:<page>."""
+    Pub = ch.pub_model
+    hidden = select(BotListing.bot_id).where(BotListing.hidden.is_(True))
+    q = (select(Pub.id, Bot.name).join(Bot, Bot.id == Pub.bot_id)
+         .where(Pub.mode == "shared", Pub.bot_id.not_in(hidden)).order_by(Pub.id.desc()))
+    rows = db.execute(q.offset(page * DIRECTORY_PAGE).limit(DIRECTORY_PAGE + 1)).all()
+    if not rows and page == 0:
+        return {"type": "send", "text": "سلام! 👋 هنوز کسب‌وکاری در این ربات فهرست نشده است. اگر لینک یک کسب‌وکار را دارید، روی همان لینک بزنید.", "buttons": []}
+    buttons = [{"text": name[:48], "data": f"bdir:{pid}"} for pid, name in rows[:DIRECTORY_PAGE]]
+    if len(rows) > DIRECTORY_PAGE:
+        buttons.append({"text": "بعدی ◀", "data": f"bdirp:{page + 1}"})
+    if page > 0:
+        buttons.append({"text": "▶ قبلی", "data": f"bdirp:{page - 1}"})
+    text = "سلام! 👋 با کدام کسب‌وکار کار دارید؟ یکی را انتخاب کنید." + (f"\n(صفحه‌ی {page + 1})" if page else "") + \
+        "\nبرای برگشتن به همین فهرست در هر زمان: /switch"
+    return {"type": "send", "text": text, "buttons": buttons, **({"edit": True} if edit else {})}
+
+
 # ---------- update handling ----------
 _locks: dict[int, threading.Lock] = defaultdict(threading.Lock)  # serialise a bot's bookings (capacity checks)
 _seen: dict[str, int] = {}
@@ -355,17 +384,27 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
     pub = own_pub
     welcome_now = False
     if kind == "shared":
-        cand = t[6:].strip() if t.startswith("/start") else t  # also Telegram deep links: t.me/<bot>?start=CODE
+        # A customer reaches a business's bot through its link (ble.ir/<bot>?start=CODE, t.me/<bot>?start=CODE: the
+        # messenger sends "/start CODE") or by picking it from the directory. A code typed as a message is NOT accepted.
         link = db.scalars(select(Link).where(Link.chat_id == chat_id)).first()
         if t == "/switch":
             if link:
                 db.delete(link)
                 db.commit()
-            say(token, chat_id, "کد رباتِ مورد نظر را بفرستید.", ch)
+            deliver(token, chat_id, [directory(db, ch, 0)], {}, ch=ch)
+            return
+        page = re.fullmatch(r"bdirp:(\d{1,4})", t)
+        if page:
+            deliver(token, chat_id, [directory(db, ch, int(page.group(1)), edit=True)], {}, edit_message_id=clicked_message_id, ch=ch)
             return
         found = None
-        if re.fullmatch(r"[A-Za-z0-9]{4,12}", cand or ""):
-            found = db.scalars(select(Pub).where(Pub.code == cand.upper(), Pub.mode == "shared")).first()
+        payload = t[6:].strip() if t.startswith("/start") else ""
+        picked = re.fullmatch(r"bdir:(\d{1,12})", t)
+        if re.fullmatch(r"[A-Za-z0-9]{4,12}", payload):
+            found = db.scalars(select(Pub).where(Pub.code == payload.upper(), Pub.mode == "shared")).first()
+        elif picked:
+            cand = db.get(Pub, int(picked.group(1)))
+            found = cand if cand is not None and cand.mode == "shared" and not _hidden(db, cand.bot_id) else None
         if found:
             if link:
                 link.pub_id = found.id
@@ -376,7 +415,7 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
         elif link:
             pub = db.get(Pub, link.pub_id)
         if pub is None:
-            say(token, chat_id, "سلام! 👋 برای شروع، «کد ربات» را بفرستید (صاحب کسب‌وکار آن را به شما می‌دهد).", ch)
+            deliver(token, chat_id, [directory(db, ch, 0)], {}, ch=ch)
             return
 
     ver = db.scalars(select(BotVersion).where(BotVersion.bot_id == pub.bot_id, BotVersion.version == pub.version)).first()

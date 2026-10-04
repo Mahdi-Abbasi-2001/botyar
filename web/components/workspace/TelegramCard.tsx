@@ -2,9 +2,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { fa } from "@/components/ui";
+import { ShareLink } from "@/components/workspace/ShareLink";
 
 type Tg = {
-  enabled: boolean; published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string;
+  enabled: boolean; published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string; listed: boolean;
   mode?: "shared" | "own"; version?: number; code?: string; admin_code?: string; bot_username?: string; admin_linked?: boolean; up_to_date?: boolean;
 };
 
@@ -39,6 +40,19 @@ export function TelegramCard({ botId }: { botId: string }) {
     try {
       setTg(await api<Tg>(`/bots/${botId}/telegram/publish`, { body: { mode: m, token: m === "own" ? token : undefined } }));
       setToken("");
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setListed(listed: boolean) {
+    setBusy(true);
+    setError("");
+    try {
+      await api(`/bots/${botId}/listing`, { method: "PUT", body: { listed } });
+      await load();
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -81,7 +95,7 @@ export function TelegramCard({ botId }: { botId: string }) {
             <button onClick={() => setMode("shared")} aria-pressed={mode === "shared"}
               className={`rounded-xl border p-4 text-right ${mode === "shared" ? "border-saffron bg-saffron/10" : "border-line-2 hover:border-mute"}`}>
               <div className="font-bold">ربات بات‌یار در تلگرام</div>
-              <div className="mt-1 text-sm leading-6 text-mute">سریع‌ترین راه؛ همان کد بله برای <span dir="ltr">@{tg.shared_bot_username}</span> هم کار می‌کند.</div>
+              <div className="mt-1 text-sm leading-6 text-mute">سریع‌ترین راه، بدون ساختن ربات؛ یک لینک و QR به ربات شما در <span dir="ltr">@{tg.shared_bot_username}</span> می‌گیرید.</div>
             </button>
           )}
           <button onClick={() => setMode("own")} aria-pressed={mode === "own"}
@@ -118,13 +132,16 @@ export function TelegramCard({ botId }: { botId: string }) {
         </div>
       )}
       {tg.mode === "shared" ? (
-        <p className="text-sm leading-8">
-          لینک مستقیم برای مشتری‌ها (کد خودش وارد می‌شود):{" "}
-          <a className="font-bold text-saffron underline" dir="ltr" href={`https://t.me/${handle}?start=${tg.code}`} target="_blank" rel="noreferrer">t.me/{handle}?start={tg.code}</a>
-          <span className="block text-mute">یا در <span dir="ltr">@{handle}</span> کد <span dir="ltr" className="font-bold tracking-widest text-fg">{tg.code}</span> را بفرستند.</span>
-        </p>
+        <div className="flex flex-col gap-4">
+          <ShareLink url={`https://t.me/${handle}?start=${tg.code}`} fileName={`telegram-${tg.code}`}
+            hint="مشتری‌های تلگرامی با این لینک یا QR مستقیم وارد ربات شما می‌شوند." />
+          <label className="flex items-start gap-3 rounded-xl border border-line-2 p-3 text-sm leading-7">
+            <input type="checkbox" checked={tg.listed} onChange={(e) => setListed(e.target.checked)} disabled={busy} className="mt-1.5 h-5 w-5 accent-[var(--color-saffron)]" />
+            <span>نمایش در فهرست <span dir="ltr">@{handle}</span><span className="block text-mute">همین تنظیم برای فهرست ربات بات‌یار در بله هم اعمال می‌شود.</span></span>
+          </label>
+        </div>
       ) : (
-        <p className="text-sm leading-7">ربات تلگرام شما فعال است: <a className="font-bold text-saffron underline" dir="ltr" href={`https://t.me/${handle}`} target="_blank" rel="noreferrer">@{handle}</a></p>
+        <ShareLink url={`https://t.me/${handle}`} fileName={`telegram-${handle}`} hint="ربات تلگرام شما فعال است. این لینک را به مشتری‌ها بدهید." />
       )}
       <div className="mt-3 border-t border-line pt-3 text-sm leading-7">
         {tg.admin_linked ? (

@@ -5,7 +5,7 @@
 خواسته شود را با نمایش تفاوت‌ها و اجرای دوباره‌ی همه‌ی تست‌ها اعمال می‌کند.
 
 - نسخه‌ی آنلاین: https://botyar.liara.run
-- ربات مشترک بله: `@botyar_ai_bot` (مشتری کد ۶حرفی ربات را می‌فرستد). همان ربات را می‌شود روی تلگرام هم منتشر کرد.
+- ربات مشترک بله: `@botyar_ai_bot`. هر ربات یک لینک و QR می‌گیرد که مشتری را مستقیم واردش می‌کند؛ کسی که بدون لینک بیاید، فهرست کسب‌وکارها را می‌بیند. همان ربات را می‌شود روی تلگرام هم منتشر کرد.
 - راهنمای آزمودن قدم‌به‌قدم: [`docs/TEST-TOUR.md`](docs/TEST-TOUR.md)
 
 مسئله‌ی انتخاب‌شده در رویداد BuildX: **۳ — سازنده و نگه‌دارنده‌ی ربات بله/تلگرام.**
@@ -96,7 +96,7 @@ For frontend work with hot reload, run `npm run dev` in `web/` with `NEXT_PUBLIC
 | `BALE_SHARED_BOT_TOKEN` | – | Token of the shared @botyar_ai_bot |
 | `PUBLIC_BASE_URL` | – | Public URL used to register Bale webhooks |
 | `TELEGRAM_RELAY_URL`, `TELEGRAM_RELAY_KEY` | – | The Telegram relay outside Iran (see [`relay/README.md`](relay/README.md)); empty = Telegram off |
-| `TELEGRAM_SHARED_BOT_TOKEN` | – | Optional shared Telegram bot (same codes as the shared Bale bot) |
+| `TELEGRAM_SHARED_BOT_TOKEN` | – | Optional shared Telegram bot (links + directory, like the shared Bale bot) |
 | `CORS_ORIGINS` | `http://localhost:3000` | Only needed when the UI runs on another origin |
 
 ### Spending guards

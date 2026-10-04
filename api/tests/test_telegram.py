@@ -170,10 +170,10 @@ def test_announcement_reaches_customers_on_both_messengers(env):
     H, bot = owner(c)
     code = c.post(f"/api/bots/{bot}/publish", json={"mode": "shared"}, headers=H).json()["code"]
     c.post(f"/api/bots/{bot}/telegram/publish", json={"mode": "shared"}, headers=H)
-    c.post(f"/api/hook/shared/{bale.shared_hook_secret()}", json=msg(301, code))
+    c.post(f"/api/hook/shared/{bale.shared_hook_secret()}", json=msg(301, f"/start {code}"))
     tg = f"/api/tghook/shared/{telegram.shared_hook_secret()}"
-    c.post(tg, json=msg(401, code))
-    c.post(tg, json=msg(402, code))
+    c.post(tg, json=msg(401, f"/start {code}"))
+    c.post(tg, json=msg(402, f"/start {code}"))
     c.post(tg, json=msg(402, "/stop"))
     assert c.get(f"/api/bots/{bot}/broadcasts", headers=H).json()["audience"] == 2
     r = c.post(f"/api/bots/{bot}/broadcasts", json={"text": "تخفیف ویژه"}, headers=H)
@@ -205,7 +205,7 @@ def test_place_freed_on_bale_goes_to_the_waiting_telegram_customer(env):
     c.post(f"/api/bots/{bid}/telegram/publish", json={"mode": "shared"}, headers=H)
     bale_url, tg_url = f"/api/hook/shared/{bale.shared_hook_secret()}", f"/api/tghook/shared/{telegram.shared_hook_secret()}"
     for url, chat, phone in ((bale_url, 901, "09120000001"), (tg_url, 902, "09120000002")):  # Bale takes the place, Telegram waits
-        c.post(url, json=msg(chat, code))
+        c.post(url, json=msg(chat, f"/start {code}"))
         for step in (cb(chat, "m:0"), cb(chat, "s:once"), msg(chat, "مشتری"), msg(chat, phone)):
             c.post(url, json=step)
     assert "لیست انتظار" in sent(calls["tg"], 902)[-2]["text"]
@@ -226,7 +226,7 @@ def test_telegram_chats_never_get_payment_invoices(env):
     H, bot = owner(c, template="cafe")
     c.put(f"/api/bots/{bot}/payment", json={"wallet_token": "WALLET-TEST-1111111111111111"}, headers=H)
     code = c.post(f"/api/bots/{bot}/telegram/publish", json={"mode": "shared"}, headers=H).json()["code"]
-    c.post(f"/api/tghook/shared/{telegram.shared_hook_secret()}", json=msg(77, code))
+    c.post(f"/api/tghook/shared/{telegram.shared_hook_secret()}", json=msg(77, f"/start {code}"))
     from app.db import SessionLocal
     from app.models import ChatSession
 

@@ -151,8 +151,11 @@ Check that nothing *else* changed in the diff — the agent regenerates the whol
 
 ## Station 6 — Publish to Bale (shared bot)
 
-**What it is:** the **انتشار** tab. Shared mode = customers message @botyar_ai_bot and send your bot's 6-character code.
-**Do:** publish → open Bale on your phone → `/start` → send the code → book a seat. Then send `/admin <your admin code>` from your
+**What it is:** the **انتشار** tab. Shared mode = your bot lives inside @botyar_ai_bot; you get a link
+(`ble.ir/botyar_ai_bot?start=<code>`) and a QR that open it directly (verified on Bale Web and the phone app). A customer
+who opens @botyar_ai_bot without a link gets a paged **directory** of the businesses there (owners can hide theirs with
+the «نمایش در فهرست» checkbox; the link keeps working). Typing a code as a message does nothing on purpose.
+**Do:** publish → scan the QR with your phone → book a seat. Then `/switch` → the directory → pick your bot again. Then send `/admin <your admin code>` from your
 own chat and book again from a second account/phone.
 **Expect:** buttons appear as inline buttons; **"next page" edits the same message** (catalog bots); the owner gets a
 🔔 notification with the customer's name and phone; the booking appears under *live records* in the app.
@@ -172,7 +175,7 @@ Liara container), so every call goes through `relay/main.ts` on Deno Deploy. Set
 **Do:** after the relay is deployed and `./deploy.sh` has run with `TELEGRAM_RELAY_URL`, open **انتشار** → the
 Telegram card → publish (shared bot, or your own token from Telegram's @BotFather). Open the `t.me/<bot>?start=<code>`
 link on a phone with Telegram, book a seat, send `/admin <code>` from your own Telegram account.
-**Expect:** the code is the SAME as on Bale; the booking appears in the same records; the owner notification arrives
+**Expect:** the link opens your bot directly (a Telegram-only customer can also pick it from the shared bot's directory); the booking appears in the same records; the owner notification arrives
 on Telegram; an announcement reaches customers on both messengers; no pay button on Telegram (payments are Bale only).
 **Break it:** book the last seat on Bale and join the waitlist on Telegram, then cancel on Bale: the Telegram customer
 must get the «freed place» message on Telegram. Stop the relay (or put a wrong `RELAY_KEY` on Deno): Bale must keep

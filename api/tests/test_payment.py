@@ -145,7 +145,7 @@ def drive(c, pub, chat=801):
 def test_shared_bot_accepts_only_the_test_wallet_and_the_full_payment_flow_works(world):
     c, H, bid, pub, calls = world
     post, msg, tap = drive(c, pub)
-    msg(pub["code"])
+    msg(f"/start {pub['code']}")
     assert c.put(f"/api/bots/{bid}/payment", json={"wallet_token": "REAL-WALLET-TOKEN-123"}, headers=H).json()["active"] is False
     calls.clear()
     tap("m:0"); tap("i:latte"); tap("n:1"); tap("checkout"); msg("سارا")
@@ -189,7 +189,7 @@ def test_shared_bot_accepts_only_the_test_wallet_and_the_full_payment_flow_works
 def test_successful_payment_with_a_wrong_amount_or_stranger_is_ignored(world):
     c, H, bid, pub, calls = world
     post, msg, tap = drive(c, pub)
-    msg(pub["code"])
+    msg(f"/start {pub['code']}")
     c.put(f"/api/bots/{bid}/payment", json={"wallet_token": "WALLET-TEST-1111111111111111"}, headers=H)
     tap("m:0"); tap("i:latte"); tap("n:1"); tap("checkout"); msg("سارا")
     with SessionLocal() as db:
@@ -203,7 +203,7 @@ def test_successful_payment_with_a_wrong_amount_or_stranger_is_ignored(world):
 def test_unpaid_orders_expire_in_the_background_job_and_owner_cannot_move_them_forward(world):
     c, H, bid, pub, calls = world
     post, msg, tap = drive(c, pub)
-    msg(pub["code"])
+    msg(f"/start {pub['code']}")
     c.put(f"/api/bots/{bid}/payment", json={"wallet_token": "WALLET-TEST-1111111111111111"}, headers=H)
     tap("m:0"); tap("i:latte"); tap("n:1"); tap("checkout"); msg("سارا")
     with SessionLocal() as db:

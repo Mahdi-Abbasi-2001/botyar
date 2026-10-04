@@ -12,7 +12,7 @@ from . import bale, faq_index
 from .auth import current_user
 from .config import settings
 from .db import get_db
-from .models import Bot, BotVersion, ChatLink, Publication, User, VersionTests
+from .models import Bot, BotListing, BotVersion, ChatLink, Publication, User, VersionTests
 from .spec import BotSpec
 
 router = APIRouter()
@@ -44,6 +44,7 @@ def _status(bot_id: int, db: Session) -> dict:
         "tests_ok": _tests_ok(bot_id, latest.version, db) if latest else False,
         "shared_bot_username": bale.shared_username(),
         "webhooks_enabled": bool(settings.public_base_url),
+        "listed": not bale._hidden(db, bot_id),
     }
     if pub:
         out |= {"mode": pub.mode, "version": pub.version, "code": pub.code, "admin_code": pub.admin_code,
@@ -116,6 +117,23 @@ def publish(bot_id: int, body: PublishIn, user: User = Depends(current_user), db
         except bale.BaleError as e:
             db.rollback()
             raise HTTPException(502, f"ثبت وبهوک در بله ناموفق بود: {e}")
+    db.commit()
+    return _status(bot_id, db)
+
+
+class ListingIn(BaseModel):
+    listed: bool
+
+
+@router.put("/api/bots/{bot_id}/listing")
+def set_listing(bot_id: int, body: ListingIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Show or hide the bot in the shared bots' directory (Bale and Telegram). Its link keeps working either way."""
+    _own(bot_id, user, db)
+    row = db.scalars(select(BotListing).where(BotListing.bot_id == bot_id)).first()
+    if row is None:
+        row = BotListing(bot_id=bot_id)
+        db.add(row)
+    row.hidden = not body.listed
     db.commit()
     return _status(bot_id, db)
 
