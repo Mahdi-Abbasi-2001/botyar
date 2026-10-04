@@ -5,7 +5,7 @@ from typing import Union
 
 from pydantic import BaseModel, Field
 
-from .spec import (AdminNotifyBlock, BookingBlock, CatalogOrderBlock, FaqBlock, FormBlock, MenuItem,
+from .spec import (AdminNotifyBlock, BookingBlock, CatalogOrderBlock, ContactBlock, FaqBlock, FormBlock, MenuItem,
                    MessageBlock, ProductIn)
 
 
@@ -13,5 +13,5 @@ class LLMBotSpec(BaseModel):
     name: str
     welcome: str
     menu: list[MenuItem]
-    blocks: list[Union[MessageBlock, FormBlock, BookingBlock, CatalogOrderBlock, FaqBlock, AdminNotifyBlock]]
+    blocks: list[Union[MessageBlock, FormBlock, BookingBlock, CatalogOrderBlock, FaqBlock, ContactBlock, AdminNotifyBlock]]
     sample_products: list[ProductIn]  # only for catalog_order with source="table"; otherwise []

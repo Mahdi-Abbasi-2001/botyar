@@ -287,6 +287,9 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict):
             state, t = engine.new_session(), "/start"
         elif kind == "shared" and t.startswith("/start"):
             t = "/start"
+        frm = (msg or cq or {}).get("from") or {}
+        if frm.get("first_name"):
+            state["cust_name"] = str(frm["first_name"])[:40]
         state["cust"] = f"bale:{chat_id}"  # stable customer identity (set last: the welcome path above replaces the whole state)
         actions = engine.handle(spec, state, t, SqlStore(db, pub.bot_id, sandbox=False), matcher=faq_index.matcher_for(db, pub.bot_id, spec))
         deliver(token, chat_id, actions, state, pub.admin_chat_id, clicked_message_id)

@@ -114,8 +114,15 @@ FAQ_CASES = [
      lambda s, m: None if faqs(s) and sched(s) else "expected an FAQ block AND an appointment schedule"),
 ]
 
+CONTACT_CASES = [
+    ("contact-basic", "ربات فروشگاه لوازم‌التحریر که مشتری‌ها بتوانند برای من پیام بفرستند و من خودم جواب بدهم", "done",
+     lambda s, m: None if blocks(s, "contact") and any(b["on"] == blocks(s, "contact")[0]["id"] for b in blocks(s, "admin_notify")) else "expected a contact block watched by admin_notify"),
+    ("contact-with-order", "ربات کافه: منوی لاته ۹۵ هزار تومان و اسپرسو ۷۰ هزار تومان، و مشتری بتواند به من پیام بدهد", "done",
+     lambda s, m: None if blocks(s, "contact") and blocks(s, "catalog_order") else "expected contact AND catalog_order"),
+]
+
 # appended by later features (appointment calendars, FAQ, owner chat, delivery/discounts) — see EXTRA_CASES below
-EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES]
+EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES]
 
 
 def run_case(c, i, name, text, want_status, check):
@@ -138,6 +145,9 @@ def run_case(c, i, name, text, want_status, check):
     spec = (c.get(f"/api/bots/{bot}", headers=H).json().get("spec")) or {"blocks": []}
     tests = c.get(f"/api/bots/{bot}/tests", headers=H).json()["results"]
     if want_status == "done":
+        for t in tests:
+            if not t["passed"] and os.environ.get("EVAL_VERBOSE"):
+                print("   FAILED SCENARIO:", json.dumps(t, ensure_ascii=False)[:1500])
         if not tests or not all(t["passed"] for t in tests):
             errors.append(f"tests {sum(t['passed'] for t in tests)}/{len(tests)}")
         err = check(spec, msg)

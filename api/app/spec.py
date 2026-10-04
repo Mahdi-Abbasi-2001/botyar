@@ -192,6 +192,15 @@ class FaqBlock(BaseModel):
     not_found_text: str = "پاسخ این سؤال را پیدا نکردم. سؤالتان برای مدیر ثبت شد و به‌زودی پاسخ می‌دهیم."
 
 
+class ContactBlock(BaseModel):
+    """Customers write to the owner; the owner answers from the dashboard inbox and the reply arrives in the customer's chat."""
+    type: Literal["contact"] = "contact"
+    id: str
+    title: str
+    prompt_text: str = "پیام خود را بنویسید تا برای مدیر ارسال شود. پاسخ را همین‌جا دریافت می‌کنید:"
+    sent_text: str = "پیام شما برای مدیر ارسال شد. پاسخ را همین‌جا دریافت می‌کنید."
+
+
 class AdminNotifyBlock(BaseModel):
     type: Literal["admin_notify"] = "admin_notify"
     id: str
@@ -200,7 +209,7 @@ class AdminNotifyBlock(BaseModel):
 
 
 Block = Annotated[
-    Union[MessageBlock, FormBlock, BookingBlock, CatalogOrderBlock, FaqBlock, AdminNotifyBlock],
+    Union[MessageBlock, FormBlock, BookingBlock, CatalogOrderBlock, FaqBlock, ContactBlock, AdminNotifyBlock],
     Field(discriminator="type"),
 ]
 

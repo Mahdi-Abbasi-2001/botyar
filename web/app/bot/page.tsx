@@ -7,12 +7,13 @@ import { ErrorNote, Icon, Logo, fa } from "@/components/ui";
 import { BuilderTab } from "@/components/workspace/BuilderTab";
 import { RecordsTab, StructureTab, TestsTab, VersionsTab } from "@/components/workspace/InspectorTabs";
 import { PublishTab } from "@/components/workspace/PublishTab";
+import { InboxTab } from "@/components/workspace/InboxTab";
 import { CatalogTab } from "@/components/workspace/CatalogTab";
 import { PhoneSim } from "@/components/workspace/PhoneSim";
 import { progressOf, type Bot, type ChatMsg, type Rec, type RunResult, type RunStatus, type TestRes, type Ver } from "@/components/workspace/model";
 
-type Tab = "build" | "spec" | "tests" | "versions" | "publish" | "catalog" | "records" | "try";
-const TAB_LABEL: Record<Tab, string> = { build: "ساخت با ایجنت", spec: "ساختار", tests: "تست‌ها", versions: "نسخه‌ها", publish: "انتشار", catalog: "محصولات", records: "ثبت‌ها", try: "امتحانش کن" };
+type Tab = "build" | "spec" | "tests" | "versions" | "publish" | "catalog" | "inbox" | "records" | "try";
+const TAB_LABEL: Record<Tab, string> = { build: "ساخت با ایجنت", spec: "ساختار", tests: "تست‌ها", versions: "نسخه‌ها", publish: "انتشار", catalog: "محصولات", inbox: "پیام‌ها", records: "ثبت‌ها", try: "امتحانش کن" };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function Workspace() {
@@ -158,7 +159,8 @@ function Workspace() {
   const spec = bot.spec;
   const passed = tests.filter((t) => t.passed).length;
   const hasCatalog = !!spec?.blocks?.some((b: any) => b.type === "catalog_order" && b.source === "table");
-  const tabs: Tab[] = spec ? (["build", "spec", "tests", "versions", ...(hasCatalog ? ["catalog"] : []), "publish", "records", "try"] as Tab[]) : ["build"];
+  const hasContact = !!spec?.blocks?.some((b: any) => b.type === "contact");
+  const tabs: Tab[] = spec ? (["build", "spec", "tests", "versions", ...(hasCatalog ? ["catalog"] : []), "publish", ...(hasContact ? ["inbox"] : []), "records", "try"] as Tab[]) : ["build"];
   const phoneTabs = tab === "build" || tab === "spec";
   const fieldLabels: Record<string, string> = { slot_label: "زمان" };
   for (const b of spec?.blocks ?? []) if ("fields" in b) for (const f of b.fields) fieldLabels[f.key] = f.label;
@@ -204,6 +206,7 @@ function Workspace() {
           {tab === "tests" && <TestsTab tests={tests} spec={spec} version={bot.version} />}
           {tab === "versions" && <VersionsTab versions={versions} spec={spec} />}
           {tab === "catalog" && spec && <CatalogTab botId={id!} />}
+          {tab === "inbox" && spec && <InboxTab botId={id!} />}
           {tab === "publish" && spec && <PublishTab botId={id!} />}
           {tab === "records" && spec && <RecordsTab records={records} spec={spec} botId={id!} onChanged={loadRecords} />}
         </div>

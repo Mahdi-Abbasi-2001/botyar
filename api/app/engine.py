@@ -14,7 +14,7 @@ from typing import Any, Protocol
 from . import dates
 from .engine_text import fa_digits, fa_norm, norm  # noqa: F401  (re-exported: engine.norm / engine.fa_norm / engine.fa_digits)
 from .faq_match import LexicalMatcher, MatcherUnavailable, RateLimited, decide
-from .spec import BotSpec, BookingBlock, CatalogOrderBlock, FaqBlock, FormBlock, FormField, MessageBlock
+from .spec import BotSpec, BookingBlock, CatalogOrderBlock, ContactBlock, FaqBlock, FormBlock, FormField, MessageBlock
 
 log = logging.getLogger("botyar.engine")
 STALE_RESETS = {"count": 0}  # tests assert this stays 0 unless a bot really changed under a conversation
@@ -211,6 +211,8 @@ def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matc
             return _order(spec, session, block, text, store, now)
         if block.type == "faq":
             return _faq(spec, session, block, text, store, now, matcher or LexicalMatcher())
+        if block.type == "contact":
+            return _contact(spec, session, block, text, store, now)
     except (StopIteration, IndexError, KeyError) as e:
         # The saved state belongs to an older version of the bot (the owner republished mid-conversation:
         # a block, field, slot or option it points to is gone). Never leave the customer in silence.
@@ -242,6 +244,9 @@ def _from_menu(spec, session, text_n, store, now):
         return [send(block.title), _ask(block.fields[0])]
     if block.type == "faq":
         return _faq_start(session, block)
+    if block.type == "contact":
+        session.update(block=block.id, step="msg", data={})
+        return [send(block.title), send(block.prompt_text, _faq_nav())]
     if block.type == "booking" and block.schedule:
         return _appt_start(spec, session, block, store, now)
     if block.type == "booking":
@@ -824,6 +829,39 @@ def _faq(spec, session, block: FaqBlock, text, store, now, matcher):
     if kind == "suggest":
         return [send("منظورتان یکی از این سؤال‌هاست؟", [_btn(_short(block.entries[i].question, 50), f"fq:{i}") for i in idx] + [_btn("هیچ‌کدام", "fn")])]
     return _faq_unanswered(spec, session, block, store, now, query)
+
+
+# ---------- talk to the owner (messages go to the dashboard inbox; the owner's replies come back to this chat) ----------
+CONTACT_MAX_CHARS, CONTACT_PER_HOUR = 1000, 20
+
+
+def thread_id(cust: str | None) -> str:
+    import hashlib
+
+    return hashlib.sha1((cust or "anon").encode()).hexdigest()[:12]
+
+
+def _contact(spec, session, block: ContactBlock, text, store, now):
+    body = text.strip()[:CONTACT_MAX_CHARS]
+    if not body:
+        return [send(block.prompt_text, _faq_nav())]
+    cust = session.get("cust")
+    if cust:  # a flooding customer must not bury the owner
+        hour_ago = now - timedelta(hours=1)
+        recent = 0
+        for r in store.find(block.id, _cust=cust):
+            try:
+                if r.get("from") == "customer" and datetime.fromisoformat(r["_at"]) > hour_ago:
+                    recent += 1
+            except (KeyError, ValueError):
+                continue
+        if recent >= CONTACT_PER_HOUR:
+            return [send("تعداد پیام‌های این ساعت زیاد شده است؛ کمی بعد دوباره بنویسید.", _faq_nav())]
+    who = session.get("cust_name") or "مشتری"
+    store.add(block.id, {"text": body, "from": "customer", "thread": thread_id(cust), "who": who, "status": "open", **_ident(session, now)})
+    actions = [send(block.sent_text, _faq_nav())]
+    _notify(spec, block.id, f"{who}: {body}\n(برای پاسخ، بخش «پیام‌ها» در پنل بات‌یار را باز کنید)", actions, prefix=f"📩 پیام جدید از مشتری · {block.title}")
+    return actions  # the customer stays in this step: a follow-up message goes to the owner as well
 
 
 # ---------- customer cancellation («ثبت‌های من») ----------

@@ -69,6 +69,8 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
     const on = spec.blocks.find((x) => x.id === b.on);
     return <span className="text-sm leading-7 text-amber-fg">بعد از هر ثبت در «{on ? blockTitle(on) : b.on}»: «{b.text}»</span>;
   }
+  if (b.type === "contact")
+    return <span className="text-sm leading-7 text-fg-2">مشتری پیامش را می‌نویسد و برای شما می‌آید؛ پاسخ را از بخش «پیام‌ها» می‌نویسید و در همان گفتگوی مشتری می‌رسد. ربات خودش جواب نمی‌دهد.</span>;
   if (b.type === "faq") {
     const open = records.filter((r) => r.collection === b.id && r.data.status === "unanswered").length;
     return (

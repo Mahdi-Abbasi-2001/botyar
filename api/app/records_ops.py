@@ -37,7 +37,7 @@ def act_on_record(bot_id: int, record_id: int, body: RecordAction, user: User = 
         raise HTTPException(404, "ثبت یافت نشد")
     ver = db.scalars(select(BotVersion).where(BotVersion.bot_id == bot_id).order_by(BotVersion.version.desc())).first()
     spec = BotSpec.model_validate(ver.spec)
-    block = next((b for b in spec.blocks if b.id == rec.collection and b.type in ("booking", "catalog_order", "faq")), None)
+    block = next((b for b in spec.blocks if b.id == rec.collection and b.type in ("booking", "catalog_order", "faq")), None)  # contact threads use the inbox endpoints
     if block is None:
         raise HTTPException(409, "بخش مربوط به این ثبت دیگر در ربات نیست")
 
@@ -73,3 +73,59 @@ def act_on_record(bot_id: int, record_id: int, body: RecordAction, user: User = 
     new_status = store.find(rec.collection, id=rec.id)[0]["status"]
     return {"id": rec.id, "status": new_status, "customer_messages": {"wanted": wanted, "sent": sent, "sandbox": rec.sandbox},
             "promoted": {"id": promoted["id"], "name": promoted.get("name")} if promoted else None}
+
+
+# ---------- inbox for "talk to the owner" blocks ----------
+class InboxReply(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+
+
+def _threads(db: Session, bot_id: int, sandbox: bool, only: str | None = None):
+    rows = db.scalars(select(Record).where(Record.bot_id == bot_id, Record.sandbox == sandbox).order_by(Record.id)).all()
+    out: dict[str, dict] = {}
+    for r in rows:
+        d = r.data
+        if "thread" not in d or d.get("from") not in ("customer", "owner"):
+            continue
+        key = f"{r.collection}:{d['thread']}"
+        if only and key != only:
+            continue
+        t = out.setdefault(key, {"thread": d["thread"], "collection": r.collection, "who": d.get("who", "مشتری"), "cust": d.get("_cust"), "messages": [], "unanswered": False})
+        if d["from"] == "customer":
+            t["who"] = d.get("who", t["who"])
+        t["messages"].append({"id": r.id, "from": d["from"], "text": d.get("text", ""), "at": r.created_at.isoformat()})
+        t["unanswered"] = d["from"] == "customer"
+    return out
+
+
+@router.get("/api/bots/{bot_id}/inbox")
+def inbox(bot_id: int, sandbox: bool = False, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    bot = db.get(Bot, bot_id)
+    if not bot or bot.user_id != user.id:
+        raise HTTPException(404, "ربات یافت نشد")
+    threads = list(_threads(db, bot_id, sandbox).values())
+    for t in threads:
+        t.pop("cust")
+    threads.sort(key=lambda t: t["messages"][-1]["id"], reverse=True)
+    return threads[:200]
+
+
+@router.post("/api/bots/{bot_id}/inbox/{collection}/{thread}/reply")
+def inbox_reply(bot_id: int, collection: str, thread: str, body: InboxReply, sandbox: bool = False,
+                user: User = Depends(current_user), db: Session = Depends(get_db)):
+    bot = db.get(Bot, bot_id)
+    if not bot or bot.user_id != user.id:
+        raise HTTPException(404, "ربات یافت نشد")
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(422, "متن پاسخ خالی است")
+    with bale._locks[bot_id]:
+        t = _threads(db, bot_id, sandbox, only=f"{collection}:{thread}").get(f"{collection}:{thread}")
+        if t is None:
+            raise HTTPException(404, "گفتگو یافت نشد")
+        store = SqlStore(db, bot_id, sandbox=sandbox)
+        row = store.add(collection, {"text": text, "from": "owner", "thread": thread, "who": t["who"], "_cust": t["cust"], "_at": now_tehran().isoformat()})
+        db.commit()
+    actions = [{"type": "notify_customer", "cust": t["cust"], "text": f"✉️ پاسخ مدیر:\n{text}"}] if t["cust"] else []
+    sent = 0 if sandbox else bale.send_customer_actions(db, bot_id, actions)
+    return {"id": row["id"], "delivered": sent, "wanted": len(actions), "sandbox": sandbox}

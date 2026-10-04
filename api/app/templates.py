@@ -97,6 +97,17 @@ FAQ_EXAMPLE = {
     ],
 }
 
+# Style reference for the agent only: customers message the owner, who answers from the panel.
+CONTACT_EXAMPLE = {
+    "name": "ربات فروشگاه گل",
+    "welcome": "سلام! به فروشگاه گل خوش آمدید.",
+    "menu": [{"label": "پیام به مدیر", "block": "contact"}],
+    "blocks": [
+        {"type": "contact", "id": "contact", "title": "ارتباط با مدیر"},
+        {"type": "admin_notify", "id": "notify_contact", "on": "contact", "text": "پیام جدید از مشتری"},
+    ],
+}
+
 TEMPLATES = {"workshop": WORKSHOP, "cafe": CAFE}
 
 
