@@ -96,6 +96,13 @@ appears as an amber bubble.
 **Migrate an old bot:** open a bot with lifetime slots and say `این سانس‌ها هر هفته تکرار می‌شوند؛ ظرفیت برای هر هفته جدا شمرده شود` → the diff should change only `weekday`/`time` on each slot. (Bookings made before the change have no date, so they stop counting — the capacity starts fresh.)
 **Break it:** book at the very end of the day before a class; ask for «هر دو هفته یک‌بار» (not supported — the agent should say so honestly instead of faking it); mix a weekly class and a one-off event in one bot.
 
+### Station 4b2 — Appointment calendars from working hours (new)
+
+**What it is:** for salons, clinics, tutors, consultants. The owner gives working days and hours, how long one appointment takes, an optional lunch break and optional staff. The bot generates the bookable times; capacity is counted **per staff member, per date, per time**. (Fixed classes/events still use *slots*, above.)
+**Do:** describe `آرایشگاه زنانه با دو آرایشگر سارا و مینا. شنبه تا چهارشنبه ۹ تا ۶، هر نوبت ۶۰ دقیقه، ساعت ۱ تا ۲ ناهار`. In the simulator you should be asked «با چه کسی؟», then see the next working days («یکشنبه ۱۴۰۵/۰۷/۱۲ (۸ نوبت خالی)»), then the times with the lunch hour missing.
+**Expect:** a time you book disappears for that stylist but stays free for the other; times that already started are never offered; a long day pages its times (8 per page, edited in place); booking the same time from two phones leaves the second customer with "someone just took it" and the time list again.
+**Break it:** book the last free time of a day (the day disappears); ask for 2 customers at once («ظرفیت ۲ نفر همزمان»); ask for appointments AND a group class in one bot (the agent should create two booking blocks).
+
 ### Station 4c — Customers cancelling («ثبت‌های من») (new)
 
 **What it is:** when a booking or order block allows it (the agent turns it on by default; say «مشتری نتونه لغو کنه» to turn it off), the bot's menu gets a built-in last button **«ثبت‌های من»**. The customer sees only their OWN active bookings/orders, taps one, confirms, and it is cancelled.

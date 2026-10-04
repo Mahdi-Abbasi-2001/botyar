@@ -226,7 +226,7 @@ function MiniMap({ spec, tests, running, stamped }: { spec: Spec | null; tests: 
               <div key={b.id} className={`flex flex-col gap-1 rounded-2xl border p-3.5 ${b.type === "admin_notify" ? "border-amber-line bg-amber-bg" : b.type === "booking" || b.type === "catalog_order" ? "border-saffron bg-panel" : "border-line-2 bg-panel"}`}>
                 <span className={`text-xs ${b.type === "admin_notify" ? "text-amber-fg/80" : "text-mute"}`}>{BLOCK_KIND[b.type]}</span>
                 <span className="text-sm leading-7">{blockTitle(b)}</span>
-                {b.type === "booking" && <span className="text-xs text-mute">{fa(b.slots.length)} زمان{b.waitlist ? " · لیست انتظار" : ""}</span>}
+                {b.type === "booking" && <span className="text-xs text-mute">{b.schedule ? `ساعت کاری · نوبت ${fa(b.schedule.duration_minutes)} دقیقه${b.schedule.staff.length ? ` · ${fa(b.schedule.staff.length)} نفر` : ""}` : `${fa(b.slots.length)} زمان${b.waitlist ? " · لیست انتظار" : ""}`}</span>}
                 {b.type === "catalog_order" && <span className="text-xs text-mute">{fa(b.items.length)} آیتم</span>}
               </div>
             ))}

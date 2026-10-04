@@ -250,6 +250,8 @@ def _from_menu(spec, session, text_n, store, now):
     session.update(block=block.id, step=0, data={})
     if block.type == "form":
         return [send(block.title), _ask(block.fields[0])]
+    if block.type == "booking" and block.schedule:
+        return _appt_start(spec, session, block, store, now)
     if block.type == "booking":
         session["step"] = "slot"
         return [send(block.title), _slot_prompt(block, store, now)]
@@ -312,6 +314,8 @@ def _slot_prompt(block: BookingBlock, store, now):
 
 def _booking(spec, session, block: BookingBlock, text, store, now):
     text_n = norm(text)
+    if block.schedule:
+        return _appt(spec, session, block, text, store, now)
     if session["step"] == "slot":
         opts = _options(block, now)
         # exact button data first; typed text may start with the display name or (for the nearest date) the bare label
@@ -349,6 +353,157 @@ def _booking(spec, session, block: BookingBlock, text, store, now):
     row = store.add(block.id, {**session["data"], "status": status, **_ident(session, now)})
     actions = [send(block.waitlist_text if full else block.confirm_text)]
     _notify(spec, block.id, f"[{status}] " + _summary(row), actions)
+    _reset(session)
+    actions.append(menu_actions(spec))
+    return actions
+
+
+# ---------- appointments generated from working hours (booking block with a `schedule`) ----------
+PAGE_TIMES = 8
+
+
+def _hm(t: str) -> int:
+    return int(t[:2]) * 60 + int(t[3:])
+
+
+def _fmt(minutes: int) -> str:
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+def _appt_times(block: BookingBlock, day: date, now) -> list[str]:
+    """Every start time of that day that is still in the future and does not collide with the daily break."""
+    sch, out = block.schedule, []
+    for w in sch.days:
+        if w.weekday != dates.persian_weekday(day):
+            continue
+        t = _hm(w.start)
+        while t + sch.duration_minutes <= _hm(w.end):
+            in_break = sch.break_start and t < _hm(sch.break_end) and t + sch.duration_minutes > _hm(sch.break_start)
+            if not in_break and datetime.combine(day, time(t // 60, t % 60), tzinfo=now.tzinfo) > now:
+                out.append(_fmt(t))
+            t += sch.duration_minutes
+    return out
+
+
+def _appt_free(block: BookingBlock, store, staff: str, day: date, hhmm: str) -> int:
+    where = {"slot": "appt", "status": "confirmed", "date": day.isoformat(), "time": hhmm}
+    if staff:
+        where["staff"] = staff
+    return block.schedule.capacity - store.count(block.id, **where)
+
+
+def _appt_free_times(block, store, staff, day, now) -> list[str]:
+    return [t for t in _appt_times(block, day, now) if _appt_free(block, store, staff, day, t) > 0]
+
+
+def _appt_days(block, store, staff, now) -> list[tuple[date, int]]:
+    out = []
+    for i in range(block.schedule.days_ahead + 1):
+        day = now.date() + timedelta(days=i)
+        n = len(_appt_free_times(block, store, staff, day, now))
+        if n:
+            out.append((day, n))
+    return out
+
+
+def _appt_label(day: date, hhmm: str | None = None, staff: str = "") -> str:
+    base = f"{dates.WEEKDAYS[dates.persian_weekday(day)]} {dates.jalali_str(day)}" + (f" ساعت {hhmm}" if hhmm else "")
+    return base + (f" — {staff}" if staff else "")
+
+
+def _appt_start(spec, session, block, store, now):
+    session.update(block=block.id, step="day", data={})
+    if block.schedule.staff:
+        session["step"] = "staff"
+        return [send(block.title), send("با چه کسی؟", [_btn(n, f"f:{i}") for i, n in enumerate(block.schedule.staff)])]
+    return _appt_day_prompt(spec, session, block, store, now, [send(block.title)])
+
+
+def _appt_day_prompt(spec, session, block, store, now, head=()):
+    staff = session["data"].get("staff", "")
+    days = _appt_days(block, store, staff, now)
+    if not days:
+        _reset(session)
+        return [*head, send("در حال حاضر نوبت خالی وجود ندارد. لطفاً بعداً دوباره سر بزنید."), menu_actions(spec)]
+    session["step"] = "day"
+    buttons = [_btn(f"{_appt_label(d)} ({n} نوبت خالی)", f"d:{d:%Y%m%d}") for d, n in days]
+    return [*head, send("روز مورد نظر را انتخاب کنید:", buttons)]
+
+
+def _appt_time_prompt(block, store, session, now, page=0, edit=False):
+    d = session["data"]
+    day = date.fromisoformat(d["date"])
+    times = _appt_free_times(block, store, d.get("staff", ""), day, now)
+    pages = max(1, math.ceil(len(times) / PAGE_TIMES))
+    page = min(max(page, 0), pages - 1)
+    buttons = [_btn(t, f"t:{t.replace(':', '')}") for t in times[page * PAGE_TIMES:(page + 1) * PAGE_TIMES]]
+    if page > 0:
+        buttons.append(_btn("‹ قبلی", f"tp:{page - 1}"))
+    if page + 1 < pages:
+        buttons.append(_btn("بعدی ›", f"tp:{page + 1}"))
+    buttons.append(_btn("بازگشت به انتخاب روز", "back"))
+    session["step"] = "time"
+    head = f"ساعت مورد نظر برای {_appt_label(day, None, d.get('staff', ''))}" + (f" — صفحه {page + 1} از {pages}" if pages > 1 else "") + ":"
+    return send(head, buttons, edit)
+
+
+def _appt(spec, session, block: BookingBlock, text, store, now):
+    text_n = norm(text)
+    d = session["data"]
+    step = session["step"]
+    sch = block.schedule
+
+    if step == "staff":
+        m = re.fullmatch(r"f:(\d+)", text_n)
+        idx = int(m.group(1)) if m else next((i for i, n in enumerate(sch.staff) if fa_norm(n) == fa_norm(text_n)), -1)
+        if not 0 <= idx < len(sch.staff):
+            return [send("لطفاً یکی از گزینه‌ها را انتخاب کنید."), send("با چه کسی؟", [_btn(n, f"f:{i}") for i, n in enumerate(sch.staff)])]
+        d["staff"] = sch.staff[idx]
+        return _appt_day_prompt(spec, session, block, store, now)
+
+    if step == "day":
+        m = re.fullmatch(r"d:(\d{8})", text_n)
+        offered = {f"{x:%Y%m%d}": x for x, _ in _appt_days(block, store, d.get("staff", ""), now)}
+        if not m or m.group(1) not in offered:
+            return _appt_day_prompt(spec, session, block, store, now, [send("لطفاً یکی از روزها را انتخاب کنید.")])
+        d["date"] = offered[m.group(1)].isoformat()
+        return [_appt_time_prompt(block, store, session, now)]
+
+    if step == "time":
+        if text_n == "back":
+            d.pop("date", None)
+            return _appt_day_prompt(spec, session, block, store, now)
+        mp = re.fullmatch(r"tp:(\d+)", text_n)
+        if mp:
+            return [_appt_time_prompt(block, store, session, now, int(mp.group(1)), edit=True)]
+        mt = re.fullmatch(r"t:(\d{4})", text_n)
+        day = date.fromisoformat(d["date"])
+        hhmm = f"{mt.group(1)[:2]}:{mt.group(1)[2:]}" if mt else None
+        if not hhmm or hhmm not in _appt_free_times(block, store, d.get("staff", ""), day, now):
+            return [send("این ساعت دیگر خالی نیست. لطفاً ساعت دیگری انتخاب کنید."), _appt_time_prompt(block, store, session, now)]
+        d["time"] = hhmm
+        d["slot"] = "appt"
+        d["slot_label"] = _appt_label(day, hhmm, d.get("staff", ""))
+        session["step"] = 0
+        return [_ask(block.fields[0])]
+
+    # contact fields
+    idx = step
+    field = block.fields[idx]
+    ok, value, err = validate(field, text)
+    if not ok:
+        return [send(err), _ask(field)]
+    d[field.key] = value
+    if idx + 1 < len(block.fields):
+        session["step"] = idx + 1
+        return [_ask(block.fields[idx + 1])]
+    day = date.fromisoformat(d["date"])
+    if _appt_free(block, store, d.get("staff", ""), day, d["time"]) <= 0:  # someone took it while this customer was typing
+        d.pop("time", None)
+        return [send(block.full_text), _appt_time_prompt(block, store, session, now)]
+    row = store.add(block.id, {**d, "status": "confirmed", **_ident(session, now)})
+    actions = [send(block.confirm_text)]
+    _notify(spec, block.id, "[confirmed] " + _summary(row), actions)
     _reset(session)
     actions.append(menu_actions(spec))
     return actions
@@ -609,6 +764,8 @@ def _active(b, r: dict, now) -> bool:
     if b.type == "booking":
         if r.get("status") not in ("confirmed", "waitlisted"):
             return False
+        if r.get("date") and r.get("time"):  # an appointment that already started is history
+            return datetime.combine(date.fromisoformat(r["date"]), time(int(r["time"][:2]), int(r["time"][3:])), tzinfo=now.tzinfo) > now
         return not r.get("date") or date.fromisoformat(r["date"]) >= now.date()
     return r.get("status") == "new"
 
@@ -624,8 +781,9 @@ def _why_not(b, r: dict, now) -> str | None:
     if b.type == "booking":
         if b.cancel_deadline_hours and r.get("date"):
             slot = next((s for s in b.slots if s.id == r.get("slot")), None)
-            if slot and slot.time:
-                h, m = (int(x) for x in slot.time.split(":"))
+            hhmm = r.get("time") or (slot.time if slot else None)  # appointments carry their own time
+            if hhmm:
+                h, m = (int(x) for x in hhmm.split(":"))
                 start = datetime.combine(date.fromisoformat(r["date"]), time(h, m), tzinfo=now.tzinfo)
                 if now >= start - timedelta(hours=b.cancel_deadline_hours):
                     return f"لغو فقط تا {b.cancel_deadline_hours} ساعت پیش از شروع ممکن است و این مهلت گذشته است. لطفاً با مدیر تماس بگیرید."

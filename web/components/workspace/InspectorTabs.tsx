@@ -3,7 +3,7 @@ import { useState } from "react";
 import { CapacityBar, Icon, Stamp, TestBar, fa } from "../ui";
 import { RecordActions } from "./RecordActions";
 import {
-  BLOCK_KIND, FIELD_KIND, ago, blockTitle, humanizeDiff, readableInput, toman, weeklyText,
+  BLOCK_KIND, FIELD_KIND, ago, blockTitle, humanizeDiff, readableInput, scheduleLines, toman, weeklyText,
   type Block, type Rec, type Spec, type TestRes, type Ver,
 } from "./model";
 
@@ -88,6 +88,12 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
   return (
     <>
       <p className="mb-2 text-xs text-mute">{b.allow_cancel ? `مشتری می‌تواند لغو کند${b.cancel_deadline_hours ? ` · تا ${fa(b.cancel_deadline_hours)} ساعت پیش از شروع` : ""}` : "لغو توسط مشتری غیرفعال است"}</p>
+      {b.schedule && (
+        <div className="flex flex-col gap-1 rounded-xl bg-raised p-3 text-sm">
+          <span className="text-xs text-mint-fg">نوبت‌دهی با ساعت کاری · زمان‌ها خودکار ساخته می‌شوند</span>
+          {scheduleLines(b.schedule).map((l, i) => <span key={i} className={i === 0 ? "" : "text-mute"}>{l}</span>)}
+        </div>
+      )}
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
         {b.slots.map((s) => {
           const weekly = weeklyText(s);

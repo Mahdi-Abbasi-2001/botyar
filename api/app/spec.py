@@ -63,11 +63,57 @@ DEFAULT_CONTACT = [
 ]
 
 
+_HHMM = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
+
+
+def _mins(t: str) -> int:
+    return int(t[:2]) * 60 + int(t[3:])
+
+
+class WorkDay(BaseModel):
+    weekday: int = Field(ge=0, le=6)  # 0 = شنبه … 6 = جمعه
+    start: str  # "HH:MM"
+    end: str
+
+    @model_validator(mode="after")
+    def _hours(self):
+        if not (_HHMM.fullmatch(self.start) and _HHMM.fullmatch(self.end)) or _mins(self.start) >= _mins(self.end):
+            raise ValueError("working hours need start < end as HH:MM")
+        return self
+
+
+class Schedule(BaseModel):
+    """Individual appointments generated from working hours (salon, clinic, tutor…), as opposed to fixed `slots`."""
+    days: list[WorkDay] = Field(min_length=1, max_length=14)
+    duration_minutes: int = Field(ge=10, le=480)
+    capacity: int = Field(default=1, ge=1, le=20)  # customers per time, per staff member
+    days_ahead: int = Field(default=7, ge=1, le=14)  # how many days from today can be booked
+    staff: list[str] = []  # optional: each person has their own calendar and the customer chooses one
+    break_start: str | None = None  # optional daily break (lunch), "HH:MM"
+    break_end: str | None = None
+
+    @model_validator(mode="after")
+    def _ok(self):
+        if len({d.weekday for d in self.days}) != len(self.days):
+            raise ValueError("each weekday may appear once in the working days")
+        for d in self.days:
+            if _mins(d.end) - _mins(d.start) < self.duration_minutes:
+                raise ValueError("an appointment is longer than a whole working day")
+        if (self.break_start is None) != (self.break_end is None):
+            raise ValueError("a break needs both break_start and break_end")
+        if self.break_start and not (_HHMM.fullmatch(self.break_start) and _HHMM.fullmatch(self.break_end) and _mins(self.break_start) < _mins(self.break_end)):
+            raise ValueError("break needs start < end as HH:MM")
+        if len(self.staff) > 8 or len({x.strip() for x in self.staff}) != len(self.staff) or any(not x.strip() or len(x) > 40 for x in self.staff):
+            raise ValueError("staff: up to 8 distinct non-empty names")
+        return self
+
+
 class BookingBlock(BaseModel):
     type: Literal["booking"] = "booking"
     id: str
     title: str
-    slots: list[Slot] = Field(min_length=1)
+    slots: list[Slot] = []  # fixed events / classes with a capacity …
+    schedule: Schedule | None = None  # … OR individual appointments generated from working hours (not both)
     occurrences: int = Field(default=2, ge=1, le=4)  # how many upcoming dates are offered for each weekly slot
     waitlist: bool = False
     allow_cancel: bool = False  # customers may cancel their own booking from «ثبت‌های من»
@@ -76,6 +122,12 @@ class BookingBlock(BaseModel):
     confirm_text: str = "ثبت‌نام شما با موفقیت انجام شد."
     full_text: str = "متأسفانه ظرفیت این زمان تکمیل است."
     waitlist_text: str = "ظرفیت تکمیل است؛ شما در لیست انتظار قرار گرفتید و در صورت خالی شدن جا خبر می‌دهیم."
+
+    @model_validator(mode="after")
+    def _one_kind(self):
+        if bool(self.slots) == (self.schedule is not None):
+            raise ValueError("a booking block needs either `slots` (fixed events/classes) or `schedule` (appointments from working hours), not both and not neither")
+        return self
 
 
 class OptionGroup(BaseModel):

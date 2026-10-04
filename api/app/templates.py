@@ -66,6 +66,21 @@ WEEKLY_EXAMPLE = {
     ],
 }
 
+# Style reference for the agent only: individual appointments generated from working hours, with two staff members.
+APPOINTMENT_EXAMPLE = {
+    "name": "ربات نوبت‌دهی آرایشگاه",
+    "welcome": "سلام! برای رزرو نوبت از منو استفاده کنید.",
+    "menu": [{"label": "رزرو نوبت", "block": "appt"}],
+    "blocks": [
+        {"type": "booking", "id": "appt", "title": "رزرو نوبت", "allow_cancel": True, "cancel_deadline_hours": 3,
+         "schedule": {"days": [{"weekday": 0, "start": "09:00", "end": "18:00"}, {"weekday": 1, "start": "09:00", "end": "18:00"},
+                               {"weekday": 3, "start": "09:00", "end": "18:00"}],
+                      "duration_minutes": 60, "capacity": 1, "days_ahead": 7, "staff": ["سارا", "مینا"],
+                      "break_start": "13:00", "break_end": "14:00"}},
+        {"type": "admin_notify", "id": "notify", "on": "appt", "text": "نوبت جدید ثبت شد"},
+    ],
+}
+
 TEMPLATES = {"workshop": WORKSHOP, "cafe": CAFE}
 
 

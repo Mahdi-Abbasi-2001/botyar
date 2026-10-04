@@ -78,8 +78,28 @@ CASES = [
     ("declined-app", "یک اپلیکیشن موبایل برای فروشگاهم بساز", "declined", lambda s, m: None),
     ("vague-asks-first", "یه ربات برای باشگاهم می‌خوام", "needs_input", lambda s, m: None),
 ]
+def sched(spec):
+    return [b["schedule"] for b in blocks(spec, "booking") if b.get("schedule")]
+
+
+APPOINTMENT_CASES = [
+    ("appt-salon-staff-break", "ربات نوبت‌دهی آرایشگاه زنانه با دو آرایشگر سارا و مینا. شنبه تا چهارشنبه از ۹ صبح تا ۶ عصر، هر نوبت ۶۰ دقیقه، ساعت ۱ تا ۲ ناهار تعطیل. نام و موبایل بگیر و خبر بده.", "done",
+     lambda s, m: None if sched(s) and sorted(d["weekday"] for d in sched(s)[0]["days"]) == [0, 1, 2, 3, 4] and sched(s)[0]["duration_minutes"] == 60
+     and set(sched(s)[0]["staff"]) == {"سارا", "مینا"} and (sched(s)[0]["break_start"], sched(s)[0]["break_end"]) == ("13:00", "14:00")
+     else f"salon schedule wrong: {json.dumps(sched(s), ensure_ascii=False)[:300]}"),
+    ("appt-clinic-short-visits", "ربات ویزیت دکتر پوست: دوشنبه و چهارشنبه از ۴ تا ۸ عصر، هر ویزیت ۱۵ دقیقه. نام و موبایل بگیر.", "done",
+     lambda s, m: None if sched(s) and sorted(d["weekday"] for d in sched(s)[0]["days"]) == [2, 4] and sched(s)[0]["duration_minutes"] == 15
+     and all((d["start"], d["end"]) == ("16:00", "20:00") for d in sched(s)[0]["days"]) and not sched(s)[0]["staff"] else f"clinic schedule wrong: {json.dumps(sched(s), ensure_ascii=False)[:300]}"),
+    ("appt-vs-class-stays-slots", "ربات ثبت‌نام کلاس پیلاتس: هر سه‌شنبه ساعت ۶ عصر، ظرفیت ۱۲ نفر. نام و موبایل بگیر.", "done",
+     lambda s, m: None if slots(s) and not sched(s) else "a fixed class must stay a slot, not a schedule"),
+    ("appt-and-class-two-blocks", "ربات استودیو: کلاس گروهی یوگا هر شنبه ساعت ۸ صبح ظرفیت ۱۰ نفر، و همچنین نوبت مشاوره‌ی خصوصی جداگانه دوشنبه‌ها از ۱۰ تا ۱۲ هر ۳۰ دقیقه. نام و موبایل بگیر.", "done",
+     lambda s, m: None if slots(s) and sched(s) and all(bool(b["slots"]) != bool(b.get("schedule")) for b in blocks(s, "booking")) else "expected one slots block and one schedule block"),
+    ("appt-default-duration", "ربات نوبت‌دهی مشاور تحصیلی، یکشنبه‌ها از ۱۰ صبح تا ۲ بعدازظهر. نام و موبایل بگیر.", "done",
+     lambda s, m: None if sched(s) and sched(s)[0]["duration_minutes"] and ("۳۰" in m or "30" in m or "مدت" in m) else "should assume a duration and say so"),
+]
+
 # appended by later features (appointment calendars, FAQ, owner chat, delivery/discounts) — see EXTRA_CASES below
-EXTRA_CASES: list = []
+EXTRA_CASES: list = [*APPOINTMENT_CASES]
 
 
 def run_case(c, i, name, text, want_status, check):

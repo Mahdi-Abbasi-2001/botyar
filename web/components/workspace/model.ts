@@ -2,12 +2,16 @@
 import { fa } from "../ui";
 
 export type Field = { key: string; label: string; kind: "text" | "phone" | "number" | "choice"; choices: string[]; required: boolean };
+export type Schedule = {
+  days: { weekday: number; start: string; end: string }[]; duration_minutes: number; capacity: number; days_ahead: number;
+  staff: string[]; break_start?: string | null; break_end?: string | null;
+};
 export type Slot = { id: string; label: string; capacity: number; weekday?: number | null; time?: string | null };
 export type Item = { id: string; name: string; price: number; options: { name: string; choices: string[] }[] };
 export type Block =
   | { type: "message"; id: string; text: string }
   | { type: "form"; id: string; title: string; fields: Field[]; done_text: string }
-  | { type: "booking"; id: string; title: string; slots: Slot[]; waitlist: boolean; allow_cancel?: boolean; cancel_deadline_hours?: number; occurrences?: number; fields: Field[]; confirm_text: string; full_text: string; waitlist_text: string }
+  | { type: "booking"; id: string; title: string; slots: Slot[]; waitlist: boolean; schedule?: Schedule | null; allow_cancel?: boolean; cancel_deadline_hours?: number; occurrences?: number; fields: Field[]; confirm_text: string; full_text: string; waitlist_text: string }
   | { type: "catalog_order"; id: string; title: string; items: Item[]; max_items: number; min_total: number; fields: Field[]; confirm_text: string }
   | { type: "admin_notify"; id: string; on: string; text: string };
 export type Spec = { name: string; welcome: string; menu: { label: string; block: string }[]; blocks: Block[] };
@@ -55,6 +59,21 @@ export function jalaliFromYmd(ymd: string): string {
   const [jy, jm, jd] = toJalali(+ymd.slice(0, 4), +ymd.slice(4, 6), +ymd.slice(6, 8));
   return `${jy}/${String(jm).padStart(2, "0")}/${String(jd).padStart(2, "0")}`;
 }
+/** Plain-Persian lines describing an appointment schedule, e.g. «شنبه تا چهارشنبه · ۰۹:۰۰ تا ۱۸:۰۰». */
+export function scheduleLines(sc: Schedule): string[] {
+  const days = [...sc.days].sort((a, b) => a.weekday - b.weekday);
+  const groups: { from: number; to: number; start: string; end: string }[] = [];
+  for (const d of days) {
+    const last = groups[groups.length - 1];
+    if (last && last.start === d.start && last.end === d.end && d.weekday === last.to + 1) last.to = d.weekday;
+    else groups.push({ from: d.weekday, to: d.weekday, start: d.start, end: d.end });
+  }
+  const lines = groups.map((g) => `${g.from === g.to ? WEEKDAYS[g.from] : `${WEEKDAYS[g.from]} تا ${WEEKDAYS[g.to]}`} · ${g.start} تا ${g.end}`);
+  lines.push(`هر نوبت ${sc.duration_minutes} دقیقه · ظرفیت هر ساعت ${sc.capacity}${sc.break_start ? ` · استراحت ${sc.break_start} تا ${sc.break_end}` : ""} · رزرو تا ${sc.days_ahead} روز آینده`);
+  if (sc.staff.length) lines.push(`تقویم جدا برای: ${sc.staff.join("، ")}`);
+  return lines;
+}
+
 /** «هر هفته · پنجشنبه ساعت ۱۰:۰۰» for a weekly slot, null for a one-off. */
 export function weeklyText(s: Slot): string | null {
   return s.weekday == null ? null : `هر هفته · ${WEEKDAYS[s.weekday]} ساعت ${s.time ?? ""}`;
