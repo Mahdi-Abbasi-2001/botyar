@@ -205,7 +205,7 @@ function Workspace() {
           {tab === "versions" && <VersionsTab versions={versions} spec={spec} />}
           {tab === "catalog" && spec && <CatalogTab botId={id!} />}
           {tab === "publish" && spec && <PublishTab botId={id!} />}
-          {tab === "records" && spec && <RecordsTab records={records} spec={spec} />}
+          {tab === "records" && spec && <RecordsTab records={records} spec={spec} botId={id!} onChanged={loadRecords} />}
         </div>
 
         {spec ? (

@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app.db import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models import BuilderRun, Product, VersionTests  # noqa: E402
+from app.models import BuilderRun, Product, Record, VersionTests  # noqa: E402
 
 PUBLIC = {("POST", "/api/auth/login"), ("POST", "/api/auth/register"), ("GET", "/api/health"), ("GET", "/api/templates"),
           ("POST", "/api/hook/shared/{secret}"), ("POST", "/api/hook/own/{pub_id}/{secret}")}
@@ -32,8 +32,10 @@ def world():
             run = BuilderRun(bot_id=bot, status="done", events=[], result={})
             db.add(run)
             db.add(VersionTests(bot_id=bot, version=1, scenarios=[], results=[]))
+            rec = Record(bot_id=bot, collection="order", data={"status": "new", "items": [], "total": 1}, sandbox=False)
+            db.add(rec)
             db.commit()
-            ids = {"bot_id": bot, "run_id": run.id, "pid": db.query(Product).first().id, "pub_id": 1, "secret": "x"}
+            ids = {"bot_id": bot, "run_id": run.id, "pid": db.query(Product).first().id, "pub_id": 1, "secret": "x", "record_id": rec.id}
         yield c, a, b, ids
 
 
@@ -68,7 +70,7 @@ def test_every_protected_route_requires_a_login(world):
         assert r.status_code == 401, f"{method} {path} answered {r.status_code} without a login"
         seen.append(path)
     # guard: the enumeration really includes every route family (a router that silently went missing would fail here)
-    for family in ("/publish", "/publication", "/catalog/preview", "/catalog/commit", "/export/products", "/export/records", "/builder", "/simulate"):
+    for family in ("/records/{record_id}", "/publish", "/publication", "/catalog/preview", "/catalog/commit", "/export/products", "/export/records", "/builder", "/simulate"):
         assert any(family in p for p in seen), f"route family {family} not covered by the matrix"
 
 

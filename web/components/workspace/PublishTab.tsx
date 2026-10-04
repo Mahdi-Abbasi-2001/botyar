@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { fa } from "@/components/ui";
 import { ExportButtons } from "@/components/workspace/ExportButtons";
+import { RecordActions } from "@/components/workspace/RecordActions";
 
 type Pub = {
   published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string; webhooks_enabled: boolean;
@@ -135,8 +136,9 @@ export function PublishTab({ botId }: { botId: string }) {
             {live.length === 0 ? <p className="text-sm text-mute">هنوز مشتری واقعی ثبتی انجام نداده است.</p> : (
               <ul className="space-y-2">
                 {live.slice(0, 20).map((r) => (
-                  <li key={r.id} className="rounded-xl border border-line-2 p-3 text-sm">
-                    {Object.entries(r.data).filter(([k]) => !k.startsWith("_") && k !== "slot").map(([k, v]) => <span key={k} className="ml-3 inline-block"><span className="text-mute">{k}: </span>{typeof v === "object" ? JSON.stringify(v) : String(v)}</span>)}
+                  <li key={r.id} className="flex flex-col gap-2 rounded-xl border border-line-2 p-3 text-sm">
+                    <div>{Object.entries(r.data).filter(([k]) => !k.startsWith("_") && k !== "slot").map(([k, v]) => <span key={k} className="ml-3 inline-block"><span className="text-mute">{k}: </span>{typeof v === "object" ? JSON.stringify(v) : String(v)}</span>)}</div>
+                    <RecordActions botId={botId} rec={r} onChanged={load} />
                   </li>
                 ))}
               </ul>

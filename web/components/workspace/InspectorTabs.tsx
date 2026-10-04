@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { CapacityBar, Icon, Stamp, TestBar, fa } from "../ui";
+import { RecordActions } from "./RecordActions";
 import {
   BLOCK_KIND, FIELD_KIND, ago, blockTitle, humanizeDiff, readableInput, toman, weeklyText,
   type Block, type Rec, type Spec, type TestRes, type Ver,
@@ -245,10 +246,13 @@ const STATUS: Record<string, [string, string]> = {
   waitlisted: ["لیست انتظار", "bg-mint text-ink font-bold"],
   new: ["سفارش جدید", "border border-saffron text-saffron"],
   cancelled: ["لغو شده", "border border-line-3 text-dim line-through"],
+  preparing: ["در حال آماده‌سازی", "border border-saffron bg-saffron/10 text-saffron"],
+  ready: ["آماده", "bg-mint text-ink font-bold"],
+  done: ["تحویل شد", "border border-line-3 text-mute"],
 };
 const mask = (p?: string) => (p && p.length >= 8 ? `${p.slice(0, 4)} ••• ${p.slice(-4)}` : p ?? "—");
 
-export function RecordsTab({ records, spec }: { records: Rec[]; spec: Spec }) {
+export function RecordsTab({ records, spec, botId, onChanged }: { records: Rec[]; spec: Spec; botId: string; onChanged: () => void }) {
   const [filter, setFilter] = useState<string>("all");
   const titles = new Map(spec.blocks.map((b) => [b.id, blockTitle(b)]));
   const bookings = spec.blocks.filter((b): b is Extract<Block, { type: "booking" }> => b.type === "booking");
@@ -303,7 +307,7 @@ export function RecordsTab({ records, spec }: { records: Rec[]; spec: Spec }) {
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="text-[13px] text-mute">
-              {["نام", "موبایل", "جزئیات", "وضعیت", "بخش", "زمان ثبت"].map((h) => <th key={h} className="whitespace-nowrap border-b border-line px-4 py-3.5 text-right font-medium">{h}</th>)}
+              {["نام", "موبایل", "جزئیات", "وضعیت", "بخش", "زمان ثبت", "عملیات"].map((h) => <th key={h} className="whitespace-nowrap border-b border-line px-4 py-3.5 text-right font-medium">{h}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -317,6 +321,7 @@ export function RecordsTab({ records, spec }: { records: Rec[]; spec: Spec }) {
                   <td className="whitespace-nowrap border-b border-line px-4 py-3.5"><span className={`rounded-md px-2 py-0.5 text-xs ${cls}`}>{label}</span></td>
                   <td className="whitespace-nowrap border-b border-line px-4 py-3.5 text-mute">{titles.get(r.collection) ?? r.collection}</td>
                   <td className="whitespace-nowrap border-b border-line px-4 py-3.5 text-mute">{ago(r.created_at)}</td>
+                  <td className="border-b border-line px-4 py-3.5"><RecordActions botId={botId} rec={r} onChanged={onChanged} /></td>
                 </tr>
               );
             })}

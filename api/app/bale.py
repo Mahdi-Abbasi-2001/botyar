@@ -154,6 +154,28 @@ def say(token: str, chat_id: str, text: str):
         log.warning("send failed: %s", e)
 
 
+def send_customer_actions(db: Session, bot_id: int, actions: list[dict]) -> int:
+    """Deliver notify_customer messages that come from the owner dashboard (no chat is in progress). Returns how many were sent."""
+    wanted = [a for a in actions if a["type"] == "notify_customer" and str(a.get("cust", "")).startswith("bale:")]
+    if not wanted:
+        return 0
+    pub = db.scalars(select(Publication).where(Publication.bot_id == bot_id)).first()
+    if pub is None:
+        return 0  # not published: there is nobody on Bale to tell
+    try:
+        token = settings.bale_shared_bot_token if pub.mode == "shared" else decrypt(pub.token_enc)
+    except BaleError:
+        return 0
+    sent = 0
+    for a in wanted:
+        try:
+            api_call(token, "sendMessage", {"chat_id": a["cust"][5:], "text": engine.fa_digits(a["text"])[:4096]})
+            sent += 1
+        except Exception as e:  # noqa: BLE001 - e.g. the customer blocked the bot
+            log.warning("customer message failed: %s", e)
+    return sent
+
+
 # ---------- update handling ----------
 _locks: dict[int, threading.Lock] = defaultdict(threading.Lock)  # serialise a bot's bookings (capacity checks)
 _seen: dict[str, int] = {}

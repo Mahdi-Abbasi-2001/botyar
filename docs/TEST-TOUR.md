@@ -104,6 +104,15 @@ appears as an amber bubble.
 **Break it:** press an old confirm button twice; cancel after the deadline; try to cancel with someone else's chat (impossible by design — ids from the button are re-checked against the customer's identity on the server).
 **Not included:** *editing* a booking (the agent says so and offers cancel + rebook), refunds/payments, owner-side cancelling.
 
+### Station 4d — The owner managing orders and bookings (new)
+
+**What it is:** in the **ثبت‌ها** tab (preview data) and under **انتشار → ثبت‌های واقعی** (real customers) every open record has action buttons.
+**Orders:** `new → preparing → ready → done`. The customer is messaged at «در حال آماده‌سازی» and «آماده»; closing an order sends nothing. **Once an order is preparing the customer can no longer cancel it** and sees its status under «ثبت‌های من».
+**Cancelling (booking or order):** with an optional reason that is sent to the customer. Cancelling a confirmed booking frees the place and promotes the first person waiting for the same date; cancelling a table-catalog order puts the stock back.
+**Do (needs two Bale accounts):** order from your phone, then in the app press «شروع آماده‌سازی» → your phone should receive a message. Then press «لغو» with a reason → the reason arrives, the stock goes back (check the products tab).
+**Break it:** try to move a finished order again (refused), cancel twice (refused), correct a mistake by going backwards (allowed, but the customer is not messaged again), act on a record while a customer books at the same moment (they are serialised by a per-bot lock).
+**Honest limits:** messages only reach customers who use the Bale bot (not simulator customers, and not customers who blocked the bot); records made before cancellation existed have no customer identity, so they can be cancelled but nobody can be messaged.
+
 ## Station 5 — Change request, versions, diff, regression
 
 **What it is:** the "maintain" half of the product.
@@ -174,7 +183,7 @@ You do not need special tools:
 ## Known gaps and improvement ideas (honest, roughly by value)
 
 0. ~~Weekly capacity never reset~~ — **fixed**: weekly slots count per date (see Station 4b). Still open: "every other week", month-based schedules, and clearing old one-off bookings by hand.
-1. ~~Customers can't cancel~~ — **done** (Station 4c). Still open: customers *editing* a booking, and the owner cancelling/closing a booking from the dashboard.
+1. ~~Customers can't cancel~~ — **done** (Station 4c). Still open: customers *editing* a booking. (Owner-side cancel and the order preparing status are done — Station 4d.)
 2. **Self-graded tests.** The agent that designs the bot also writes its tests. Idea: show the owner a plain-language "what I understood" summary to confirm *before* building; add a second "reviewer" pass.
 3. **Category lists aren't paginated** (a store with 40 categories shows 40 buttons; Bale's limit is unknown). Product lists reload the whole catalog per tap — fine for hundreds of items, untested for thousands.
 4. **Single server instance.** The anti-double-booking lock lives in memory, so we cannot run two instances without moving locks into the database. No uptime monitoring/alerts; database backup policy unverified.

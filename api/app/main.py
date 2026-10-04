@@ -311,6 +311,10 @@ from .export import router as export_router  # noqa: E402
 
 app.include_router(export_router)
 
+from .records_ops import router as records_ops_router  # noqa: E402
+
+app.include_router(records_ops_router)
+
 # ---------- static frontend (Next.js export copied to api/static at build time) ----------
 import os  # noqa: E402
 

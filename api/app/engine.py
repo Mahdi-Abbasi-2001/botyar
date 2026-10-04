@@ -19,7 +19,8 @@ log = logging.getLogger("botyar.engine")
 STALE_RESETS = {"count": 0}  # tests assert this stays 0 unless a bot really changed under a conversation
 MY_LABEL = "ثبت‌های من"  # built-in menu entry, present when a block allows cancelling
 MY_BLOCK = "__my__"
-STATUS_FA = {"confirmed": "تأیید شده", "waitlisted": "در لیست انتظار", "new": "سفارش جدید", "cancelled": "لغو شده"}
+STATUS_FA = {"confirmed": "تأیید شده", "waitlisted": "در لیست انتظار", "new": "سفارش جدید", "preparing": "در حال آماده‌سازی", "ready": "آماده", "done": "تحویل داده شد", "cancelled": "لغو شده"}
+ORDER_FLOW = ["new", "preparing", "ready", "done"]  # the owner moves an order forward; the customer is told at each step
 MENU_WORDS = {"/start", "/menu", "منو", "منوی اصلی", "شروع"}
 CANCEL_WORDS = {"/cancel", "انصراف", "لغو"}
 
@@ -656,13 +657,19 @@ def _my_start(spec, session, store, now):
     if cust:
         for bi, b in _cancel_blocks(spec):
             found += [(bi, b, r) for r in store.find(b.id, _cust=cust) if _active(b, r, now)]
+    progress = []
+    if cust:
+        for _, b in _cancel_blocks(spec):
+            if b.type == "catalog_order":  # orders the shop has already started on can't be cancelled here, but the customer can follow them
+                progress += [f"سفارش {r['id']} — {STATUS_FA[r['status']]}" for r in store.find(b.id, _cust=cust) if r.get("status") in ("preparing", "ready")]
     if not found:
         _reset(session)
-        return [send("هنوز ثبت فعالی ندارید."), menu_actions(spec)]
+        return [send("\n".join(["هنوز ثبت قابل لغوی ندارید." if progress else "هنوز ثبت فعالی ندارید.", *progress])), menu_actions(spec)]
     found.sort(key=lambda t: t[2]["id"], reverse=True)
     session.update(block=MY_BLOCK, step="list", data={})
     buttons = [_btn("لغو: " + _short(_describe(b, r), 50), f"x:{bi}:{r['id']}") for bi, b, r in found[:8]]
-    return [send("ثبت‌های فعال شما — برای لغو، روی مورد دلخواه بزنید:", buttons + [_btn("بازگشت به منو", "/menu")])]
+    head = "ثبت‌های فعال شما — برای لغو، روی مورد دلخواه بزنید:" + ("".join("\n" + p for p in progress))
+    return [send(head, buttons + [_btn("بازگشت به منو", "/menu")])]
 
 
 def _mine(spec, session, text, store, now):
@@ -698,29 +705,58 @@ def _mine(spec, session, text, store, now):
     return _do_cancel(spec, session, store, now, b, r)
 
 
-def _do_cancel(spec, session, store, now, b, r):
+def cancel_record(spec: BotSpec, store, now, b, r: dict, by: str = "customer", reason: str = "") -> tuple[list[dict], dict | None]:
+    """THE cancellation rules, shared by the customer flow and the owner dashboard:
+    mark cancelled, free the place (booking) or put the stock back (table order), promote the first person waiting
+    for the same date, and tell whoever needs to know. Returns (actions, promoted_record)."""
     prev = r["status"]
-    store.update(b.id, r["id"], status="cancelled", _cancelled_at=now.isoformat())
-    who = f"❌ لغو توسط مشتری · {b.title}"
+    store.update(b.id, r["id"], status="cancelled", _cancelled_at=now.isoformat(), _cancelled_by=by)
     actions: list[dict] = []
-    _notify(spec, b.id, _summary(r), actions, prefix=who)
+    if by == "customer":
+        _notify(spec, b.id, _summary(r), actions, prefix=f"❌ لغو توسط مشتری · {b.title}")
+    promoted = None
     if b.type == "booking":
-        done = f"ثبت‌نام شما در «{r.get('slot_label', b.title)}» لغو شد."
         if prev == "confirmed":  # a place just opened: the first person waiting for the SAME date gets it
             where = {"slot": r.get("slot"), "status": "waitlisted"}
             if r.get("date"):
                 where["date"] = r["date"]
             waiting = sorted(store.find(b.id, **where), key=lambda w: w["id"])
             if waiting:
-                w = waiting[0]
-                store.update(b.id, w["id"], status="confirmed", _promoted_at=now.isoformat())
-                if w.get("_cust"):
-                    actions.append({"type": "notify_customer", "cust": w["_cust"],
-                                    "text": f"🎉 جای خالی شد! ثبت‌نام شما در «{w.get('slot_label', b.title)}» تأیید شد."})
-                _notify(spec, b.id, _summary(w), actions, prefix=f"✅ از لیست انتظار تأیید شد · {b.title}")
-    else:
-        done = "سفارش شما لغو شد."
-        if b.source == "table":
-            store.release(b.id, [(it["id"], it.get("qty", 1)) for it in r.get("items", [])])
+                promoted = waiting[0]
+                store.update(b.id, promoted["id"], status="confirmed", _promoted_at=now.isoformat())
+                if promoted.get("_cust"):
+                    actions.append({"type": "notify_customer", "cust": promoted["_cust"],
+                                    "text": f"🎉 جای خالی شد! ثبت‌نام شما در «{promoted.get('slot_label', b.title)}» تأیید شد."})
+                if by == "customer":
+                    _notify(spec, b.id, _summary(promoted), actions, prefix=f"✅ از لیست انتظار تأیید شد · {b.title}")
+    elif b.source == "table":
+        store.release(b.id, [(it["id"], it.get("qty", 1)) for it in r.get("items", [])])
+    if by == "owner" and r.get("_cust"):
+        what = f"ثبت‌نام شما در «{r.get('slot_label', b.title)}»" if b.type == "booking" else "سفارش شما"
+        actions.append({"type": "notify_customer", "cust": r["_cust"],
+                        "text": f"متأسفانه {what} توسط مدیر لغو شد." + (f"\nدلیل: {reason.strip()}" if reason.strip() else "")})
+    return actions, promoted
+
+
+def set_order_status(store, now, b, r: dict, status: str) -> list[dict]:
+    """Owner moves an order forward (preparing -> ready -> done). Returns the customer notification, if any."""
+    if b.type != "catalog_order":
+        raise ValueError("وضعیت فقط برای سفارش‌ها قابل تغییر است.")
+    cur = r.get("status")
+    if cur in ("cancelled", "done"):
+        raise ValueError("این سفارش بسته شده و دیگر قابل تغییر نیست.")
+    if status not in ORDER_FLOW[1:]:
+        raise ValueError("وضعیت نامعتبر است.")
+    forward = ORDER_FLOW.index(status) > ORDER_FLOW.index(cur) if cur in ORDER_FLOW else True
+    store.update(b.id, r["id"], status=status, **{f"_{status}_at": now.isoformat()})
+    note = {"preparing": "سفارش شما در حال آماده‌سازی است.", "ready": "✅ سفارش شما آماده است."}.get(status)
+    if forward and note and r.get("_cust"):
+        return [{"type": "notify_customer", "cust": r["_cust"], "text": note}]
+    return []  # moving backwards (a correction) or closing the order never spams the customer
+
+
+def _do_cancel(spec, session, store, now, b, r):
+    actions, _ = cancel_record(spec, store, now, b, r, by="customer")
+    done = f"ثبت‌نام شما در «{r.get('slot_label', b.title)}» لغو شد." if b.type == "booking" else "سفارش شما لغو شد."
     _reset(session)
     return [send(done), *actions, menu_actions(spec)]
