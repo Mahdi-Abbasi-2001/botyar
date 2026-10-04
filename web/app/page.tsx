@@ -8,6 +8,26 @@ const PROOF = [
   { name: "رد موبایل نامعتبر", lines: [["بیمار", "۱۲۳۴"], ["ربات", "شماره معتبر نیست. مثل ۰۹۱۲۱۲۳۴۵۶۷ وارد کنید."]] },
 ];
 
+const FEATURES: { icon: React.ComponentProps<typeof Icon>["name"]; title: string; text: string }[] = [
+  { icon: "calendar", title: "نوبت‌دهی و کلاس هفتگی", text: "سانس با ظرفیت، تکرار هر هفته با تاریخ شمسی، و لیست انتظار وقتی جا پر شد." },
+  { icon: "clock", title: "تقویم وقت‌دهی", text: "از ساعت کاری، مدت هر نوبت و وقت ناهار، زمان‌ها خودش ساخته می‌شود؛ برای هر همکار جدا." },
+  { icon: "cart", title: "فروشگاه و منو", text: "دسته‌بندی، سایز و رنگ، موجودی، سبد خرید، هزینه‌ی ارسال و کد تخفیف." },
+  { icon: "file", title: "ورود محصولات", text: "فایل اکسل، CSV، متن کپی‌شده یا حتی عکس لیست قیمت؛ اول پیش‌نمایش، بعد ذخیره." },
+  { icon: "card", title: "پرداخت آنلاین در بله", text: "فاکتور پرداخت داخل خود بله؛ سفارش پرداخت‌نشده بعد از چند دقیقه خودش لغو می‌شود." },
+  { icon: "help", title: "پرسش‌های متداول", text: "مشتری به زبان خودش می‌پرسد؛ جواب، همان جمله‌ای است که خودت نوشتی. چیزی از خودش نمی‌سازد." },
+  { icon: "repeat", title: "لغو و تغییر زمان", text: "«ثبت‌های من» برای هر مشتری؛ جای آزادشده خودکار به نفر اول لیست انتظار می‌رسد." },
+  { icon: "bell", title: "یادآوری و اطلاعیه", text: "یادآوری پیش از نوبت، و اطلاعیه برای همه‌ی مشتری‌ها با امکان لغو دریافت." },
+  { icon: "star", title: "پیام به مدیر و نظر مشتری", text: "پیام‌های مشتری در صندوق پنل، جوابت مستقیم در چت او؛ امتیاز ستاره‌ای و نظر." },
+  { icon: "chart", title: "مدیریت و خروجی", text: "لغو با دلیل، وضعیت سفارش (آماده‌سازی، آماده، تحویل) و خروجی اکسل از همه‌ی ثبت‌ها." },
+];
+
+const PROOF_NUMBERS: [string, string][] = [
+  ["۸ از ۸", "درخواست متنوع به ربات کامل و تست‌شده رسید"],
+  ["۱۲ تا ۴۳ ثانیه", "از پیام صاحب کسب‌وکار تا ربات آماده"],
+  ["حدود ۰٫۰۰۲ دلار", "میانگین هزینه‌ی هوش مصنوعی برای ساخت یک ربات"],
+  ["بدون مدل زبانی", "جواب پیام‌های مشتری؛ پرسش متداول فقط بین جمله‌های خودت جست‌وجو می‌شود"],
+];
+
 function Kicker({ children, mint }: { children: React.ReactNode; mint?: boolean }) {
   return <span className={`text-sm font-bold ${mint ? "text-mint" : "text-saffron"}`}>{children}</span>;
 }
@@ -21,6 +41,7 @@ export default function Home() {
           <header className="flex flex-wrap items-center justify-between gap-4 py-6">
             <Logo />
             <nav className="flex flex-wrap items-center gap-6 text-[15px]">
+              <a href="#features" className="hidden text-fg-2 hover:text-fg sm:inline">چه کارهایی بلد است؟</a>
               <a href="#proof" className="hidden text-fg-2 hover:text-fg sm:inline">چطور مطمئن شوم؟</a>
               <Link href="/login/?mode=login" className="text-fg-2 hover:text-fg">ورود</Link>
               <Link href="/login/" className="inline-flex min-h-11 items-center rounded-xl bg-fg px-5 font-bold text-ink hover:bg-white">ساخت اولین ربات</Link>
@@ -100,15 +121,59 @@ export default function Home() {
 
         <section className="flex flex-wrap items-center gap-12">
           <div className="flex flex-[1_1_420px] flex-col gap-2.5">
-            <Kicker mint>۳ · امتحانش کن، همین‌جا</Kicker>
-            <h2 className="m-0 text-3xl font-black leading-snug sm:text-[44px]">قبل از انتشار، مثل مشتری با ربات‌ت حرف بزن.</h2>
-            <p className="m-0 text-[17px] leading-8 text-fg-2">شبیه‌ساز کنار دستت است؛ هر نوبت یا سفارشی که ثبت کنی، در «ثبت‌ها» می‌بینی و پیام مدیر هم همان‌جا می‌رسد.</p>
+            <Kicker mint>۳ · روی بله، همین امروز</Kicker>
+            <h2 className="m-0 text-3xl font-black leading-snug sm:text-[44px]">نسخه‌ی تست‌شده با یک دکمه به دست مشتری‌ها می‌رسد.</h2>
+            <p className="m-0 text-[17px] leading-8 text-fg-2">
+              ساده‌ترین راه: مشتری‌ها ربات مشترک <span dir="ltr" className="font-bold text-fg">@botyar_ai_bot</span> را در بله باز می‌کنند و کد ۶حرفی ربات تو را می‌فرستند.
+              یا توکن ربات خودت را بگذار تا با اسم و عکس خودت جواب بدهد. نوبت‌ها و سفارش‌ها همان لحظه در پنل و در چت بله‌ی خودت می‌رسند.
+            </p>
+            <p className="m-0 flex items-center gap-2 text-sm text-mute"><Icon name="lock" size={16} className="text-mint" /> تا وقتی حتی یک تست رد شده باشد، انتشار قفل است.</p>
           </div>
           <div className="flex min-w-0 flex-[1_1_520px] flex-col gap-2.5 rounded-[20px] border border-line bg-panel p-5 text-sm">
-            <span className="self-start rounded-[14px_14px_14px_4px] bg-raised px-3 py-2">کدوم زمان رو می‌خواید؟</span>
-            <span className="self-start rounded-[10px] border border-line-3 px-3 py-2">دوشنبه ساعت ۵ عصر (۵ جای خالی)</span>
-            <span className="self-end rounded-[14px_14px_4px_14px] bg-saffron px-3 py-2 text-ink">دوشنبه ساعت ۵ عصر</span>
-            <span className="flex items-center gap-2 self-stretch rounded-xl border border-amber-line bg-amber-bg px-3 py-2 text-amber-fg"><Icon name="bell" size={16} /> اعلان به مدیر: نوبت جدید · دوشنبه ۵ عصر</span>
+            <span className="flex items-center gap-2 border-b border-line pb-2.5 text-[13px] text-mute"><span className="h-2 w-2 rounded-full bg-mint" />بله · <span dir="ltr">@botyar_ai_bot</span></span>
+            <span className="self-end rounded-[14px_14px_4px_14px] bg-saffron px-3 py-2 text-ink" dir="ltr">/start</span>
+            <span className="self-start rounded-[14px_14px_14px_4px] bg-raised px-3 py-2">سلام! برای شروع، «کد ربات» را بفرستید.</span>
+            <span className="self-end rounded-[14px_14px_4px_14px] bg-saffron px-3 py-2 font-bold tracking-widest text-ink" dir="ltr">K7M2QX</span>
+            <span className="self-start rounded-[14px_14px_14px_4px] bg-raised px-3 py-2">سلام! به کلینیک دندانپزشکی خوش آمدید.</span>
+            <span className="self-start rounded-[10px] border border-line-3 px-3 py-2">دریافت نوبت</span>
+            <span className="flex items-center gap-2 self-stretch rounded-xl border border-amber-line bg-amber-bg px-3 py-2 text-amber-fg"><Icon name="bell" size={16} /> برای تو: نوبت جدید · دوشنبه ۵ عصر</span>
+          </div>
+        </section>
+
+        <section id="features" className="flex flex-col gap-7">
+          <div className="flex max-w-[760px] flex-col gap-2.5">
+            <Kicker>۴ · بیشتر از یک ربات جواب‌گو</Kicker>
+            <h2 className="m-0 text-3xl font-black leading-snug sm:text-[44px]">کارهای روزمره‌ی کسب‌وکارت را بگو؛ ربات بلدش است.</h2>
+            <p className="m-0 text-[17px] leading-8 text-fg-2">لازم نیست اسم این‌ها را بدانی. همان‌طور که برای یک همکار توضیح می‌دهی بنویس؛ ایجنت بخش درست را انتخاب می‌کند.</p>
+          </div>
+          <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fill,minmax(250px,1fr))]">
+            {FEATURES.map((f) => (
+              <div key={f.title} className="flex flex-col gap-2 rounded-[18px] border border-line bg-panel p-[18px]">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-raised text-saffron"><Icon name={f.icon} size={20} /></span>
+                <span className="text-base font-extrabold">{f.title}</span>
+                <span className="text-sm leading-7 text-mute">{f.text}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="flex flex-wrap items-center gap-12 rounded-[24px] border border-mint-line bg-mint-bg/40 p-6 sm:p-10">
+          <div className="flex flex-[1_1_440px] flex-col gap-2.5">
+            <Kicker mint>۵ · مشتری با هوش مصنوعی حرف نمی‌زند</Kicker>
+            <h2 className="m-0 text-3xl font-black leading-snug sm:text-[40px]">هوش مصنوعی ربات را می‌سازد؛ جواب مشتری را نه.</h2>
+            <p className="m-0 text-[17px] leading-8 text-fg-2">
+              ایجنت فقط یک نقشه‌ی دقیق از ربات می‌نویسد. پیام‌های مشتری را یک موتور ثابت جواب می‌دهد: هر بار همان رفتار، بدون حرف ساختگی،
+              بدون امکان فریب‌دادن ربات، و تقریباً بدون هزینه برای هر پیام.
+            </p>
+          </div>
+          <div className="grid flex-[1_1_440px] grid-cols-2 gap-3">
+            {PROOF_NUMBERS.map(([big, label]) => (
+              <div key={label} className="flex flex-col gap-1 rounded-2xl border border-line bg-panel p-4">
+                <span className="text-[28px] font-black text-mint">{big}</span>
+                <span className="text-[13px] leading-6 text-fg-2">{label}</span>
+              </div>
+            ))}
+            <span className="col-span-2 text-xs text-dim">اعداد از ارزیابی خودمان روی ۸ درخواست متنوع؛ هر بار اجرا کمی فرق می‌کند.</span>
           </div>
         </section>
 

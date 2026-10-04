@@ -47,7 +47,8 @@ export function CapacityBar({ used, capacity }: { used: number; capacity: number
   );
 }
 
-type IconName = "send" | "bell" | "shield" | "back" | "alert" | "plus" | "phone" | "chat" | "tree" | "clock" | "list" | "refresh";
+type IconName = "send" | "bell" | "shield" | "back" | "alert" | "plus" | "phone" | "chat" | "tree" | "clock" | "list" | "refresh"
+  | "calendar" | "cart" | "card" | "star" | "help" | "file" | "repeat" | "lock" | "chart";
 const PATHS: Record<IconName, React.ReactNode> = {
   send: <path d="M19 12H5M11 6l-6 6 6 6" />,
   bell: <><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.9 1.9 0 003.4 0" /></>,
@@ -61,6 +62,15 @@ const PATHS: Record<IconName, React.ReactNode> = {
   clock: <><circle cx="12" cy="12" r="8" /><path d="M12 8v4l3 2" /></>,
   list: <path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" />,
   refresh: <><path d="M20 11a8 8 0 10-2.3 5.7" /><path d="M20 4v7h-7" /></>,
+  calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></>,
+  cart: <><path d="M3 4h2l2.4 11.2a2 2 0 002 1.6h7.7a2 2 0 002-1.5L21 8H6.2" /><circle cx="10" cy="20" r="1" /><circle cx="18" cy="20" r="1" /></>,
+  card: <><rect x="2.5" y="5" width="19" height="14" rx="2" /><path d="M2.5 10h19M6 15h4" /></>,
+  star: <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />,
+  help: <><circle cx="12" cy="12" r="9" /><path d="M9.5 9.3a2.6 2.6 0 015 .9c0 1.7-2.5 2.2-2.5 3.8M12 17h.01" /></>,
+  file: <><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h4" /></>,
+  repeat: <><path d="M17 2l3 3-3 3" /><path d="M4 11V9a4 4 0 014-4h12M7 22l-3-3 3-3" /><path d="M20 13v2a4 4 0 01-4 4H4" /></>,
+  lock: <><rect x="4.5" y="10.5" width="15" height="10" rx="2" /><path d="M8 10.5V7a4 4 0 018 0v3.5" /></>,
+  chart: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
 };
 
 export function Icon({ name, size = 18, className = "", strokeWidth = 2 }: { name: IconName; size?: number; className?: string; strokeWidth?: number }) {
