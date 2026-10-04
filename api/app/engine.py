@@ -327,14 +327,13 @@ def _booking(spec, session, block: BookingBlock, text, store, now):
         if pick is None:
             return [send("لطفاً یکی از زمان‌ها را انتخاب کنید."), _slot_prompt(block, store, now)]
         slot, day, _, name = pick
-        if _remaining(block, slot, store, day) <= 0 and not block.waitlist:
-            return [send(block.full_text), _slot_prompt(block, store, now)]
+        if _remaining(block, slot, store, day) <= 0 and (not block.waitlist or session["data"].get("_replace")):
+            return [send(block.full_text), _slot_prompt(block, store, now)]  # moving to a full date would lose the customer's place
         session["data"]["slot"] = slot.id
         session["data"]["slot_label"] = name
         if day is not None:
             session["data"]["date"] = day.isoformat()
-        session["step"] = 0
-        return [_ask(block.fields[0])]
+        return _after_pick(spec, session, block, store, now)
     idx = session["step"]
     field = block.fields[idx]
     ok, value, err = validate(field, text)
@@ -344,6 +343,10 @@ def _booking(spec, session, block: BookingBlock, text, store, now):
     if idx + 1 < len(block.fields):
         session["step"] = idx + 1
         return [_ask(block.fields[idx + 1])]
+    return _commit_slot(spec, session, block, store, now)
+
+
+def _commit_slot(spec, session, block: BookingBlock, store, now):
     slot = next(s for s in block.slots if s.id == session["data"]["slot"])
     day = date.fromisoformat(session["data"]["date"]) if "date" in session["data"] else None
     # re-check capacity at commit time (another customer may have taken the last place meanwhile)
@@ -351,13 +354,49 @@ def _booking(spec, session, block: BookingBlock, text, store, now):
     if full and not block.waitlist:
         _reset(session)
         return [send(block.full_text), menu_actions(spec)]
+    if full and session["data"].get("_replace"):  # the date filled up while the customer was choosing: keep the old place
+        session["step"] = "slot"
+        return [send(block.full_text), _slot_prompt(block, store, now)]
     status = "waitlisted" if full else "confirmed"
     row = store.add(block.id, {**session["data"], "status": status, **_ident(session, now)})
-    actions = [send(block.waitlist_text if full else block.confirm_text)]
-    _notify(spec, block.id, f"[{status}] " + _summary(row), actions)
+    actions = _finish_booking(spec, session, block, store, now, row, status, block.waitlist_text if full else block.confirm_text)
+    return actions
+
+
+def _finish_booking(spec, session, block, store, now, row, status, text):
+    """Confirmation + owner notice; for a reschedule the old booking is released only now that the new place is certain."""
+    actions = [send(text)]
+    old_id = session["data"].get("_replace")
+    if old_id and status == "confirmed":
+        old = next(iter(store.find(block.id, id=old_id)), None)
+        if old and old.get("status") in ("confirmed", "waitlisted"):
+            more, _ = cancel_record(spec, store, now, block, old, by="customer")
+            actions += more
+            actions.append(send(f"✅ زمان شما تغییر کرد؛ ثبت قبلی ({old.get('slot_label', block.title)}) لغو شد."))
+    _notify(spec, block.id, f"[{status}] " + _summary(row) + ("\n(تغییر زمان توسط مشتری)" if old_id else ""), actions)
     _reset(session)
     actions.append(menu_actions(spec))
     return actions
+
+
+def _after_pick(spec, session, block: BookingBlock, store, now):
+    """The customer chose the time. A reschedule reuses the contact details of the old booking and commits at once."""
+    d = session["data"]
+    old = next(iter(store.find(block.id, id=d["_replace"])), None) if d.get("_replace") else None
+    if old:
+        if (old.get("slot"), old.get("date"), old.get("time")) == (d.get("slot"), d.get("date"), d.get("time")):
+            for k in ("slot", "slot_label", "date", "time"):
+                d.pop(k, None)
+            if block.schedule:
+                return [send("این همان زمان فعلی شماست؛ زمان دیگری انتخاب کنید."), *_appt_day_prompt(spec, session, block, store, now)]
+            session["step"] = "slot"
+            return [send("این همان زمان فعلی شماست؛ زمان دیگری انتخاب کنید."), _slot_prompt(block, store, now)]
+        for f in block.fields:
+            if f.key in old:
+                d[f.key] = old[f.key]
+        return _commit_appt(spec, session, block, store, now) if block.schedule else _commit_slot(spec, session, block, store, now)
+    session["step"] = 0
+    return [_ask(block.fields[0])]
 
 
 # ---------- appointments generated from working hours (booking block with a `schedule`) ----------
@@ -486,8 +525,7 @@ def _appt(spec, session, block: BookingBlock, text, store, now):
         d["time"] = hhmm
         d["slot"] = "appt"
         d["slot_label"] = _appt_label(day, hhmm, d.get("staff", ""))
-        session["step"] = 0
-        return [_ask(block.fields[0])]
+        return _after_pick(spec, session, block, store, now)
 
     # contact fields
     idx = step
@@ -499,16 +537,17 @@ def _appt(spec, session, block: BookingBlock, text, store, now):
     if idx + 1 < len(block.fields):
         session["step"] = idx + 1
         return [_ask(block.fields[idx + 1])]
+    return _commit_appt(spec, session, block, store, now)
+
+
+def _commit_appt(spec, session, block: BookingBlock, store, now):
+    d = session["data"]
     day = date.fromisoformat(d["date"])
     if _appt_free(block, store, d.get("staff", ""), day, d["time"]) <= 0:  # someone took it while this customer was typing
         d.pop("time", None)
         return [send(block.full_text), _appt_time_prompt(block, store, session, now)]
     row = store.add(block.id, {**d, "status": "confirmed", **_ident(session, now)})
-    actions = [send(block.confirm_text)]
-    _notify(spec, block.id, "[confirmed] " + _summary(row), actions)
-    _reset(session)
-    actions.append(menu_actions(spec))
-    return actions
+    return _finish_booking(spec, session, block, store, now, row, "confirmed", block.confirm_text)
 
 
 # ---------- catalog order (inline menu, or products from the database table) ----------
@@ -1047,6 +1086,10 @@ def _my_start(spec, session, store, now):
     return [send(head, buttons + [_btn("بازگشت به منو", "/menu")])]
 
 
+def _my_choices(b):
+    return [_btn("بله، لغو کن", "xy")] + ([_btn("🔄 تغییر زمان", "xr")] if b is not None and b.type == "booking" else []) + [_btn("نه، نگه دار", "xn")]
+
+
 def _mine(spec, session, text, store, now):
     text_n = norm(text)
     d = session["data"]
@@ -1061,13 +1104,29 @@ def _mine(spec, session, text, store, now):
             return [send(why)] + _my_start(spec, session, store, now)
         d.update(bi=int(m.group(1)), rid=r["id"])
         session["step"] = "confirm"
-        return [send(f"«{_describe(b, r)}» لغو شود؟", [_btn("بله، لغو کن", "xy"), _btn("نه، نگه دار", "xn")])]
+        ask = "لغو شود یا زمانش تغییر کند؟" if b.type == "booking" else "لغو شود؟"
+        return [send(f"«{_describe(b, r)}» {ask}", _my_choices(b))]
     # confirm
+    if text_n == "xr":
+        owned = _owned(spec, session, store, d["bi"], d["rid"])
+        why = _why_not(owned[0], owned[1], now) if owned else "این مورد دیگر قابل تغییر نیست."
+        if owned is None or owned[0].type != "booking" or not _active(owned[0], owned[1], now) or why:
+            _reset(session)
+            return [send(why or "این مورد دیگر قابل تغییر نیست."), menu_actions(spec)]
+        b, r = owned
+        if b.schedule:
+            out = _appt_start(spec, session, b, store, now)
+        else:
+            session.update(block=b.id, step="slot", data={})
+            out = [send(b.title), _slot_prompt(b, store, now)]
+        session["data"]["_replace"] = r["id"]
+        return out
     if text_n == "xn":
         _reset(session)
         return [send("باشه، ثبت شما سر جایش ماند."), menu_actions(spec)]
     if text_n != "xy":
-        return [send("لطفاً یکی از دو دکمه را بزنید."), send("لغو شود؟", [_btn("بله، لغو کن", "xy"), _btn("نه، نگه دار", "xn")])]
+        owned = _owned(spec, session, store, d["bi"], d["rid"])
+        return [send("لطفاً یکی از دکمه‌ها را بزنید."), send("چه کار کنیم؟", _my_choices(owned[0] if owned else None))]
     owned = _owned(spec, session, store, d["bi"], d["rid"])
     if owned is None or not _active(owned[0], owned[1], now):
         _reset(session)

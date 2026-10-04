@@ -61,7 +61,7 @@ def test_cancel_frees_the_place_and_tells_the_owner():
     assert "لغو: پنجشنبه ساعت ۱۰ صبح — 1405/07/16 — تأیید شده" in text(out)
     rec_id = st.rows["b"][0]["id"]
     out = a.say(f"x:0:{rec_id}")
-    assert "لغو شود؟" in text(out)
+    assert "لغو شود" in text(out)
     out = a.say("xy")
     assert "لغو شد" in text(out) and "notify_admin" in kinds(out) and "❌ لغو توسط مشتری" in text(out)
     assert st.rows["b"][0]["status"] == "cancelled"

@@ -135,6 +135,8 @@ PRICING_CASES = [
 ]
 
 FEEDBACK_CASES = [
+    ("order-edit-not-promised", "ربات کافه با لاته ۹۵ هزار تومان. مشتری بتواند سفارشش را ویرایش کند و آیتم‌هایش را عوض کند", "done",
+     lambda s, m: None if ("پشتیبانی نمی" in m) else "should say order editing is not supported: " + m[:300]),
     ("feedback-basic", "ربات رستوران که مشتری‌ها بتوانند به غذا امتیاز ۱ تا ۵ بدهند و نظرشان را بنویسند، و به من اطلاع بدهد", "done",
      lambda s, m: None if blocks(s, "feedback") and any(b["on"] == blocks(s, "feedback")[0]["id"] for b in blocks(s, "admin_notify")) else "expected feedback + notify"),
     ("feedback-with-booking", "ربات آرایشگاه: نوبت‌دهی شنبه تا چهارشنبه ۹ تا ۱۷ هر ۳۰ دقیقه و بخش ثبت نظر مشتری", "done",
