@@ -5,6 +5,7 @@ import { fa } from "@/components/ui";
 import { ExportButtons } from "@/components/workspace/ExportButtons";
 import { RecordActions } from "@/components/workspace/RecordActions";
 import { PaymentCard } from "@/components/workspace/PaymentCard";
+import { TelegramCard } from "@/components/workspace/TelegramCard";
 
 type Pub = {
   published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string; webhooks_enabled: boolean;
@@ -69,6 +70,7 @@ export function PublishTab({ botId }: { botId: string }) {
       {error && <p className="rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-bad">{error}</p>}
 
       {!pub.published ? (
+        <>
         <div className={card}>
           <h3 className="mb-1 text-lg font-extrabold">انتشار روی پیام‌رسان بله</h3>
           <p className="mb-4 text-sm leading-7 text-mute">ربات شما همین‌جا آزمایش شده است. با انتشار، مشتری‌هایتان می‌توانند در بله با آن گفتگو کنند و ثبت‌ها به‌صورت واقعی ذخیره می‌شود.</p>
@@ -94,6 +96,8 @@ export function PublishTab({ botId }: { botId: string }) {
             {busy ? "در حال انتشار…" : "انتشار روی بله"}
           </button>
         </div>
+        <TelegramCard botId={botId} />
+        </>
       ) : (
         <>
           <div className={card}>
@@ -118,6 +122,8 @@ export function PublishTab({ botId }: { botId: string }) {
               <p className="text-sm leading-7">ربات شما فعال است: <a className="font-bold text-saffron underline" dir="ltr" href={`https://ble.ir/${handle}`} target="_blank" rel="noreferrer">@{handle}</a></p>
             )}
           </div>
+
+          <TelegramCard botId={botId} />
 
           <div className={card}>
             <h3 className="mb-1 font-bold">اعلان ثبت‌های جدید</h3>

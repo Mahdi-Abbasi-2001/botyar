@@ -5,7 +5,7 @@
 خواسته شود را با نمایش تفاوت‌ها و اجرای دوباره‌ی همه‌ی تست‌ها اعمال می‌کند.
 
 - نسخه‌ی آنلاین: https://botyar.liara.run
-- ربات مشترک بله: `@botyar_ai_bot` (مشتری کد ۶حرفی ربات را می‌فرستد)
+- ربات مشترک بله: `@botyar_ai_bot` (مشتری کد ۶حرفی ربات را می‌فرستد). همان ربات را می‌شود روی تلگرام هم منتشر کرد.
 - راهنمای آزمودن قدم‌به‌قدم: [`docs/TEST-TOUR.md`](docs/TEST-TOUR.md)
 
 مسئله‌ی انتخاب‌شده در رویداد BuildX: **۳ — سازنده و نگه‌دارنده‌ی ربات بله/تلگرام.**
@@ -50,7 +50,8 @@ is logged with its token count and cost; the UI shows the cost per request and p
 | `api/app/agent.py`, `api/app/prompts.py` | LangGraph builder agent and its prompts |
 | `api/app/testing.py` | Test runner and spec diff |
 | `api/app/llm.py` | The single LLM entry point (model, pricing, cost log) |
-| `api/app/bale.py`, `api/app/publish.py` | Bale channel: webhooks, buttons, shared bot and own-token publishing |
+| `api/app/bale.py`, `api/app/publish.py` | Messenger glue shared by Bale and Telegram; Bale publishing and webhooks |
+| `api/app/telegram.py`, `relay/` | Telegram channel and the Deno relay it goes through (Telegram is unreachable from Iran) |
 | `api/app/catalog.py`, `api/app/export.py` | Product catalogs, CSV/Excel/paste/photo/PDF import, CSV/XLSX export |
 | `api/app/faq_index.py`, `api/app/faq_match.py` | FAQ retrieval (embeddings) |
 | `api/app/outreach.py`, `api/app/payments.py`, `api/app/records_ops.py` | Reminders, announcements, Bale invoices, owner actions on records |
@@ -94,6 +95,8 @@ For frontend work with hot reload, run `npm run dev` in `web/` with `NEXT_PUBLIC
 | `OPENAI_API_KEY` | – | Agent, vision import, FAQ embeddings |
 | `BALE_SHARED_BOT_TOKEN` | – | Token of the shared @botyar_ai_bot |
 | `PUBLIC_BASE_URL` | – | Public URL used to register Bale webhooks |
+| `TELEGRAM_RELAY_URL`, `TELEGRAM_RELAY_KEY` | – | The Telegram relay outside Iran (see [`relay/README.md`](relay/README.md)); empty = Telegram off |
+| `TELEGRAM_SHARED_BOT_TOKEN` | – | Optional shared Telegram bot (same codes as the shared Bale bot) |
 | `CORS_ORIGINS` | `http://localhost:3000` | Only needed when the UI runs on another origin |
 
 ### Spending guards

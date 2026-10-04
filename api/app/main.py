@@ -46,6 +46,9 @@ async def lifespan(app):
     from .bale import ensure_shared_webhook
 
     threading.Thread(target=ensure_shared_webhook, daemon=True).start()  # no-op unless PUBLIC_BASE_URL is set
+    from .telegram import ensure_shared_webhook as ensure_tg_webhook
+
+    threading.Thread(target=ensure_tg_webhook, daemon=True).start()  # no-op unless the Telegram relay is configured too
     if settings.public_base_url:  # production only: tests and local dev must not send reminders
         from .outreach import start_scheduler
 
@@ -328,6 +331,10 @@ app.include_router(outreach_router)
 from .payments import router as payments_router  # noqa: E402
 
 app.include_router(payments_router)
+
+from .telegram import router as telegram_router  # noqa: E402  (also registers the Telegram channel)
+
+app.include_router(telegram_router)
 
 # ---------- static frontend (Next.js export copied to api/static at build time) ----------
 import os  # noqa: E402

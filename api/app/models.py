@@ -121,6 +121,31 @@ class ChatLink(Base):
     pub_id: Mapped[int] = mapped_column(ForeignKey("publications.id"), index=True)
 
 
+class TgPublication(Base):
+    """The same bot published to Telegram (separate table: a bot can be live on Bale and Telegram at once, and the
+    app has no migrations, so the Bale tables are never altered). Fields mean the same as in Publication."""
+    __tablename__ = "tg_publications"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), unique=True, index=True)
+    mode: Mapped[str] = mapped_column(String(8))  # shared | own
+    version: Mapped[int] = mapped_column(Integer)
+    code: Mapped[str] = mapped_column(String(12), unique=True, index=True)
+    admin_code: Mapped[str] = mapped_column(String(16), unique=True)
+    token_enc: Mapped[str] = mapped_column(Text, default="")
+    hook_secret: Mapped[str] = mapped_column(String(64), default="")
+    bot_username: Mapped[str] = mapped_column(String(64), default="")
+    admin_chat_id: Mapped[str] = mapped_column(String(32), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class TgChatLink(Base):
+    """Which published bot a Telegram chat is talking to on the shared Telegram bot."""
+    __tablename__ = "tg_chat_links"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    chat_id: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    pub_id: Mapped[int] = mapped_column(ForeignKey("tg_publications.id"), index=True)
+
+
 class Product(Base):
     """One row of a store's catalog (a catalog_order block with source='table')."""
     __tablename__ = "products"

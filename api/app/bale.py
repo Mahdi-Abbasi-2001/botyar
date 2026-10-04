@@ -1,4 +1,4 @@
-"""Bale adapter: thin HTTP client + the glue that feeds Bale updates to the deterministic engine.
+"""Messenger adapter (Bale, and Telegram via app.telegram): thin HTTP client + the glue that feeds updates to the deterministic engine.
 
 Facts from docs.bale.ai (verified 2026-10-04): Telegram-style Bot API at tapi.bale.ai; no webhook secret
 (so our webhook URLs carry an unguessable secret); callback_data max 64 bytes; answerCallbackQuery is
@@ -8,6 +8,8 @@ from __future__ import annotations
 import copy
 
 import base64
+from dataclasses import dataclass
+from typing import Callable
 import hashlib
 import hmac
 import logging
@@ -46,6 +48,28 @@ def api_call(token: str, method: str, payload: dict | None = None, timeout: floa
     if not d.get("ok"):
         raise BaleError(d.get("description") or f"HTTP {r.status_code}")
     return d.get("result")
+
+
+# ---------- channels ----------
+@dataclass(frozen=True)
+class Channel:
+    """A Telegram-style messenger. Bale and Telegram share one Bot API shape, so everything below serves both;
+    a customer's key ("bale:123", "tg:123") says which messenger to answer them on."""
+    name: str                          # customer-key prefix and webhook namespace
+    call: Callable                     # (token, method, payload=None, timeout=15) -> result
+    pub_model: type                    # Publication | TgPublication
+    link_model: type                   # ChatLink | TgChatLink (shared bot: chat -> published bot)
+    shared_token: Callable[[], str]
+    payments: bool                     # Bale wallet invoices; Telegram has no payment provider that serves Iran
+
+
+# a lambda, not api_call itself: tests replace bale.api_call and the channel must follow
+BALE = Channel("bale", lambda *a, **k: api_call(*a, **k), Publication, ChatLink, lambda: settings.bale_shared_bot_token, True)
+CHANNELS: dict[str, Channel] = {"bale": BALE}  # telegram.py adds itself
+
+
+def pub_token(ch: Channel, pub) -> str:
+    return ch.shared_token() if pub.mode == "shared" else decrypt(pub.token_enc)
 
 
 # ---------- secrets ----------
@@ -114,42 +138,48 @@ def to_markup(buttons: list[dict], cb: dict) -> dict:
     return {"inline_keyboard": rows}
 
 
-def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_chat_id: str = "", edit_message_id: int | None = None, wallet: str = "") -> list[int]:
-    """Send the actions. Returns the record ids whose invoice could not be sent."""
+def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_chat_id: str = "", edit_message_id: int | None = None,
+            wallet: str = "", ch: Channel = BALE, others: list[dict] | None = None) -> list[int]:
+    """Send the actions. Returns the record ids whose invoice could not be sent.
+    Messages for customers on the OTHER messenger are appended to `others` for send_customer_actions."""
     cb: dict = {}
     failed_invoices: list[int] = []
+    mine = f"{ch.name}:"
     for n, a in enumerate(actions):
         try:
             if a["type"] == "send" and n == 0 and a.get("edit") and edit_message_id:
-                # in-place navigation (e.g. next page): edit the clicked message; fall back to a new message if Bale refuses
+                # in-place navigation (e.g. next page): edit the clicked message; fall back to a new message if refused
                 payload = {"chat_id": chat_id, "message_id": edit_message_id, "text": engine.fa_digits(a["text"])[:4096] or "…"}
                 if a.get("buttons"):
                     payload["reply_markup"] = to_markup(a["buttons"], cb)
                 try:
-                    api_call(token, "editMessageText", payload)
+                    ch.call(token, "editMessageText", payload)
                     continue
                 except Exception as e:  # noqa: BLE001
                     log.warning("edit failed, sending a new message: %s", e)
                     payload.pop("message_id")
-                    api_call(token, "sendMessage", payload)
+                    ch.call(token, "sendMessage", payload)
                     continue
             if a["type"] == "send":
                 payload = {"chat_id": chat_id, "text": engine.fa_digits(a["text"])[:4096] or "…"}
                 if a.get("buttons"):
                     payload["reply_markup"] = to_markup(a["buttons"], cb)
-                api_call(token, "sendMessage", payload)
+                ch.call(token, "sendMessage", payload)
             elif a["type"] == "invoice":
                 if not wallet:
                     raise BaleError("no wallet token")
-                api_call(token, "sendInvoice", {"chat_id": chat_id, "title": a["title"], "description": engine.fa_digits(a["text"])[:255] or "سفارش",
-                                                 "payload": f"o:{a['rid']}", "provider_token": wallet,
-                                                 "prices": [{"label": a["title"], "amount": int(a["amount"]) * 10}]})  # Bale amounts are rials
+                ch.call(token, "sendInvoice", {"chat_id": chat_id, "title": a["title"], "description": engine.fa_digits(a["text"])[:255] or "سفارش",
+                                               "payload": f"o:{a['rid']}", "provider_token": wallet,
+                                               "prices": [{"label": a["title"], "amount": int(a["amount"]) * 10}]})  # Bale amounts are rials
             elif a["type"] == "notify_customer":
-                # a message for ANOTHER customer (e.g. promoted from the waitlist); only Bale customers are reachable
-                if str(a.get("cust", "")).startswith("bale:"):
-                    api_call(token, "sendMessage", {"chat_id": a["cust"][5:], "text": engine.fa_digits(a["text"])[:4096]})
+                # a message for ANOTHER customer (e.g. promoted from the waitlist), possibly on the other messenger
+                cust = str(a.get("cust", ""))
+                if cust.startswith(mine):
+                    ch.call(token, "sendMessage", {"chat_id": cust[len(mine):], "text": engine.fa_digits(a["text"])[:4096]})
+                elif others is not None:
+                    others.append(a)
             elif a["type"] == "notify_admin" and admin_chat_id:
-                api_call(token, "sendMessage", {"chat_id": admin_chat_id, "text": ("🔔 " + a["text"])[:4096]})
+                ch.call(token, "sendMessage", {"chat_id": admin_chat_id, "text": ("🔔 " + a["text"])[:4096]})
         except Exception as e:  # noqa: BLE001
             log.warning("send failed: %s", e)
             if a["type"] == "invoice":
@@ -217,32 +247,35 @@ def _paid(db: Session, token: str, msg: dict):
         deliver(token, chat_id, actions + [engine.menu_actions(spec)], {}, pub.admin_chat_id)
 
 
-def say(token: str, chat_id: str, text: str):
+def say(token: str, chat_id: str, text: str, ch: Channel = BALE):
     try:
-        api_call(token, "sendMessage", {"chat_id": chat_id, "text": text})
+        ch.call(token, "sendMessage", {"chat_id": chat_id, "text": text})
     except Exception as e:  # noqa: BLE001
         log.warning("send failed: %s", e)
 
 
 def send_customer_actions(db: Session, bot_id: int, actions: list[dict]) -> int:
-    """Deliver notify_customer messages that come from the owner dashboard (no chat is in progress). Returns how many were sent."""
-    wanted = [a for a in actions if a["type"] == "notify_customer" and str(a.get("cust", "")).startswith("bale:")]
-    if not wanted:
-        return 0
-    pub = db.scalars(select(Publication).where(Publication.bot_id == bot_id)).first()
-    if pub is None:
-        return 0  # not published: there is nobody on Bale to tell
-    try:
-        token = settings.bale_shared_bot_token if pub.mode == "shared" else decrypt(pub.token_enc)
-    except BaleError:
-        return 0
+    """Deliver notify_customer messages outside a live chat turn (owner dashboard, reminders, or a customer on the
+    other messenger), each on the messenger its customer key names. Returns how many were sent."""
     sent = 0
-    for a in wanted:
+    for ch in CHANNELS.values():
+        mine = f"{ch.name}:"
+        wanted = [a for a in actions if a["type"] == "notify_customer" and str(a.get("cust", "")).startswith(mine)]
+        if not wanted:
+            continue
+        pub = db.scalars(select(ch.pub_model).where(ch.pub_model.bot_id == bot_id)).first()
+        if pub is None:
+            continue  # not published on this messenger: there is nobody there to tell
         try:
-            api_call(token, "sendMessage", {"chat_id": a["cust"][5:], "text": engine.fa_digits(a["text"])[:4096]})
-            sent += 1
-        except Exception as e:  # noqa: BLE001 - e.g. the customer blocked the bot
-            log.warning("customer message failed: %s", e)
+            token = pub_token(ch, pub)
+        except BaleError:
+            continue
+        for a in wanted:
+            try:
+                ch.call(token, "sendMessage", {"chat_id": a["cust"][len(mine):], "text": engine.fa_digits(a["text"])[:4096]})
+                sent += 1
+            except Exception as e:  # noqa: BLE001 - e.g. the customer blocked the bot
+                log.warning("customer message failed: %s", e)
     return sent
 
 
@@ -251,10 +284,10 @@ _locks: dict[int, threading.Lock] = defaultdict(threading.Lock)  # serialise a b
 _seen: dict[str, int] = {}
 
 
-def process_update(kind: str, pub_id: int | None, update: dict):
+def process_update(kind: str, pub_id: int | None, update: dict, ch: Channel = BALE):
     db = SessionLocal()
     try:
-        _process(db, kind, pub_id, update)
+        _process(db, kind, pub_id, update, ch)
     except Exception:  # noqa: BLE001
         log.exception("update failed")
         db.rollback()
@@ -262,23 +295,23 @@ def process_update(kind: str, pub_id: int | None, update: dict):
         db.close()
 
 
-def _process(db: Session, kind: str, pub_id: int | None, update: dict):
-    key = f"{kind}:{pub_id}"
+def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Channel = BALE):
+    key = f"{ch.name}:{kind}:{pub_id}"
     uid = update.get("update_id")
     if isinstance(uid, int):
         if uid <= _seen.get(key, -1):
-            return  # Bale retried a delivery we already handled
+            return  # the messenger retried a delivery we already handled
         _seen[key] = uid
 
-    own_pub = db.get(Publication, pub_id) if kind == "own" else None
+    own_pub = db.get(ch.pub_model, pub_id) if kind == "own" else None
     if kind == "own" and own_pub is None:
         return
-    token = settings.bale_shared_bot_token if kind == "shared" else decrypt(own_pub.token_enc)
+    token = ch.shared_token() if kind == "shared" else decrypt(own_pub.token_enc)
 
-    if update.get("pre_checkout_query"):
+    if ch.payments and update.get("pre_checkout_query"):
         _pre_checkout(db, token, update["pre_checkout_query"])
         return
-    if (update.get("message") or {}).get("successful_payment"):
+    if ch.payments and (update.get("message") or {}).get("successful_payment"):
         _paid(db, token, update["message"])
         return
 
@@ -296,62 +329,62 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict):
         return
     chat_id = str(chat)
     clicked_message_id = ((cq or {}).get("message") or {}).get("message_id") if cq else None
-    if cq_id:  # mandatory per Bale docs
+    if cq_id:  # mandatory per Bale docs (and stops Telegram's loading spinner)
         try:
-            api_call(token, "answerCallbackQuery", {"callback_query_id": cq_id})
+            ch.call(token, "answerCallbackQuery", {"callback_query_id": cq_id})
         except Exception as e:  # noqa: BLE001
             log.warning("answerCallbackQuery failed: %s", e)
     if not text:
-        say(token, chat_id, "لطفاً فقط پیام متنی بفرستید یا از دکمه‌ها استفاده کنید.")
+        say(token, chat_id, "لطفاً فقط پیام متنی بفرستید یا از دکمه‌ها استفاده کنید.", ch)
         return
     t = engine.norm(text)
+    Pub, Link = ch.pub_model, ch.link_model
 
     # owner links their chat to receive notifications
     if t.startswith("/admin"):
         code = t[6:].strip().upper()
-        q = select(Publication).where(Publication.admin_code == code)
-        target = db.scalars(q).first() if code else None
+        target = db.scalars(select(Pub).where(Pub.admin_code == code)).first() if code else None
         if target is None or (own_pub is not None and target.id != own_pub.id):
-            say(token, chat_id, "کد مدیر نامعتبر است. کد را از صفحه‌ی «انتشار» در بات‌یار کپی کنید: /admin CODE")
+            say(token, chat_id, "کد مدیر نامعتبر است. کد را از صفحه‌ی «انتشار» در بات‌یار کپی کنید: /admin CODE", ch)
         else:
             target.admin_chat_id = chat_id
             db.commit()
-            say(token, chat_id, "✅ انجام شد. از این به بعد ثبت‌های جدید همین‌جا برای شما ارسال می‌شود.")
+            say(token, chat_id, "✅ انجام شد. از این به بعد ثبت‌های جدید همین‌جا برای شما ارسال می‌شود.", ch)
         return
 
     pub = own_pub
     welcome_now = False
     if kind == "shared":
-        cand = t[6:].strip() if t.startswith("/start") else t
-        link = db.scalars(select(ChatLink).where(ChatLink.chat_id == chat_id)).first()
+        cand = t[6:].strip() if t.startswith("/start") else t  # also Telegram deep links: t.me/<bot>?start=CODE
+        link = db.scalars(select(Link).where(Link.chat_id == chat_id)).first()
         if t == "/switch":
             if link:
                 db.delete(link)
                 db.commit()
-            say(token, chat_id, "کد رباتِ مورد نظر را بفرستید.")
+            say(token, chat_id, "کد رباتِ مورد نظر را بفرستید.", ch)
             return
         found = None
         if re.fullmatch(r"[A-Za-z0-9]{4,12}", cand or ""):
-            found = db.scalars(select(Publication).where(Publication.code == cand.upper(), Publication.mode == "shared")).first()
+            found = db.scalars(select(Pub).where(Pub.code == cand.upper(), Pub.mode == "shared")).first()
         if found:
             if link:
                 link.pub_id = found.id
             else:
-                db.add(ChatLink(chat_id=chat_id, pub_id=found.id))
+                db.add(Link(chat_id=chat_id, pub_id=found.id))
             db.commit()
             pub, welcome_now = found, True
         elif link:
-            pub = db.get(Publication, link.pub_id)
+            pub = db.get(Pub, link.pub_id)
         if pub is None:
-            say(token, chat_id, "سلام! 👋 برای شروع، «کد ربات» را بفرستید (صاحب کسب‌وکار آن را به شما می‌دهد).")
+            say(token, chat_id, "سلام! 👋 برای شروع، «کد ربات» را بفرستید (صاحب کسب‌وکار آن را به شما می‌دهد).", ch)
             return
 
     ver = db.scalars(select(BotVersion).where(BotVersion.bot_id == pub.bot_id, BotVersion.version == pub.version)).first()
     if ver is None:
-        say(token, chat_id, "این ربات فعلاً در دسترس نیست.")
+        say(token, chat_id, "این ربات فعلاً در دسترس نیست.", ch)
         return
     spec = BotSpec.model_validate(ver.spec)
-    skey = f"bale:{chat_id}"
+    skey = f"{ch.name}:{chat_id}"
     with _locks[pub.bot_id]:
         row = db.scalars(select(ChatSession).where(ChatSession.bot_id == pub.bot_id, ChatSession.key == skey)).first()
         if row is None:
@@ -364,7 +397,7 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict):
             state["muted"] = t == "/stop"
             row.state = state
             db.commit()
-            say(token, chat_id, "اطلاعیه‌های این ربات دیگر برایتان نمی‌آید (یادآوری نوبت‌ها همچنان ارسال می‌شود). برای فعال‌سازی دوباره: /resume" if t == "/stop" else "اطلاعیه‌ها دوباره فعال شد ✅")
+            say(token, chat_id, "اطلاعیه‌های این ربات دیگر برایتان نمی‌آید (یادآوری نوبت‌ها همچنان ارسال می‌شود). برای فعال‌سازی دوباره: /resume" if t == "/stop" else "اطلاعیه‌ها دوباره فعال شد ✅", ch)
             return
         if welcome_now:
             muted = state.get("muted")
@@ -376,17 +409,20 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict):
         frm = (msg or cq or {}).get("from") or {}
         if frm.get("first_name"):
             state["cust_name"] = str(frm["first_name"])[:40]
-        state["cust"] = f"bale:{chat_id}"  # stable customer identity (set last: the welcome path above replaces the whole state)
-        wallet = wallet_token(db, pub)
+        state["cust"] = skey  # stable customer identity (set last: the welcome path above replaces the whole state)
+        wallet = wallet_token(db, pub) if ch.payments else ""
         state["pay_ok"], state["pay_sim"] = bool(wallet), False  # pay_sim (the fake pay button) must never be on in a real chat
         store = SqlStore(db, pub.bot_id, sandbox=False)
         actions = engine.handle(spec, state, t, store, matcher=faq_index.matcher_for(db, pub.bot_id, spec))
-        for rid in deliver(token, chat_id, actions, state, pub.admin_chat_id, clicked_message_id, wallet):
+        others: list[dict] = []  # e.g. a waitlisted customer on the other messenger who just got the freed place
+        for rid in deliver(token, chat_id, actions, state, pub.admin_chat_id, clicked_message_id, wallet, ch, others):
             rec = db.get(Record, rid)  # the invoice could not be sent: keep the order as an ordinary one and tell both sides
             if rec:
                 rec.data = {**rec.data, "status": "new", "_pay_failed": True}
-                say(token, chat_id, "ارسال فاکتور پرداخت ناموفق بود؛ سفارش شما ثبت شد و مدیر درباره‌ی پرداخت با شما هماهنگ می‌کند.")
+                say(token, chat_id, "ارسال فاکتور پرداخت ناموفق بود؛ سفارش شما ثبت شد و مدیر درباره‌ی پرداخت با شما هماهنگ می‌کند.", ch)
                 if pub.admin_chat_id:
-                    say(token, pub.admin_chat_id, f"⚠️ فاکتور پرداخت سفارش {rid} ارسال نشد؛ سفارش بدون پرداخت آنلاین ثبت شد.")
+                    say(token, pub.admin_chat_id, f"⚠️ فاکتور پرداخت سفارش {rid} ارسال نشد؛ سفارش بدون پرداخت آنلاین ثبت شد.", ch)
         row.state = state
         db.commit()
+        if others:
+            send_customer_actions(db, pub.bot_id, others)

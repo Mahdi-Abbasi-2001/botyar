@@ -17,14 +17,26 @@ if [ -z "$(get JWT_SECRET)" ]; then
   echo "generated JWT_SECRET into $ENV_FILE"
 fi
 
+# Telegram is optional: it needs the relay (relay/main.ts on Deno Deploy) whose RELAY_KEY must equal TELEGRAM_RELAY_KEY
+if [ -n "$(get TELEGRAM_RELAY_URL)" ] && [ -z "$(get TELEGRAM_RELAY_KEY)" ]; then
+  [ -n "$(tail -c1 "$ENV_FILE")" ] && echo >> "$ENV_FILE"
+  echo "TELEGRAM_RELAY_KEY=$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')" >> "$ENV_FILE"
+  echo "generated TELEGRAM_RELAY_KEY into $ENV_FILE: copy it into the Deno relay's RELAY_KEY variable, then deploy again"
+  exit 1
+fi
+TG_ENV=()
+for k in TELEGRAM_RELAY_URL TELEGRAM_RELAY_KEY TELEGRAM_SHARED_BOT_TOKEN; do
+  [ -n "$(get $k)" ] && TG_ENV+=("$k=$(get $k)")
+done
+
 ./build.sh
 liara env set -a "$APP" --team-id "$TEAM" -f \
   "DATABASE_URL=$(get PROD_DATABASE_URL)" \
   "JWT_SECRET=$(get JWT_SECRET)" \
   "OPENAI_API_KEY=$(get OPENAI_API_KEY)" \
   "BALE_SHARED_BOT_TOKEN=$(get BALE_SHARED_BOT_TOKEN)" \
-  "PUBLIC_BASE_URL=https://botyar.liara.run" >/dev/null
-echo "env vars set"
+  "PUBLIC_BASE_URL=https://botyar.liara.run" "${TG_ENV[@]}" >/dev/null
+echo "env vars set${TG_ENV:+ (with Telegram)}"
 # stage only what the image needs (keeps .venv and .env out of the upload)
 STAGE="$(mktemp -d)"
 cp -r api/app api/static api/Dockerfile api/requirements.txt api/liara.json "$STAGE"/

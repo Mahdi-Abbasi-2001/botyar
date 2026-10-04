@@ -12,7 +12,8 @@ from app.main import app  # noqa: E402
 from app.models import BuilderRun, Product, Record, VersionTests  # noqa: E402
 
 PUBLIC = {("POST", "/api/auth/login"), ("POST", "/api/auth/register"), ("GET", "/api/health"), ("GET", "/api/templates"),
-          ("POST", "/api/hook/shared/{secret}"), ("POST", "/api/hook/own/{pub_id}/{secret}")}
+          ("POST", "/api/hook/shared/{secret}"), ("POST", "/api/hook/own/{pub_id}/{secret}"),
+          ("POST", "/api/tghook/shared/{secret}"), ("POST", "/api/tghook/own/{pub_id}/{secret}")}
 NO_BOT = {("GET", "/api/bots"), ("POST", "/api/bots"), ("POST", "/api/bots/draft"), ("GET", "/api/me")}  # scoped to the caller, no bot id
 
 
@@ -100,3 +101,6 @@ def test_webhook_urls_reject_wrong_secrets(world):
     assert c.post("/api/hook/shared/not-the-secret", json={}).status_code == 404
     assert c.post("/api/hook/own/1/not-the-secret", json={}).status_code == 404
     assert c.post("/api/hook/own/99999/x", json={}).status_code == 404
+    assert c.post("/api/tghook/shared/not-the-secret", json={}).status_code == 404
+    assert c.post("/api/tghook/own/1/not-the-secret", json={}).status_code == 404
+    assert c.post("/api/tghook/own/99999/x", json={}).status_code == 404

@@ -16,10 +16,9 @@ from sqlalchemy.orm import Session
 
 from . import bale, engine
 from .auth import current_user
-from .config import settings
 from .dates import jalali_str, now_tehran
 from .db import SessionLocal, get_db
-from .models import Bot, BotVersion, Broadcast, ChatLink, ChatSession, Publication, Record, User
+from .models import Bot, BotVersion, Broadcast, ChatSession, Publication, Record, User
 from .spec import BotSpec
 from .store import SqlStore
 
@@ -29,8 +28,17 @@ BROADCASTS_PER_DAY = 3
 PACE_SECONDS = 0.1  # stay far below any messenger rate limit
 
 
-def _token(pub: Publication) -> str:
-    return settings.bale_shared_bot_token if pub.mode == "shared" else bale.decrypt(pub.token_enc)
+def _live_bots(db: Session) -> dict[int, int]:
+    """bot_id -> live version, for every bot published on any messenger (Bale's version wins if both)."""
+    out: dict[int, int] = {}
+    for ch in bale.CHANNELS.values():
+        for pub in db.scalars(select(ch.pub_model)).all():
+            out.setdefault(pub.bot_id, pub.version)
+    return out
+
+
+def _is_messenger_customer(cust: str) -> bool:
+    return cust.split(":", 1)[0] in bale.CHANNELS
 
 
 # ---------- reminders ----------
@@ -41,19 +49,19 @@ def reminder_text(b, r: dict, start) -> str:
 def due_reminders(db: Session, now) -> int:
     """Send every reminder whose time has come; each booking is reminded at most once. Returns how many were sent."""
     sent = 0
-    for pub in db.scalars(select(Publication)).all():
-        ver = db.scalars(select(BotVersion).where(BotVersion.bot_id == pub.bot_id, BotVersion.version == pub.version)).first()
+    for bot_id, version in _live_bots(db).items():
+        ver = db.scalars(select(BotVersion).where(BotVersion.bot_id == bot_id, BotVersion.version == version)).first()
         if ver is None:
             continue
         spec = BotSpec.model_validate(ver.spec)
         blocks = [b for b in spec.blocks if b.type == "booking" and b.reminder_hours]
         if not blocks:
             continue
-        store = SqlStore(db, pub.bot_id, sandbox=False)
+        store = SqlStore(db, bot_id, sandbox=False)
         todo = []
         for b in blocks:
             for r in store.find(b.id, status="confirmed"):
-                if r.get("_reminded") or not r.get("_cust", "").startswith("bale:"):
+                if r.get("_reminded") or not _is_messenger_customer(r.get("_cust", "")):
                     continue
                 start = engine.booking_start(b, r, now.tzinfo)
                 if start is None or now >= start:
@@ -66,7 +74,7 @@ def due_reminders(db: Session, now) -> int:
                     if not late:
                         todo.append({"type": "notify_customer", "cust": r["_cust"], "text": reminder_text(b, r, start)})
         db.commit()
-        sent += bale.send_customer_actions(db, pub.bot_id, todo)
+        sent += bale.send_customer_actions(db, bot_id, todo)
     return sent
 
 
@@ -104,33 +112,41 @@ def start_scheduler():
 
 
 # ---------- announcements ----------
-def audience(db: Session, pub: Publication) -> list[str]:
-    """Bale chat ids that talked to THIS bot, are still linked to it (shared bot) and did not send /stop."""
-    rows = db.scalars(select(ChatSession).where(ChatSession.bot_id == pub.bot_id, ChatSession.key.like("bale:%"))).all()
-    linked = None
-    if pub.mode == "shared":
-        linked = {c for (c,) in db.execute(select(ChatLink.chat_id).where(ChatLink.pub_id == pub.id))}
+def audience(db: Session, bot_id: int) -> list[str]:
+    """Customer keys ("bale:123", "tg:456") that talked to THIS bot on a messenger it is published on, are still
+    linked to it (shared bots) and did not send /stop."""
     out = []
-    for r in rows:
-        chat = r.key[5:]
-        if (r.state or {}).get("muted") or (linked is not None and chat not in linked):
+    for ch in bale.CHANNELS.values():
+        pub = db.scalars(select(ch.pub_model).where(ch.pub_model.bot_id == bot_id)).first()
+        if pub is None:
             continue
-        out.append(chat)
+        prefix = f"{ch.name}:"
+        rows = db.scalars(select(ChatSession).where(ChatSession.bot_id == bot_id, ChatSession.key.like(prefix + "%"))).all()
+        linked = None
+        if pub.mode == "shared":
+            linked = {c for (c,) in db.execute(select(ch.link_model.chat_id).where(ch.link_model.pub_id == pub.id))}
+        for r in rows:
+            chat = r.key[len(prefix):]
+            if (r.state or {}).get("muted") or (linked is not None and chat not in linked):
+                continue
+            out.append(r.key)
     return out
+
+
+def _any_publication(db: Session, bot_id: int) -> bool:
+    return any(db.scalars(select(ch.pub_model).where(ch.pub_model.bot_id == bot_id)).first() for ch in bale.CHANNELS.values())
 
 
 class BroadcastIn(BaseModel):
     text: str = Field(min_length=1, max_length=1000)
 
 
-def _owned_pub(bot_id: int, user: User, db: Session) -> Publication:
+def _owned_published(bot_id: int, user: User, db: Session):
     bot = db.get(Bot, bot_id)
     if not bot or bot.user_id != user.id:
         raise HTTPException(404, "ربات یافت نشد")
-    pub = db.scalars(select(Publication).where(Publication.bot_id == bot_id)).first()
-    if pub is None:
+    if not _any_publication(db, bot_id):
         raise HTTPException(409, "ربات هنوز منتشر نشده است.")
-    return pub
 
 
 @router.get("/api/bots/{bot_id}/broadcasts")
@@ -138,16 +154,16 @@ def list_broadcasts(bot_id: int, user: User = Depends(current_user), db: Session
     bot = db.get(Bot, bot_id)
     if not bot or bot.user_id != user.id:
         raise HTTPException(404, "ربات یافت نشد")
-    pub = db.scalars(select(Publication).where(Publication.bot_id == bot_id)).first()
+    published = _any_publication(db, bot_id)
     rows = db.scalars(select(Broadcast).where(Broadcast.bot_id == bot_id).order_by(Broadcast.id.desc()).limit(20)).all()
-    return {"published": pub is not None, "audience": len(audience(db, pub)) if pub else 0, "per_day": BROADCASTS_PER_DAY,
+    return {"published": published, "audience": len(audience(db, bot_id)) if published else 0, "per_day": BROADCASTS_PER_DAY,
             "items": [{"id": b.id, "text": b.text, "audience": b.audience, "sent": b.sent, "failed": b.failed, "done": b.done,
                        "created_at": b.created_at.isoformat()} for b in rows]}
 
 
 @router.post("/api/bots/{bot_id}/broadcasts")
 def send_broadcast(bot_id: int, body: BroadcastIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    pub = _owned_pub(bot_id, user, db)
+    _owned_published(bot_id, user, db)
     text = body.text.strip()
     if not text:
         raise HTTPException(422, "متن اطلاعیه خالی است")
@@ -156,29 +172,33 @@ def send_broadcast(bot_id: int, body: BroadcastIn, user: User = Depends(current_
     recent = sum(1 for b in last if (b.created_at if b.created_at.tzinfo else b.created_at.replace(tzinfo=timezone.utc)) > day_ago)
     if recent >= BROADCASTS_PER_DAY:
         raise HTTPException(429, f"در هر شبانه‌روز حداکثر {BROADCASTS_PER_DAY} اطلاعیه می‌توانید بفرستید تا مشتری‌ها ناراحت نشوند.")
-    chats = audience(db, pub)
-    if not chats:
+    custs = audience(db, bot_id)
+    if not custs:
         raise HTTPException(409, "هنوز مشتری‌ای با ربات شما گفتگو نکرده است.")
-    row = Broadcast(bot_id=bot_id, text=text, audience=len(chats))
+    row = Broadcast(bot_id=bot_id, text=text, audience=len(custs))
     db.add(row)
     db.commit()
-    threading.Thread(target=_deliver, args=(row.id, pub.id, chats, text), daemon=True).start()
-    return {"id": row.id, "audience": len(chats)}
+    threading.Thread(target=_deliver, args=(row.id, bot_id, custs, text), daemon=True).start()
+    return {"id": row.id, "audience": len(custs)}
 
 
-def _deliver(broadcast_id: int, pub_id: int, chats: list[str], text: str):
+def _deliver(broadcast_id: int, bot_id: int, custs: list[str], text: str):
     with SessionLocal() as db:
-        pub, row = db.get(Publication, pub_id), db.get(Broadcast, broadcast_id)
-        try:
-            token = _token(pub)
-        except Exception:  # noqa: BLE001
-            row.failed, row.done = len(chats), True
-            db.commit()
-            return
-        body = engine.fa_digits(text)[:4096] + "\n\nبرای توقف اطلاعیه‌ها: /stop"
-        for i, chat in enumerate(chats, 1):
+        row = db.get(Broadcast, broadcast_id)
+        tokens: dict[str, str | None] = {}  # channel name -> bot token (None: not usable)
+        for ch in bale.CHANNELS.values():
+            pub = db.scalars(select(ch.pub_model).where(ch.pub_model.bot_id == bot_id)).first()
             try:
-                bale.api_call(token, "sendMessage", {"chat_id": chat, "text": body})
+                tokens[ch.name] = bale.pub_token(ch, pub) if pub else None
+            except Exception:  # noqa: BLE001
+                tokens[ch.name] = None
+        body = engine.fa_digits(text)[:4096] + "\n\nبرای توقف اطلاعیه‌ها: /stop"
+        for i, cust in enumerate(custs, 1):
+            name, chat = cust.split(":", 1)
+            try:
+                if not tokens.get(name):
+                    raise bale.BaleError(f"{name} token unavailable")
+                bale.CHANNELS[name].call(tokens[name], "sendMessage", {"chat_id": chat, "text": body})
                 row.sent += 1
             except Exception as e:  # noqa: BLE001
                 row.failed += 1
