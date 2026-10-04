@@ -111,6 +111,18 @@ appears as an amber bubble.
 **Break it (important):** ask the agent for an FAQ and give it NO facts, then keep saying «خودت تصمیم بگیر». It must never invent hours/prices/addresses — it should ask, and when finally forced it writes «اطلاعات … هنوز ثبت نشده است». Also try questions in slang, with typos, in English, and very long text.
 **Honest numbers:** see `docs/faq-evaluation.md` — about 63% answered at once, ~90% right within one tap, rare wrong answers (0–1% in our samples).
 
+### Station 4f — Talk to the owner, ratings, rescheduling, reminders, announcements, delivery/discounts, payment (new)
+
+Try each in a fresh bot (describe it to the agent in Persian, one sentence each). Prices/times below are just examples.
+
+1. **Talk to the owner.** «ربات فروشگاه گل که مشتری‌ها بتوانند برای من پیام بفرستند». In the simulator pick «پیام به مدیر», type a message → you get «پیام شما ارسال شد». Open the **پیام‌ها** tab (check «فقط آزمایشی») → reply. On Bale (after publishing): the reply arrives in the customer's chat as «✉️ پاسخ مدیر».
+2. **Ratings.** «بخش ثبت نظر مشتری با ستاره ۱ تا ۵». Tap ⭐⭐⭐⭐, write a comment (or «رد کردن»). The structure tab shows the average; the same customer can rate at most 5 times a day.
+3. **Reschedule.** In a bot with appointments: book, open «ثبت‌های من», pick the booking → «🔄 تغییر زمان», choose another time. The old place is freed only after the new one is confirmed; a full date is refused (you keep the old one).
+4. **Reminders.** Ask for «۲۴ ساعت قبل از نوبت یادآوری بده». Can't be seen in the simulator (it needs a real clock and a Bale chat); check the booking card says «یادآوری ۲۴ ساعت قبل». The server sends one message per booking; a booking made inside the window gets none.
+5. **Announcements.** Tab **اطلاعیه** (bot must be published): write text → preview → send. Customers who sent /stop are skipped; max 3 per day; every announcement ends with the /stop hint.
+6. **Delivery fee + discount codes.** «هزینه ارسال ۳۰ هزار تومان، رایگان بالای ۲۰۰ هزار، کد YALDA ده درصد، حداکثر ۵ بار». At checkout the bot asks «کد تخفیف دارید؟»; try a wrong code, the right code in lowercase, and cancel an order to see the use come back.
+7. **Online payment.** «سفارش را آنلاین پرداخت کنند». In the simulator, after the last question you get a bill and a «💳 پرداخت (آزمایشی)» button; the owner notification arrives only after paying; an unpaid order is cancelled after 15 minutes. In the **انتشار** tab save the wallet token `WALLET-TEST-1111111111111111` (Bale's published test token) to try a real invoice on the shared bot with no real money. Real money needs your OWN bot token + your own wallet token from @botfather.
+
 ### Station 4c — Customers cancelling («ثبت‌های من») (new)
 
 **What it is:** when a booking or order block allows it (the agent turns it on by default; say «مشتری نتونه لغو کنه» to turn it off), the bot's menu gets a built-in last button **«ثبت‌های من»**. The customer sees only their OWN active bookings/orders, taps one, confirms, and it is cancelled.
@@ -198,7 +210,7 @@ You do not need special tools:
 ## Known gaps and improvement ideas (honest, roughly by value)
 
 0. ~~Weekly capacity never reset~~ — **fixed**: weekly slots count per date (see Station 4b). Still open: "every other week", month-based schedules, and clearing old one-off bookings by hand.
-1. ~~Customers can't cancel~~ — **done** (Station 4c). Still open: customers *editing* a booking. (Owner-side cancel and the order preparing status are done — Station 4d.)
+1. ~~Customers can't cancel~~ — **done** (Station 4c). Customers can now *reschedule* a booking; editing the items of an order is still not supported (cancel and re-order). (Owner-side cancel and the order preparing status are done — Station 4d.)
 2. **Self-graded tests.** The agent that designs the bot also writes its tests. Idea: show the owner a plain-language "what I understood" summary to confirm *before* building; add a second "reviewer" pass.
 3. **Category lists aren't paginated** (a store with 40 categories shows 40 buttons; Bale's limit is unknown). Product lists reload the whole catalog per tap — fine for hundreds of items, untested for thousands.
 4. **Single server instance.** The anti-double-booking lock lives in memory, so we cannot run two instances without moving locks into the database. No uptime monitoring/alerts; database backup policy unverified.
