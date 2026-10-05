@@ -47,3 +47,15 @@ def test_booking_and_order_confirmations_can_use_fields_too():
     with pytest.raises(ValidationError):
         BotSpec.model_validate({"name": "x", "welcome": "س", "menu": [{"label": "ثبت", "block": "b"}],
             "blocks": [{"type": "booking", "id": "b", "title": "t", "confirm_text": "{zzz}", "slots": [{"id": "a", "label": "الف", "capacity": 2}]}]})
+
+
+def test_id_placeholder_is_the_tracking_number():
+    sp = spec(done="مشکل ثبت شد. شماره پیگیری: {id}")
+    s, st = new_session(), MemoryStore()
+    for t in ["/start", "m:0", "الف"]:
+        handle(sp, s, t, st)
+    s2 = new_session()
+    out = None
+    for t in ["/start", "m:0", "ب"]:
+        out = handle(sp, s2, t, st)
+    assert out[0]["text"] == "مشکل ثبت شد. شماره پیگیری: 2"

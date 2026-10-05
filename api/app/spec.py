@@ -49,7 +49,7 @@ class FormBlock(BaseModel):
 
     @model_validator(mode="after")
     def _placeholders(self):
-        check_placeholders([self.done_text], {f.key for f in self.fields})
+        check_placeholders([self.done_text], {f.key for f in self.fields} | {"id"})
         return self
 
 
@@ -144,7 +144,7 @@ class BookingBlock(BaseModel):
     def _one_kind(self):
         if bool(self.slots) == (self.schedule is not None):
             raise ValueError("a booking block needs either `slots` (fixed events/classes) or `schedule` (appointments from working hours), not both and not neither")
-        check_placeholders([self.confirm_text, self.waitlist_text], {f.key for f in self.fields} | {"slot_label", "date", "time", "staff"})
+        check_placeholders([self.confirm_text, self.waitlist_text], {f.key for f in self.fields} | {"id", "slot_label", "date", "time", "staff"})
         return self
 
 
@@ -216,7 +216,7 @@ class CatalogOrderBlock(BaseModel):
     def _items(self):
         if len({norm_code(c.code) for c in self.discount_codes}) != len(self.discount_codes):
             raise ValueError("duplicate discount code")
-        check_placeholders([self.confirm_text], {f.key for f in self.fields})
+        check_placeholders([self.confirm_text], {f.key for f in self.fields} | {"id"})
         if self.source == "inline" and not self.items:
             raise ValueError("an inline catalog_order needs at least one item (or use source='table')")
         return self
