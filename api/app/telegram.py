@@ -33,6 +33,10 @@ log = logging.getLogger("botyar.telegram")
 router = APIRouter()
 
 
+# channel_post: posts in channels (post forwarding, /link in a channel). Telegram only delivers the update types listed here.
+ALLOWED_UPDATES = ["message", "callback_query", "channel_post"]
+
+
 def enabled() -> bool:
     return bool(settings.telegram_relay_url and settings.telegram_relay_key)
 
@@ -90,7 +94,7 @@ def ensure_shared_webhook():
         return
     try:
         api_call(settings.telegram_shared_bot_token, "setWebhook",
-                 {"url": hook_url(f"shared/{shared_hook_secret()}"), "allowed_updates": ["message", "callback_query"]})
+                 {"url": hook_url(f"shared/{shared_hook_secret()}"), "allowed_updates": ALLOWED_UPDATES})
         log.info("telegram shared webhook registered")
     except Exception as e:  # noqa: BLE001
         log.warning("telegram setWebhook failed: %s", e)
@@ -190,7 +194,7 @@ def tg_publish(bot_id: int, body: TgPublishIn, user: User = Depends(current_user
     if body.mode == "own":
         try:
             api_call(bale.decrypt(token_enc), "setWebhook",
-                     {"url": hook_url(f"own/{pub.id}/{pub.hook_secret}"), "allowed_updates": ["message", "callback_query"]})
+                     {"url": hook_url(f"own/{pub.id}/{pub.hook_secret}"), "allowed_updates": ALLOWED_UPDATES})
         except bale.BaleError as e:
             db.rollback()
             raise HTTPException(502, f"ثبت وبهوک در تلگرام ناموفق بود: {e}")
