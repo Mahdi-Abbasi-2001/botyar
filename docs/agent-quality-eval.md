@@ -26,3 +26,28 @@ Eight varied Persian requests, each sent as a single message to a fresh account 
 - Eight cases, one run each; the agent is non-deterministic, so numbers will vary run to run.
 - The tests are written by the same agent that designs the bot. «All tests pass» proves the bot behaves as the agent
   understood the request, not that it matches what the owner meant. The simulator is where the owner confirms that.
+
+
+---
+
+# Regression harness (updated 2026-10-06)
+
+The eight-case study above was the first measurement. Since then the evaluation became a committed harness,
+`api/scripts/eval_agent.py`, with **54 real-model cases** (run it with name filters, e.g. `eval_agent.py quiz menu`). Each case sends one Persian
+request to a fresh account on a throw-away database, answers clarifying questions with a fixed sentence, then checks *what was
+built* (blocks, numbers copied exactly, honest «پشتیبانی نمی‌شود» notes), that the agent's own tests pass, cost ≤ $0.02 and time ≤ 150 s.
+
+Case families: supported builds (slots, schedules, catalogs, orders, forms), weekly/appointment calendars, cancellation rules, FAQ (no
+invented facts), contact, feedback, delivery fee and discount codes, online payment (and honest refusal for booking deposits), reminders,
+order-edit not promised, random messages, personalised confirmations, sub-menus, quizzes (asks for the questions instead of inventing
+answers), photos/files and map pins (never invents coordinates), forced channel join (asks for the channel), invite links, anonymous chat,
+honest declines (face recognition, free-form AI chat, mobile app), and tiny odd requests (`scripts/odd_requests.py`).
+
+Measured so far (honest summary):
+- **Full run, 2026-10-05, 40 cases:** 36 passed on the first pass; the 4 failures were 3 transient provider errors (zero cost, zero tests) and 1 quality miss;
+  all 4 passed when re-run individually. Total about $0.08 for the full run (average about $0.002 per case).
+- **Cases added later** (random messages, placeholders, sub-menus, quizzes, files, join gate, referral, anonymous chat, odd requests) were run
+  individually when added; they passed, and the prompt fixes they led to are in the repository.
+- **Known non-determinism:** a few cases are flaky at about 1 in 4 (for example the «cancellation forbidden» wording and the first fix for
+  «build the supported part of a tiny request», which went from about 3/4 to 5/5 after the second self-check was added). Rerunning a failing case once is part of the routine; a full run costs about $0.10 and is done once before each deploy.
+- The agent still sometimes asks a needless second question for support-ticket style requests, and does not volunteer the «talk to the owner» block for them.

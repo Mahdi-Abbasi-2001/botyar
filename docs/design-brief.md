@@ -26,6 +26,7 @@ Café / workshop / clinic / gym owners. Non-technical, phone-first habits, Persi
      - **تست‌ها (Tests)** — list of scenarios with ✓/✗, failure reasons, expandable transcript (user line ↔ bot line). This is the proof the bot works; make it feel like evidence, not a log dump.
      - **نسخه‌ها (Versions)** — timeline: version number, the request that created it, tests passed/total, and a **readable diff** (what changed: e.g. "لیست انتظار: غیرفعال ← فعال"). Currently shown as raw paths; needs a human-friendly rendering.
      - **ثبت‌ها (Records)** — table/cards of bookings/orders created in the simulator (and later from the real Bale bot).
+     - Added since this brief was written (functional, not yet designed): **انتشار** (Bale/Telegram publishing, links/QR, wallet token for payments), **محصولات** (catalog import), **پیام‌ها** (inbox), **اطلاعیه** (announcements, scheduled announcements), **مشتریان** (list, search, export, referral leaderboard, ban), **فایل‌ها** (photos/files for message blocks), **کانال و گروه** (link code, forwarding rules, moderation settings, join-gate status), an amber **delivery banner** when a messenger is unreachable, and the pages **/pricing** (plans) and **/account** (usage meters, demo upgrade, payment history).
 5. **(Next, design now so it fits) Publish screen** — connect to Bale: paste bot token OR use the shared Botyar bot with a short code; shows status and a link/QR. Plus a "live records" view with real users.
 
 ## Agent progress events (real strings the UI receives, in order)

@@ -29,8 +29,10 @@
 ```
 
 1. **The agent never writes code.** It writes a **BotSpec**: Pydantic-validated JSON assembled from a fixed set of
-   blocks: message, form, booking (fixed or weekly slots, or appointment calendars from working hours), catalog order,
-   FAQ, contact the owner, feedback, admin notify.
+   blocks: message (random variants, photo/file, map pin), form, booking (fixed or weekly slots, or appointment
+   calendars from working hours, with cancel and reschedule), catalog order (stock, delivery fee, discount codes, online
+   payment in Bale), FAQ, contact the owner, feedback, sub-menu, quiz, invite links, anonymous chat, admin notify; plus
+   an optional forced channel join.
 2. **Customers never talk to a language model.** A deterministic engine runs the spec, so a live bot behaves the same
    every time, can't be prompt-injected and costs almost nothing per message. (FAQ free-text questions use one small
    embeddings lookup against the owner's own sentences; answers are never generated.)
@@ -54,10 +56,13 @@ is logged with its token count and cost; the UI shows the cost per request and p
 | `api/app/telegram.py`, `relay/` | Telegram channel and the Deno relay it goes through (Telegram is unreachable from Iran) |
 | `api/app/catalog.py`, `api/app/export.py` | Product catalogs, CSV/Excel/paste/photo/PDF import, CSV/XLSX export |
 | `api/app/faq_index.py`, `api/app/faq_match.py` | FAQ retrieval (embeddings) |
-| `api/app/outreach.py`, `api/app/payments.py`, `api/app/records_ops.py` | Reminders, announcements, Bale invoices, owner actions on records |
+| `api/app/outreach.py`, `api/app/payments.py`, `api/app/records_ops.py` | Reminders, announcements (manual and scheduled), Bale invoices, owner actions on records |
+| `api/app/resilience.py`, `outbox.py`, `webhooks.py` | Messenger outages: safe retries, health, a retry queue, webhook refresh |
+| `api/app/billing.py`, `customers.py`, `media.py` | Plans and limits (demo payments), customers list and bans, photos/files |
+| `api/app/communities.py`, `gate.py`, `referral.py`, `anon.py` | Channel/group linking, post forwarding, group moderation, forced join, invite links, anonymous chat |
 | `api/tests/` | Backend tests (no network, no OpenAI) |
 | `web/` | Next.js frontend (static export, Persian RTL) |
-| `docs/` | Test tour, agent and FAQ evaluations, design brief, sample import files |
+| `docs/` | **`technical.md`** (architecture and behaviour), `business-plan.md`, `TEST-TOUR.md`, `real-bale-checklist.md`, agent and FAQ evaluations, design brief, sample import files |
 | `build.sh`, `deploy.sh` | Build the frontend into `api/static`; deploy to Liara |
 
 ## Run it locally
@@ -97,12 +102,15 @@ For frontend work with hot reload, run `npm run dev` in `web/` with `NEXT_PUBLIC
 | `PUBLIC_BASE_URL` | – | Public URL used to register Bale webhooks |
 | `TELEGRAM_RELAY_URL`, `TELEGRAM_RELAY_KEY` | – | The Telegram relay outside Iran (see [`relay/README.md`](relay/README.md)); empty = Telegram off |
 | `TELEGRAM_SHARED_BOT_TOKEN` | – | Optional shared Telegram bot (links + directory, like the shared Bale bot) |
+| `BILLING_DEMO` | `true` | Demo app: upgrading a plan simulates a successful payment and activates it at once; `false` = request and admin approval |
+| `ADMIN_EMAILS` | – | Comma-separated accounts that may approve upgrade requests (only used when `BILLING_DEMO=false`) |
 | `CORS_ORIGINS` | `http://localhost:3000` | Only needed when the UI runs on another origin |
 
 ### Spending guards
 
 40 agent runs per user per 24 h, 300 agent runs and 300 AI-assisted imports per 24 h across all users, 8 sign-ups per
-IP per hour. A typical bot costs about $0.002 to build (`docs/agent-quality-eval.md`).
+IP per hour, plus per-plan limits (bots, live bots, active customers, agent requests; `docs/technical.md` §10). A typical
+bot costs about $0.002 to build (`docs/agent-quality-eval.md`).
 
 ## Tests
 
@@ -117,5 +125,10 @@ separately against the real model; see `docs/agent-quality-eval.md` and `docs/fa
 ## Deploy
 
 `./deploy.sh` builds the frontend, sets the environment on the Liara app `botyar` from `api/.env`
-(`PROD_DATABASE_URL`, `OPENAI_API_KEY`, `BALE_SHARED_BOT_TOKEN`, `JWT_SECRET`) and deploys the Docker image. It never
-prints secrets.
+(`PROD_DATABASE_URL`, `OPENAI_API_KEY`, `BALE_SHARED_BOT_TOKEN`, `JWT_SECRET`, and the optional Telegram and admin
+variables) and deploys the Docker image. It never prints secrets. Liara allows 20 deployments per day.
+
+## What still has to be tried on real messengers
+
+Automated tests use a fake messenger. `docs/real-bale-checklist.md` lists every step that must be tried once on real
+Bale/Telegram accounts, what you should see, and what a failure means.

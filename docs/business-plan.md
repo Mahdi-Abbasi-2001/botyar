@@ -1,36 +1,37 @@
 # Botyar (بات‌یار) — Business plan (DRAFT v1, 2026-10-05)
 
-**Status of the numbers.** Everything below marked **[measured]** comes from our own product logs, **[sourced]** from a page we read (links in `pricing-research.md` and `competitor-sahbot.md`), **[proposed]** is our own proposal that has *not* been validated with customers, and **[blank]** is unknown and must be filled by the founder. Nothing is invented.
+**Status of the numbers.** Everything below marked **[measured]** comes from our own product logs, **[sourced]** from a page we read (source URLs are given next to each number), **[proposed]** is our own proposal that has *not* been validated with customers, and **[blank]** is unknown and must be filled by the founder. Nothing is invented.
 
 ## 1. One-sentence pitch
 Describe your Bale bot in Persian; an agent builds it, tests it before it goes live, publishes it, and keeps changing it when you ask — for a flat monthly price.
 
 ## 2. The problem
 Small Iranian businesses (cafés, clinics, salons, gyms, shops, teachers) live on messengers, but a working bot today means either:
-- **hiring a freelancer**: a basic Bale bot costs **2–8 million Toman**, a shop bot **12–30 million**, custom work from **30 million**; each extra feature (payment, booking, AI support) adds **1.5–7 million** [sourced: filtori.com price guide, 1405]; or
-- **building it yourself** in a visual/no-code tool such as SahBot: powerful, but you must learn blocks, plugin tags and a daily "diamond/points" cost model (they even run a course session on how to calculate the bill) [sourced: sahbot.com docs].
+- **hiring a freelancer**: a basic Bale bot costs **2–8 million Toman**, a shop bot **12–30 million**, custom work from **30 million**; each extra feature (payment, booking, AI support) adds **1.5–7 million** [sourced: https://filtori.com/tools/, 1405]; or
+- **building it yourself** in a visual/no-code tool such as SahBot: powerful, but you must learn blocks, plugin tags and a daily "diamond/points" cost model (they even run a course session on how to calculate the bill) [sourced: https://sahbot.com/doc.html].
 Both options are slow, and changes later (a new price, a new class time) need the same effort again.
 
 ## 3. The solution (what exists today, in production)
 - **Agent builder**: Persian description → clarifying questions only when needed → bot spec → **automatic test scenarios run against the real engine** → repair loop (up to 3) → save. Measured cost **about $0.001–0.009 per build or change** [measured: `llm_calls` log, eval harness].
 - **Deterministic runtime**: customers never talk to an LLM; the agent only writes a validated spec that an engine executes. Safe, cheap, testable, explainable.
-- **Block types** (all in the spec language): messages (random variants, photo/file, map pin), forms, bookings (fixed slots with capacity and waitlist, weekly repeats with Jalali dates, **individual appointments from working hours and staff**), orders and shops (catalog from CSV/Excel/paste/photo, stock, delivery fee, discount codes, **online payment inside Bale**), FAQ (retrieval only: answers are the owner's own sentences), quizzes, sub-menus, ratings, "talk to the owner" inbox, owner notifications.
+- **Block types** (all in the spec language): messages (random variants, photo/file, map pin), forms, bookings (fixed slots with capacity and waitlist, weekly repeats with Jalali dates, **individual appointments from working hours and staff**, cancel and reschedule), orders and shops (catalog from CSV/Excel/paste/photo, stock, delivery fee, discount codes, **online payment inside Bale**), FAQ (retrieval only: answers are the owner's own sentences), quizzes, sub-menus, ratings, invite links, anonymous chat, "talk to the owner" inbox, owner notifications, optional forced channel join.
 - **Owner panel**: records with cancel/status actions, inbox with replies delivered to the customer's chat, announcements (manual and scheduled, with `/stop` opt-out), customers list with Excel export, booking reminders, files tab, plan and usage page.
 - **Channels**: Bale (shared bot with links/QR and a directory, or the owner's own bot token); Telegram via a relay outside Iran.
 - **Community tools** (new, to be proven on real Bale): forced channel join, invite links with counting, anonymous chat with report/ban, post forwarding between channels, group moderation.
-- **Quality evidence**: 200+ automated tests, a committed agent regression harness (40+ real-model cases), mutation checks for business rules, fuzzing of conversations.
+- **Reliability**: safe retries, a retry queue and a health banner when Bale or Telegram is unreachable (`docs/technical.md` §8).
+- **Quality evidence**: 270+ automated tests, a committed agent regression harness (54 real-model cases), mutation checks for business rules, fuzzing of conversations.
 
 ## 4. Market
 - Bale: **16.5 million monthly active users (May 2023, Iranian ICT ministry); 35 million+ registered** [sourced earlier in research; re-verify before the pitch].
 - Number of small businesses using bots in Iran: **[blank — not found; do not guess]**. Proxy: SahBot is a knowledge-based company running since 2017 with 8 channels and a paid usage model, i.e. demand is proven.
 - Reachable first segment (our product fits today): appointment-based and order-based small businesses on Bale: clinics, salons, cafés, bakeries, classes, gyms, small shops. Count: **[blank]**.
 
-## 5. Competition (details in `competitor-sahbot.md`, `pricing-research.md`)
+## 5. Competition (public information, read 2026-10-05)
 | | Botyar | SahBot (صهبات) | AradBot | Freelancer |
 |---|---|---|---|---|
 | How you build | **describe in Persian** | blocks, plugins, advanced scripting | not yet researched in depth | brief + waiting |
 | Tested before publish | **yes, automatic** | not seen in docs | not researched | manual, depends |
-| Price model | flat monthly per plan [proposed] | daily diamonds + per-message points (diamond 20 Toman, point 3 Toman, +10% VAT); typical sample bot ≈ 150–235k Toman/month [sourced] | flat plans 183k / 287k / 609k Toman/month [sourced] | one-off 2–30M Toman |
+| Price model | flat monthly per plan [proposed] | daily diamonds + per-message points (diamond 20 Toman, point 3 Toman, +10% VAT); their own sample bots use 246–390 diamonds/day ≈ 150–235k Toman/month [sourced: price calculator inside their panel, https://sahbot.com/] | flat plans 183k / 287k / 609k Toman/month [sourced: https://aradbot.com/feature/] | one-off 2–30M Toman |
 | Channels | Bale, Telegram | Bale, Telegram, Eitaa, iGap, Rubika, Soroush, WhatsApp, SMS | — | any |
 | Breadth | focused: booking, orders, FAQ, forms, payments | very broad (shop, cron, group manager, API/AI, custom code) | — | unlimited |
 Honest position: we do **not** win on breadth. We win on **time to a working, tested bot for a non-technical owner**, and on **predictable pricing**.

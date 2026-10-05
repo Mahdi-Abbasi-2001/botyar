@@ -21,13 +21,14 @@ gap in our explanation, and both are worth fixing.
    save a version                          deterministically
         │  uses only gpt-6-luna                   ▲
         ▼                                         │ webhook
-   OpenAI API                          Bale messenger (customers, owner)
+   OpenAI API                 Bale and Telegram (customers, owner)
 ```
 
 Three ideas to hold on to:
 
-1. **The agent never writes code.** It writes a **BotSpec** (a JSON description built from 5 block types: message, form,
-   booking, catalog_order, admin_notify). A fixed engine executes it. That is why bots are safe, testable and diff-able.
+1. **The agent never writes code.** It writes a **BotSpec** (a JSON description built from a fixed set of blocks: message,
+   form, booking, catalog_order, FAQ, contact, feedback, sub-menu, quiz, referral, anonymous chat, admin_notify, plus an
+   optional forced channel join). A fixed engine executes it. That is why bots are safe, testable and diff-able.
 2. **Customers never talk to an AI.** Their messages go to the deterministic engine. So a running bot costs no OpenAI
    money, cannot be prompt-injected, and behaves the same every time. AI is used only to *build and change* bots.
 3. **Every version is tested before it can be published.** The agent writes test conversations, the engine runs them,
@@ -37,15 +38,20 @@ Where things live (for when you want to read the code):
 
 | Part | File |
 |---|---|
-| BotSpec schema (the 5 blocks) | `api/app/spec.py` |
+| BotSpec schema (all blocks) | `api/app/spec.py` |
 | Runtime engine (all bot behaviour) | `api/app/engine.py` |
 | Agent graph + prompts | `api/app/agent.py`, `api/app/prompts.py` |
 | Test runner + spec diff | `api/app/testing.py` |
 | LLM calls + cost log (Luna only) | `api/app/llm.py` |
-| Bale channel (webhooks, buttons, editing) | `api/app/bale.py`, `api/app/publish.py` |
+| Bale + Telegram channel (webhooks, buttons, editing) | `api/app/bale.py`, `api/app/publish.py`, `api/app/telegram.py` |
+| Outages (retries, queue, health, webhook refresh) | `api/app/resilience.py`, `outbox.py`, `webhooks.py` |
+| Plans and limits | `api/app/billing.py` |
+| Channels, groups, join gate, invite links, anonymous chat | `api/app/communities.py`, `gate.py`, `referral.py`, `anon.py` |
 | Product catalog + imports | `api/app/catalog.py` |
 | Exports (CSV/XLSX) | `api/app/export.py` |
 | UI | `web/app/*`, `web/components/workspace/*` |
+
+The full description of the system is in `docs/technical.md`; what must still be tried on real Bale/Telegram accounts is in `docs/real-bale-checklist.md`.
 
 ---
 
@@ -133,6 +139,16 @@ Try each in a fresh bot (describe it to the agent in Persian, one sentence each)
 6. **Sub-menus.** «دکمه محصولات که دو دکمه لپ‌تاپ و موبایل نشون بده، هرکدوم توضیح خودش را بگوید».
 7. **Quiz.** Give the questions and correct answers yourself; the agent asks for them if you don't. A score appears at the end and each result is stored.
 8. **Random message / personalised confirmation.** «با زدن دکمه، هر بار یک جمله انگیزشی تصادفی نشان بده» and «اسمم رو بپرس و بعدش با اسم خوش‌آمد بگو».
+
+### Station 4h — Channels, groups, forced join, invite links, anonymous chat, outages (new)
+
+All of these need a real messenger; use `docs/real-bale-checklist.md` (sections C–F) for the exact steps. In the web simulator you can only see how the blocks read:
+1. **Forced join**: «مشتری‌ها باید اول عضو کانال @yourchannel بشن». The Structure tab shows a «عضویت اجباری» card; the «کانال و گروه» tab shows whether the bot is an admin of that channel. The simulator does not apply the gate.
+2. **Invite friends**: the referral block shows «دعوت‌های موفق: ۰ از N» and a note that the real link exists only on Bale/Telegram.
+3. **Anonymous chat**: the simulator explains that pairing needs two real customers.
+4. **Channels and groups tab**: «دریافت کد اتصال» gives `/link CODE`; post forwarding and group moderation settings appear after a chat is linked.
+5. **Outages**: if Bale/Telegram is unreachable the workspace shows an amber banner (messenger down, messages queued, messages lost in 24 h). Unreachable messenger → messages wait in a queue for up to 30 minutes.
+6. **Plans (demo)**: `/pricing/` and `/account/` — upgrading simulates a payment and activates the plan at once.
 
 ### Station 4c — Customers cancelling («ثبت‌های من») (new)
 
@@ -240,10 +256,12 @@ You do not need special tools:
 1. ~~Customers can't cancel~~ — **done** (Station 4c). Customers can now *reschedule* a booking; editing the items of an order is still not supported (cancel and re-order). (Owner-side cancel and the order preparing status are done — Station 4d.)
 2. **Self-graded tests.** The agent that designs the bot also writes its tests. Idea: show the owner a plain-language "what I understood" summary to confirm *before* building; add a second "reviewer" pass.
 3. **Category lists aren't paginated** (a store with 40 categories shows 40 buttons; Bale's limit is unknown). Product lists reload the whole catalog per tap — fine for hundreds of items, untested for thousands.
-4. **Single server instance.** The anti-double-booking lock lives in memory, so we cannot run two instances without moving locks into the database. No uptime monitoring/alerts; database backup policy unverified.
+4. **Single server instance.** The anti-double-booking lock and the background jobs live in memory, so we cannot run two instances without moving locks into the database. No uptime monitoring/alerts; database backup policy unverified.
 5. **No password reset, email verification, account/data deletion.** (Out of competition scope, needed for a real product.)
-6. **Dates are Gregorian**, not Jalali. **No Telegram.** One owner chat gets notifications.
-7. **Own-token mode untested on real Bale**; the shared-bot code can't be regenerated.
+6. **Dates are Gregorian in exports** (conversations use Jalali). Telegram exists (through a relay) but is tested against a fake relay only. One owner chat gets notifications per publication.
+7. **Several things are untested on real messengers**: own-token mode, channel/group message delivery on Bale (post forwarding, moderation, channel linking), file upload format, invoices — see `docs/real-bale-checklist.md`.
 8. **No owner analytics** (e.g. "40% of customers drop out at the phone-number step") — also a strong pitch point.
 9. **Photo import can misread small text** (we saw a wrong size range). It always needs the owner's review; consider a second-pass check.
 10. **Prices/totals in notifications** use the digits typed; consistent Persian/Latin policy is a product decision.
+11. **Messenger outages** are now handled (retries, queue, health banner); queued messages are dropped after 30 minutes by design.
+12. **Plans** are enforced but their prices are proposals and payment is simulated (demo).

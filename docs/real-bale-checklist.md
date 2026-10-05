@@ -55,3 +55,15 @@ Prerequisite: create a test Bale channel and a test Bale group, add the bot to b
 
 ## G. Plans
 Open `/pricing/` and `/account/`; try creating a 4th bot on the free plan (expect a clear message); press «پرداخت آزمایشی و فعال‌سازی» (a simulated payment: the plan activates at once), check the limits change and the payment history row, then cancel back to free.
+
+## H. Telegram (through the relay)
+1. Open the relay's address in a browser: it must show `ok`.
+2. After a deploy with `TELEGRAM_SHARED_BOT_TOKEN` set, open the shared Telegram bot: it must show the directory of businesses (`/start`), and a business link `t.me/<bot>?start=CODE` must open that bot.
+3. Repeat B1–B2, B4 and E on Telegram. Expected differences: no payment button, files are replaced by a short note, everything else the same.
+4. For C on Telegram the bot must be admin; channel posts are delivered because the webhook asks for `channel_post` updates.
+
+## I. Outage drill (optional, 5 minutes)
+1. Publish a bot, send a message to it from a customer account, confirm the reply.
+2. Break the connection on purpose (for example set a wrong `TELEGRAM_RELAY_URL` and redeploy, or block the server's access to the messenger).
+3. Send messages to the bot: the panel should show an amber banner (messenger down, messages waiting) after three failed calls.
+4. Restore the connection: within a few minutes the waiting messages should arrive in order and the banner should disappear.
