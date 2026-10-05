@@ -23,7 +23,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import anon, billing, communities, dates, engine, faq_index, gate, media, referral
+from . import anon, billing, communities, outbox, dates, engine, faq_index, gate, media, referral
 from .config import settings
 from .db import SessionLocal
 from .models import Bot, BotListing, BotVersion, ChatLink, BannedCustomer, ChatSession, CustomerSeen, PaymentConfig, Publication, Record
@@ -35,19 +35,12 @@ API = "https://tapi.bale.ai"
 CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # no 0/O/1/I confusion
 
 
-class BaleError(Exception):
-    pass
+from .resilience import BaleError, TransientError, UncertainError  # noqa: E402,F401  (re-exported: bale.BaleError is used everywhere)
+from . import resilience  # noqa: E402
 
 
 def api_call(token: str, method: str, payload: dict | None = None, timeout: float = 15):
-    r = httpx.post(f"{API}/bot{token}/{method}", json=payload or {}, timeout=timeout)
-    try:
-        d = r.json()
-    except Exception:
-        raise BaleError(f"HTTP {r.status_code}")
-    if not d.get("ok"):
-        raise BaleError(d.get("description") or f"HTTP {r.status_code}")
-    return d.get("result")
+    return resilience.request("bale", lambda: httpx.post(f"{API}/bot{token}/{method}", json=payload or {}, timeout=timeout))
 
 
 # ---------- channels ----------
@@ -143,19 +136,12 @@ def to_markup(buttons: list[dict], cb: dict) -> dict:
 
 def api_upload(token: str, method: str, fields: dict, file_field: str, filename: str, data: bytes, mime: str, timeout: float = 60):
     """Multipart upload of a photo/document (Bale accepts multipart/form-data; JSON cannot carry file bytes)."""
-    r = httpx.post(f"{API}/bot{token}/{method}", data={k: str(v) for k, v in fields.items()},
-                   files={file_field: (filename, data, mime)}, timeout=timeout)
-    try:
-        d = r.json()
-    except Exception:
-        raise BaleError(f"HTTP {r.status_code}")
-    if not d.get("ok"):
-        raise BaleError(d.get("description") or f"HTTP {r.status_code}")
-    return d.get("result")
+    return resilience.request("bale", lambda: httpx.post(f"{API}/bot{token}/{method}", data={k: str(v) for k, v in fields.items()},
+                                                          files={file_field: (filename, data, mime)}, timeout=timeout))
 
 
 def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_chat_id: str = "", edit_message_id: int | None = None,
-            wallet: str = "", ch: Channel = BALE, others: list[dict] | None = None, files=None) -> list[int]:
+            wallet: str = "", ch: Channel = BALE, others: list[dict] | None = None, files=None, bot_id: int | None = None, db: Session | None = None) -> list[int]:
     """Send the actions. Returns the record ids whose invoice could not be sent.
     Messages for customers on the OTHER messenger are appended to `others` for send_customer_actions."""
     cb: dict = {}
@@ -180,7 +166,7 @@ def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_
                 payload = {"chat_id": chat_id, "text": engine.fa_digits(a["text"])[:4096] or "…"}
                 if a.get("buttons"):
                     payload["reply_markup"] = to_markup(a["buttons"], cb)
-                ch.call(token, "sendMessage", payload)
+                outbox.send(ch, token, "sendMessage", payload, bot_id, db)
             elif a["type"] == "media":
                 f = files(a["block"]) if files else None
                 if f is None:
@@ -206,11 +192,11 @@ def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_
                     payload = {"chat_id": cust[len(mine):], "text": engine.fa_digits(a["text"])[:4096]}
                     if a.get("buttons"):
                         payload["reply_markup"] = to_markup(a["buttons"], {})
-                    ch.call(token, "sendMessage", payload)
+                    outbox.send(ch, token, "sendMessage", payload, bot_id, db)
                 elif others is not None:
                     others.append(a)
             elif a["type"] == "notify_admin" and admin_chat_id:
-                ch.call(token, "sendMessage", {"chat_id": admin_chat_id, "text": ("🔔 " + a["text"])[:4096]})
+                outbox.send(ch, token, "sendMessage", {"chat_id": admin_chat_id, "text": ("🔔 " + a["text"])[:4096]}, bot_id, db)
         except Exception as e:  # noqa: BLE001
             log.warning("send failed: %s", e)
             if a["type"] == "invoice":
@@ -275,7 +261,7 @@ def _paid(db: Session, token: str, msg: dict):
         actions = engine.mark_paid(spec, store, dates.now_tehran(), block, row, str(pay.get("provider_payment_charge_id") or pay.get("telegram_payment_charge_id") or ""))
         db.commit()
     if actions:
-        deliver(token, chat_id, actions + [engine.menu_actions(spec)], {}, pub.admin_chat_id)
+        deliver(token, chat_id, actions + [engine.menu_actions(spec)], {}, pub.admin_chat_id, bot_id=rec.bot_id, db=db)
 
 
 def shared_username_for(ch: Channel) -> str:
@@ -314,7 +300,7 @@ def send_customer_actions(db: Session, bot_id: int, actions: list[dict]) -> int:
                 payload = {"chat_id": a["cust"][len(mine):], "text": engine.fa_digits(a["text"])[:4096]}
                 if a.get("buttons"):
                     payload["reply_markup"] = to_markup(a["buttons"], {})
-                ch.call(token, "sendMessage", payload)
+                outbox.send(ch, token, "sendMessage", payload, bot_id, db)  # queued for later when the messenger is unreachable
                 sent += 1
             except Exception as e:  # noqa: BLE001 - e.g. the customer blocked the bot
                 log.warning("customer message failed: %s", e)
@@ -557,7 +543,7 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
             actions, anon_others = anon.run(db, bot, spec, state, skey, actions)
         others: list[dict] = []  # e.g. a waitlisted customer on the other messenger who just got the freed place
         for rid in deliver(token, chat_id, actions, state, pub.admin_chat_id, clicked_message_id, wallet, ch, others,
-                           files=lambda block_id: media.get_file(db, pub.bot_id, block_id)):
+                           files=lambda block_id: media.get_file(db, pub.bot_id, block_id), bot_id=pub.bot_id, db=db):
             rec = db.get(Record, rid)  # the invoice could not be sent: keep the order as an ordinary one and tell both sides
             if rec:
                 rec.data = {**rec.data, "status": "new", "_pay_failed": True}

@@ -10,6 +10,7 @@ import { PublishTab } from "@/components/workspace/PublishTab";
 import { AnnounceTab } from "@/components/workspace/AnnounceTab";
 import { CustomersTab } from "@/components/workspace/CustomersTab";
 import { ChannelsTab } from "@/components/workspace/ChannelsTab";
+import { DeliveryBanner } from "@/components/workspace/DeliveryBanner";
 import { MediaTab } from "@/components/workspace/MediaTab";
 import { InboxTab } from "@/components/workspace/InboxTab";
 import { CatalogTab } from "@/components/workspace/CatalogTab";
@@ -203,6 +204,7 @@ function Workspace() {
       <main className="flex flex-1 flex-wrap items-start gap-5 p-4 sm:p-6">
         <div className={`min-w-0 flex-[1_1_640px] flex-col gap-4 ${tab === "try" ? "hidden" : "flex"}`}>
           {error && <ErrorNote>{error}</ErrorNote>}
+          {spec && tab !== "build" && <DeliveryBanner botId={id!} />}
           {tab === "build" && (
             <BuilderTab spec={spec} tests={tests} chat={chat} events={events} running={running} lastCost={lastCost} stamped={stamped}
               input={input} setInput={setInput} inputRef={inputRef} onSend={sendBuild} />

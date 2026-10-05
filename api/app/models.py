@@ -389,3 +389,20 @@ class PlanPayment(Base):
     amount: Mapped[int] = mapped_column(Integer, default=0)  # Toman
     simulated: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class OutboxMessage(Base):
+    """A customer/owner message that could not be sent because the messenger was unreachable; retried for a while, then given up.
+    Holds no token: the bot's token is looked up again when the message is retried."""
+    __tablename__ = "outbox_messages"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    ch: Mapped[str] = mapped_column(String(8))
+    chat_id: Mapped[str] = mapped_column(String(32), index=True)
+    payload: Mapped[dict] = mapped_column(JSON)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(8), default="pending", index=True)  # pending | sent | failed
+    next_try: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

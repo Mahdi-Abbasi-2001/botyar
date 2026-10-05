@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import anon, bale, engine
+from . import anon, bale, engine, outbox, webhooks
 from .auth import current_user
 from .dates import TEHRAN, jalali_str, now_tehran
 from .db import SessionLocal, get_db
@@ -104,17 +104,32 @@ def expire_anon_waiting(db: Session, now: datetime) -> int:
     return len(msgs)
 
 
-def _loop():
-    while True:
-        _time.sleep(60)
+def _jobs(ticks: int):
+    """Each job runs on its own: one failing (or slow) job must not stop the others."""
+    now_u = datetime.now(timezone.utc)
+    work = [("reminders", lambda db: due_reminders(db, now_tehran())),
+            ("unpaid orders", lambda db: expire_unpaid_orders(db, now_tehran())),
+            ("scheduled announcements", lambda db: due_scheduled(db, now_u)),
+            ("anonymous waiting", lambda db: expire_anon_waiting(db, now_u)),
+            ("outbox", lambda db: outbox.process(db, now_u))]
+    if ticks % 15 == 0:
+        work.append(("webhooks", lambda db: webhooks.refresh(db)))
+    if ticks % 1440 == 0:
+        work.append(("outbox purge", lambda db: outbox.purge(db, now_u)))
+    for name, fn in work:
         try:
             with SessionLocal() as db:
-                due_reminders(db, now_tehran())
-                expire_unpaid_orders(db, now_tehran())
-                due_scheduled(db, datetime.now(timezone.utc))
-                expire_anon_waiting(db, datetime.now(timezone.utc))
+                fn(db)
         except Exception:  # noqa: BLE001
-            log.exception("reminder run failed")
+            log.exception("background job failed: %s", name)
+
+
+def _loop():
+    ticks = 0
+    while True:
+        _time.sleep(60)
+        ticks += 1
+        _jobs(ticks)
 
 
 def start_scheduler():
@@ -324,7 +339,7 @@ def _deliver(broadcast_id: int, bot_id: int, custs: list[str], text: str):
             try:
                 if not tokens.get(name):
                     raise bale.BaleError(f"{name} token unavailable")
-                bale.CHANNELS[name].call(tokens[name], "sendMessage", {"chat_id": chat, "text": body})
+                outbox.send(bale.CHANNELS[name], tokens[name], "sendMessage", {"chat_id": chat, "text": body}, bot_id, db)  # queued if unreachable
                 row.sent += 1
             except Exception as e:  # noqa: BLE001
                 row.failed += 1

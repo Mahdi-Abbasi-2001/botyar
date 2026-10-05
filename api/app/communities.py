@@ -371,3 +371,14 @@ def _ban(ch, token, chat_id, uid) -> bool:
     except Exception as e:  # noqa: BLE001
         log.warning("ban failed: %s", e)
         return False
+
+
+# ---------- delivery status for the owner's panel ----------
+@router.get("/api/bots/{bot_id}/delivery")
+def delivery_status(bot_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Is each messenger this bot is published on reachable right now, and what is waiting to be re-sent?"""
+    from . import outbox, resilience
+
+    own_bot(bot_id, user, db)
+    names = [ch.name for ch in bale.CHANNELS.values() if db.scalars(select(ch.pub_model).where(ch.pub_model.bot_id == bot_id)).first()]
+    return {"messengers": [resilience.health(n) for n in names], "outbox": outbox.stats(db, bot_id)}

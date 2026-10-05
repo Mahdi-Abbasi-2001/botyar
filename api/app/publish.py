@@ -93,6 +93,8 @@ def publish(bot_id: int, body: PublishIn, user: User = Depends(current_user), db
             raise HTTPException(400, "توکن ربات را وارد کنید")
         try:
             username = bale.api_call(token, "getMe").get("username", "")
+        except (bale.TransientError, bale.UncertainError):  # an outage must never be reported as «your token is wrong»
+            raise HTTPException(503, "اتصال به بله برقرار نشد (بله یا اینترنت در دسترس نیست). چند دقیقه بعد دوباره امتحان کنید.")
         except bale.BaleError:
             raise HTTPException(400, "توکن معتبر نیست؛ دوباره از @botfather بله کپی کنید")
         token_enc = bale.encrypt(token)
@@ -116,6 +118,9 @@ def publish(bot_id: int, body: PublishIn, user: User = Depends(current_user), db
         url = f"{settings.public_base_url.rstrip('/')}/api/hook/own/{pub.id}/{pub.hook_secret}"
         try:
             bale.api_call(bale.decrypt(token_enc), "setWebhook", {"url": url})
+        except bale.TransientError:
+            db.rollback()
+            raise HTTPException(503, "اتصال به بله برقرار نشد (بله یا اینترنت در دسترس نیست). چند دقیقه بعد دوباره امتحان کنید.")
         except bale.BaleError as e:
             db.rollback()
             raise HTTPException(502, f"ثبت وبهوک در بله ناموفق بود: {e}")

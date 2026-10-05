@@ -44,18 +44,8 @@ def enabled() -> bool:
 def api_call(token: str, method: str, payload: dict | None = None, timeout: float = 15):
     if not enabled():
         raise bale.BaleError("Telegram relay is not configured")
-    try:
-        r = httpx.post(f"{settings.telegram_relay_url.rstrip('/')}/bot{token}/{method}", json=payload or {},
-                       headers={"x-relay-key": settings.telegram_relay_key}, timeout=timeout + 5)
-    except httpx.HTTPError as e:
-        raise bale.BaleError(f"relay unreachable: {type(e).__name__}")
-    try:
-        d = r.json()
-    except Exception:
-        raise bale.BaleError(f"HTTP {r.status_code}")
-    if not d.get("ok"):
-        raise bale.BaleError(d.get("description") or f"HTTP {r.status_code}")
-    return d.get("result")
+    return bale.resilience.request("tg", lambda: httpx.post(f"{settings.telegram_relay_url.rstrip('/')}/bot{token}/{method}", json=payload or {},
+                                                            headers={"x-relay-key": settings.telegram_relay_key}, timeout=timeout + 5))
 
 
 TELEGRAM = bale.Channel("tg", lambda *a, **k: api_call(*a, **k), TgPublication, TgChatLink,
@@ -171,6 +161,8 @@ def tg_publish(bot_id: int, body: TgPublishIn, user: User = Depends(current_user
             raise HTTPException(400, "توکن ربات تلگرام را وارد کنید")
         try:
             username = api_call(token, "getMe").get("username", "")
+        except (bale.TransientError, bale.UncertainError):
+            raise HTTPException(503, "اتصال به تلگرام برقرار نشد (تلگرام یا رِله در دسترس نیست)؛ چند دقیقه بعد دوباره تلاش کنید")
         except bale.BaleError as e:
             if "relay" in str(e):
                 raise HTTPException(502, "اتصال به تلگرام برقرار نشد؛ چند دقیقه بعد دوباره تلاش کنید")
@@ -195,6 +187,9 @@ def tg_publish(bot_id: int, body: TgPublishIn, user: User = Depends(current_user
         try:
             api_call(bale.decrypt(token_enc), "setWebhook",
                      {"url": hook_url(f"own/{pub.id}/{pub.hook_secret}"), "allowed_updates": ALLOWED_UPDATES})
+        except (bale.TransientError, bale.UncertainError):
+            db.rollback()
+            raise HTTPException(503, "اتصال به تلگرام برقرار نشد (تلگرام یا رِله در دسترس نیست)؛ چند دقیقه بعد دوباره تلاش کنید")
         except bale.BaleError as e:
             db.rollback()
             raise HTTPException(502, f"ثبت وبهوک در تلگرام ناموفق بود: {e}")
