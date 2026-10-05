@@ -6,7 +6,8 @@ import { api, getToken } from "@/lib/api";
 import { ErrorNote, Logo, fa } from "@/components/ui";
 
 type Plan = { key: string; name: string; price: number; bots: number; live_bots: number; customers: number; ai_requests: number };
-type Me = { plan: Plan; usage: { bots: number; live_bots: number; ai_requests: number; per_bot: { id: number; name: string; live: boolean; customers: number }[] }; pending_request: string | null; admin: boolean };
+type Pay = { id: number; plan: string; name: string; amount: number; simulated: boolean; at: string };
+type Me = { demo?: boolean; payments?: Pay[]; plan: Plan; usage: { bots: number; live_bots: number; ai_requests: number; per_bot: { id: number; name: string; live: boolean; customers: number }[] }; pending_request: string | null; admin: boolean };
 type Plans = { plans: (Plan & { tagline: string })[] };
 type Req = { id: number; email: string; plan: string; current: string; note: string; status: string };
 
@@ -54,9 +55,20 @@ export default function Account() {
     setError("");
     setMsg("");
     try {
-      await api("/me/upgrade", { body: { plan: pick, note } });
-      setMsg("درخواست شما ثبت شد؛ پس از بررسی پلن فعال می‌شود.");
+      const r = await api<{ simulated?: boolean }>("/me/upgrade", { body: { plan: pick, note } });
+      setMsg(r.simulated ? "✅ پرداخت آزمایشی با موفقیت انجام شد و پلن شما فعال شد (پولی کسر نشد)." : "درخواست شما ثبت شد؛ پس از بررسی پلن فعال می‌شود.");
       setNote("");
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }
+  async function cancelPlan() {
+    setError("");
+    setMsg("");
+    try {
+      await api("/me/plan/cancel", { method: "POST", body: {} });
+      setMsg("به پلن رایگان برگشتید. رباتی که منتشر شده بود همچنان فعال می‌ماند، ولی ساخت یا انتشار رباتِ تازه از سقف رایگان پیروی می‌کند.");
       await load();
     } catch (e: any) {
       setError(e.message);
@@ -92,6 +104,7 @@ export default function Account() {
             </section>
             <section className={`${card} flex flex-col gap-3`}>
               <h2 className="m-0 text-lg font-extrabold">ارتقای پلن</h2>
+              {me.demo && <p className="m-0 rounded-xl border border-amber-line bg-saffron/10 px-3 py-2 text-sm text-amber-fg">نسخه‌ی نمایشی: هنوز درگاه پرداخت وصل نیست؛ «پرداخت» شبیه‌سازی می‌شود، پلن بلافاصله فعال می‌شود و هیچ پولی کسر نمی‌شود.</p>}
               {me.pending_request ? (
                 <p className="m-0 text-sm text-mute">درخواست ارتقا به پلن «{plans?.plans.find((p) => p.key === me.pending_request)?.name ?? me.pending_request}» در حال بررسی است.</p>
               ) : (
@@ -100,11 +113,20 @@ export default function Account() {
                     {plans?.plans.filter((p) => p.key !== "free").map((p) => <option key={p.key} value={p.key}>{p.name} — {fa(p.price.toLocaleString("en-US"))} تومان در ماه (پیشنهادی)</option>)}
                   </select>
                   <textarea aria-label="توضیح" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="کسب‌وکارت چیست و چرا به این پلن نیاز داری؟ (اختیاری)" className="min-h-20 rounded-xl border border-line-2 bg-raised p-3" />
-                  <button onClick={upgrade} className="min-h-11 rounded-xl bg-saffron px-5 font-bold text-ink">ثبت درخواست ارتقا</button>
-                  <p className="m-0 text-xs leading-6 text-dim">پرداخت آنلاین اشتراک هنوز راه‌اندازی نشده؛ تیم بات‌یار با شما هماهنگ می‌کند و پلن را فعال می‌کند.</p>
+                  <button onClick={upgrade} className="min-h-11 rounded-xl bg-saffron px-5 font-bold text-ink">{me.demo ? "پرداخت آزمایشی و فعال‌سازی" : "ثبت درخواست ارتقا"}</button>
+                  {!me.demo && <p className="m-0 text-xs leading-6 text-dim">پرداخت آنلاین اشتراک هنوز راه‌اندازی نشده؛ تیم بات‌یار با شما هماهنگ می‌کند و پلن را فعال می‌کند.</p>}
                 </>
               )}
             </section>
+            {me.plan.key !== "free" && <button onClick={cancelPlan} className="w-fit text-sm text-mute underline hover:text-bad">لغو اشتراک و برگشت به پلن رایگان</button>}
+            {(me.payments?.length ?? 0) > 0 && (
+              <section className={`${card} flex flex-col gap-1 text-sm`}>
+                <h2 className="m-0 text-lg font-extrabold">پرداخت‌ها</h2>
+                {me.payments!.map((p) => (
+                  <span key={p.id} className="text-fg-2">{fa(new Date(p.at).toLocaleDateString("fa-IR"))} · پلن {p.name} · {fa(p.amount.toLocaleString("en-US"))} تومان{p.simulated ? " · (پرداخت آزمایشی، پولی کسر نشد)" : ""}</span>
+                ))}
+              </section>
+            )}
             {me.admin && (
               <section className={`${card} flex flex-col gap-2`}>
                 <h2 className="m-0 text-lg font-extrabold">درخواست‌های ارتقا (مدیر)</h2>

@@ -3,7 +3,7 @@
 The automated tests use a fake messenger. Everything below must be tried once on a real phone before it is shown to judges. For each item: what to do, what you should see, and what a failure tells us. Use two phones or two accounts where noted. After each pass or fail, tell me and I will fix or reword.
 
 ## A. Setup
-1. Deploy, then log in at https://botyar.liara.run with a fresh account. Add `ADMIN_EMAILS=<your email>` to `api/.env` first if you want the upgrade-approval page.
+1. Deploy, then log in at https://botyar.liara.run with a fresh account. (`ADMIN_EMAILS` is only needed if you set `BILLING_DEMO=false`.)
 2. Build one bot with the agent (for example a café with a menu), run its tests, publish it on Bale, open the link, and send `/admin <code>` from your own Bale to receive notifications.
 
 ## B. Already-built features that were never tested on a phone
@@ -54,4 +54,4 @@ Prerequisite: create a test Bale channel and a test Bale group, add the bot to b
 | F4 | Ban the reported customer in «مشتریان» | that account sees «دسترسی شما مسدود شده است» | |
 
 ## G. Plans
-Open `/pricing/` and `/account/`; try creating a 4th bot on the free plan (expect a clear message); request an upgrade, approve it from the admin section, check the limits change.
+Open `/pricing/` and `/account/`; try creating a 4th bot on the free plan (expect a clear message); press «پرداخت آزمایشی و فعال‌سازی» (a simulated payment: the plan activates at once), check the limits change and the payment history row, then cancel back to free.

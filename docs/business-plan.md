@@ -45,7 +45,7 @@ Per-account monthly plans; every feature is in every plan, plans differ only in 
 | Pro | 349,000 | 10 / 3 | 3,000 | 300 |
 | Agency | 1,490,000 | 50 / 10 | 3,000 | 1,500 |
 Why these anchors: SahBot's own sample bots cost 150–235k Toman/month in diamonds alone; AradBot's flat plans start at 183k; a freelancer's single basic bot costs 2–8M once — so ~150–350k/month is in-market and cheap next to a freelancer. **The founder must still validate the numbers with owners.**
-Upgrades today are manual (the owner requests, an admin approves). Online subscription payment (e.g. ZarinPal) is **[blank — needs merchant onboarding]**.
+In this demo build, upgrading is a **simulated payment**: the plan is activated immediately and the account page shows an invoice history marked «پرداخت آزمایشی» (no money moves, because there is no payment gateway yet). A switch (`BILLING_DEMO=false`) turns on the request-and-approve flow for a manual launch. Real subscription payment (e.g. ZarinPal) is **[blank — needs merchant onboarding]**.
 Later options: annual discount (AradBot gives ~22–26%), one-off "we build it for you" service, white-label for agencies. Not taking a cut of customers' payments: money goes to the owner's own Bale wallet by design.
 
 ## 7. Unit economics

@@ -378,3 +378,14 @@ class BannedCustomer(Base):
     key: Mapped[str] = mapped_column(String(64), index=True)
     reason: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class PlanPayment(Base):
+    """A plan purchase. In the demo app these are SIMULATED (no money moves); the row exists so the account page can show an invoice history."""
+    __tablename__ = "plan_payments"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    plan: Mapped[str] = mapped_column(String(16))
+    amount: Mapped[int] = mapped_column(Integer, default=0)  # Toman
+    simulated: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

@@ -22,6 +22,7 @@ def world(monkeypatch):
     from tests.conftest import REAL_FREE
 
     monkeypatch.setitem(billing.PLANS, "free", dict(REAL_FREE))   # this file tests the real limits
+    monkeypatch.setattr(settings, "billing_demo", False)           # the request/approval flow; demo mode has its own test below
     bale._seen.clear()
     bale._cap_notice.clear()
     monkeypatch.setattr(settings, "public_base_url", "https://example.test")
@@ -170,3 +171,28 @@ def test_customers_tab_lists_searches_exports_and_hides_chat_ids(world):
     assert c.get(f"/api/bots/{bid}/export/customers?format=xlsx", headers=H).status_code == 200
     assert c.get(f"/api/bots/{bid}/customers", headers=other).status_code == 404
     assert c.get(f"/api/bots/{bid}/export/customers", headers=other).status_code == 404
+
+
+def test_demo_mode_simulates_the_payment_activates_the_plan_at_once_and_can_be_cancelled(world, monkeypatch):
+    c, user, _ = world
+    monkeypatch.setattr(settings, "billing_demo", True)
+    H = user("d@x.com")
+    assert c.get("/api/plans").json()["demo"] is True
+    for _ in range(3):
+        c.post("/api/bots/draft", headers=H)
+    assert c.post("/api/bots/draft", headers=H).status_code == 402
+    r = c.post("/api/me/upgrade", json={"plan": "pro"}, headers=H).json()
+    assert r == {"ok": True, "simulated": True, "plan": "pro", "amount": 349000}
+    me = c.get("/api/me/plan", headers=H).json()
+    assert me["plan"]["key"] == "pro" and me["demo"] is True and me["pending_request"] is None
+    assert [(p["plan"], p["amount"], p["simulated"]) for p in me["payments"]] == [("pro", 349000, True)]
+    assert c.post("/api/bots/draft", headers=H).status_code == 200                    # the higher limit applies immediately
+    assert c.post("/api/me/upgrade", json={"plan": "free"}, headers=H).status_code == 422
+    assert c.post("/api/me/upgrade", json={"plan": "nope"}, headers=H).status_code == 422
+    assert c.post("/api/me/upgrade", json={"plan": "agency"}, headers=H).json()["plan"] == "agency"   # switching plans is allowed
+    assert len(c.get("/api/me/plan", headers=H).json()["payments"]) == 2
+    assert c.post("/api/me/plan/cancel", headers=H).json() == {"ok": True, "plan": "free"}
+    assert c.get("/api/me/plan", headers=H).json()["plan"]["key"] == "free"
+    assert c.post("/api/me/plan/cancel").status_code == 401
+    other = user("e@x.com")
+    assert c.get("/api/me/plan", headers=other).json()["payments"] == []             # payment history is per account

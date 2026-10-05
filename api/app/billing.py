@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from .auth import current_user
 from .config import settings
 from .db import get_db
-from .models import Bot, BuilderRun, CustomerSeen, Publication, Subscription, TgPublication, UpgradeRequest, User
+from .models import Bot, BuilderRun, CustomerSeen, PlanPayment, Publication, Subscription, TgPublication, UpgradeRequest, User
 
 router = APIRouter()
 WINDOW_DAYS = 30  # "per month" = the last 30 days, so there is no calendar-month edge case
@@ -137,15 +137,17 @@ def track_customer(db: Session, bot: Bot, key: str, name: str) -> bool:
 @router.get("/api/plans")
 def list_plans():
     return {"plans": [{"key": k, **v} for k, v in PLANS.items()], "included": INCLUDED, "window_days": WINDOW_DAYS,
-            "prices_proposed": True, "currency": "تومان", "billing": "ماهانه"}
+            "prices_proposed": True, "currency": "تومان", "billing": "ماهانه", "demo": settings.billing_demo}
 
 
 @router.get("/api/me/plan")
 def my_plan(user: User = Depends(current_user), db: Session = Depends(get_db)):
     key = plan_key(db, user.id)
     pending = db.scalars(select(UpgradeRequest).where(UpgradeRequest.user_id == user.id, UpgradeRequest.status == "pending")).first()
+    pays = db.scalars(select(PlanPayment).where(PlanPayment.user_id == user.id).order_by(PlanPayment.id.desc()).limit(10)).all()
     return {"plan": {"key": key, **PLANS[key]}, "usage": usage(db, user.id), "pending_request": pending.plan if pending else None,
-            "admin": is_admin(user)}
+            "admin": is_admin(user), "demo": settings.billing_demo,
+            "payments": [{"id": p.id, "plan": p.plan, "name": PLANS[p.plan]["name"], "amount": p.amount, "simulated": p.simulated, "at": p.created_at.isoformat()} for p in pays]}
 
 
 class UpgradeIn(BaseModel):
@@ -153,15 +155,39 @@ class UpgradeIn(BaseModel):
     note: str = Field(default="", max_length=500)
 
 
+def _set_plan(db: Session, user_id: int, plan: str, note: str):
+    sub = db.scalars(select(Subscription).where(Subscription.user_id == user_id)).first()
+    if sub is None:
+        db.add(Subscription(user_id=user_id, plan=plan, note=note))
+    else:
+        sub.plan, sub.note, sub.updated_at = plan, note, now_utc()
+
+
 @router.post("/api/me/upgrade")
 def request_upgrade(body: UpgradeIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     if body.plan not in PLANS or body.plan == "free":
         raise HTTPException(422, "پلن نامعتبر است")
+    if settings.billing_demo:
+        # DEMO: no payment gateway exists, so the payment is simulated and the plan is activated at once. Nothing is charged.
+        _set_plan(db, user.id, body.plan, "demo payment")
+        db.add(PlanPayment(user_id=user.id, plan=body.plan, amount=PLANS[body.plan]["price"], simulated=True))
+        for r in db.scalars(select(UpgradeRequest).where(UpgradeRequest.user_id == user.id, UpgradeRequest.status == "pending")):
+            r.status = "approved"
+        db.commit()
+        return {"ok": True, "simulated": True, "plan": body.plan, "amount": PLANS[body.plan]["price"]}
     if db.scalars(select(UpgradeRequest).where(UpgradeRequest.user_id == user.id, UpgradeRequest.status == "pending")).first():
         raise HTTPException(409, "درخواست ارتقای قبلی شما هنوز در حال بررسی است.")
     db.add(UpgradeRequest(user_id=user.id, plan=body.plan, note=body.note.strip()))
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "simulated": False}
+
+
+@router.post("/api/me/plan/cancel")
+def cancel_plan(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Back to the free plan. Bots that are already live stay live (nothing is unpublished), but new bots and publications follow the free limits."""
+    _set_plan(db, user.id, "free", "cancelled by owner")
+    db.commit()
+    return {"ok": True, "plan": "free"}
 
 
 def _admin(user: User = Depends(current_user)) -> User:
@@ -188,10 +214,6 @@ def decide(rid: int, body: Decision, _: User = Depends(_admin), db: Session = De
         raise HTTPException(404, "درخواست یافت نشد یا قبلاً بررسی شده است")
     r.status = "approved" if body.approve else "rejected"
     if body.approve:
-        sub = db.scalars(select(Subscription).where(Subscription.user_id == r.user_id)).first()
-        if sub is None:
-            db.add(Subscription(user_id=r.user_id, plan=r.plan, note="approved by admin"))
-        else:
-            sub.plan, sub.updated_at = r.plan, now_utc()
+        _set_plan(db, r.user_id, r.plan, "approved by admin")
     db.commit()
     return {"ok": True}

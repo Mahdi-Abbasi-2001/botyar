@@ -5,7 +5,7 @@ import { api, getToken } from "@/lib/api";
 import { ErrorNote, Logo, fa } from "@/components/ui";
 
 type Plan = { key: string; name: string; price: number; bots: number; live_bots: number; customers: number; ai_requests: number; tagline: string };
-type Plans = { plans: Plan[]; included: string[]; window_days: number; prices_proposed: boolean };
+type Plans = { plans: Plan[]; included: string[]; window_days: number; prices_proposed: boolean; demo?: boolean };
 
 export default function Pricing() {
   const [data, setData] = useState<Plans | null>(null);
@@ -47,7 +47,7 @@ export default function Pricing() {
                 <li>✓ {fa(p.ai_requests.toLocaleString("en-US"))} درخواست به ایجنت در ماه (ساخت و تغییر ربات)</li>
               </ul>
               <Link href={loggedIn ? "/account/" : "/login/"} className={`mt-auto inline-flex min-h-11 items-center justify-center rounded-xl px-4 font-bold ${p.key === "free" ? "border border-line-2 hover:border-saffron" : "bg-saffron text-ink hover:bg-saffron-hi"}`}>
-                {p.key === "free" ? "شروع رایگان" : "درخواست این پلن"}
+                {p.key === "free" ? "شروع رایگان" : data?.demo ? "ارتقا (پرداخت آزمایشی)" : "درخواست این پلن"}
               </Link>
             </section>
           ))}
@@ -59,7 +59,7 @@ export default function Pricing() {
           </ul>
           <p className="m-0 mt-2 text-xs leading-6 text-dim">
             «در ماه» یعنی در ۳۰ روز گذشته. مشتری فعال یعنی کسی که در این مدت به ربات پیام داده؛ مشتری‌های قبلی هیچ‌وقت قطع نمی‌شوند و فقط پذیرش مشتری <i>جدید</i> بعد از پر شدن سقف متوقف می‌شود.
-            ارتقا فعلاً با ثبت درخواست و تأیید تیم بات‌یار انجام می‌شود (پرداخت آنلاین اشتراک هنوز راه‌اندازی نشده).
+            {data?.demo ? "این نسخه‌ی نمایشی است: ارتقای پلن «پرداخت آزمایشی» است و هیچ پولی کسر نمی‌شود." : "ارتقا فعلاً با ثبت درخواست و تأیید تیم بات‌یار انجام می‌شود (پرداخت آنلاین اشتراک هنوز راه‌اندازی نشده)."}
           </p>
         </section>
       </main>

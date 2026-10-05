@@ -15,7 +15,7 @@ PUBLIC = {("POST", "/api/auth/login"), ("POST", "/api/auth/register"), ("GET", "
           ("POST", "/api/hook/shared/{secret}"), ("POST", "/api/hook/own/{pub_id}/{secret}"),
           ("POST", "/api/tghook/shared/{secret}"), ("POST", "/api/tghook/own/{pub_id}/{secret}")}
 NO_BOT = {("GET", "/api/bots"), ("POST", "/api/bots"), ("POST", "/api/bots/draft"), ("GET", "/api/me"),
-          ("GET", "/api/me/plan"), ("POST", "/api/me/upgrade"), ("GET", "/api/admin/upgrades"), ("POST", "/api/admin/upgrades/{rid}")}  # scoped to the caller, no bot id
+          ("GET", "/api/me/plan"), ("POST", "/api/me/upgrade"), ("POST", "/api/me/plan/cancel"), ("GET", "/api/admin/upgrades"), ("POST", "/api/admin/upgrades/{rid}")}  # scoped to the caller, no bot id
 
 
 @pytest.fixture()
