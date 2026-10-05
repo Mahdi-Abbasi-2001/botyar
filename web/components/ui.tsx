@@ -48,7 +48,7 @@ export function CapacityBar({ used, capacity }: { used: number; capacity: number
 }
 
 type IconName = "send" | "bell" | "shield" | "back" | "alert" | "plus" | "phone" | "chat" | "tree" | "clock" | "list" | "refresh"
-  | "calendar" | "cart" | "card" | "star" | "help" | "file" | "repeat" | "lock" | "chart";
+  | "calendar" | "cart" | "card" | "star" | "help" | "file" | "repeat" | "lock" | "chart" | "live";
 const PATHS: Record<IconName, React.ReactNode> = {
   send: <path d="M19 12H5M11 6l-6 6 6 6" />,
   bell: <><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.9 1.9 0 003.4 0" /></>,
@@ -71,6 +71,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   repeat: <><path d="M17 2l3 3-3 3" /><path d="M4 11V9a4 4 0 014-4h12M7 22l-3-3 3-3" /><path d="M20 13v2a4 4 0 01-4 4H4" /></>,
   lock: <><rect x="4.5" y="10.5" width="15" height="10" rx="2" /><path d="M8 10.5V7a4 4 0 018 0v3.5" /></>,
   chart: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
+  live: <><circle cx="12" cy="12" r="2" /><path d="M16.2 7.8a6 6 0 010 8.4M7.8 16.2a6 6 0 010-8.4M19.1 4.9a10 10 0 010 14.2M4.9 19.1a10 10 0 010-14.2" /></>,
 };
 
 export function Icon({ name, size = 18, className = "", strokeWidth = 2 }: { name: IconName; size?: number; className?: string; strokeWidth?: number }) {

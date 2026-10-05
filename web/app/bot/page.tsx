@@ -19,6 +19,15 @@ import { progressOf, type Bot, type ChatMsg, type Rec, type RunResult, type RunS
 
 type Tab = "build" | "spec" | "tests" | "versions" | "publish" | "catalog" | "inbox" | "announce" | "customers" | "media" | "channels" | "records" | "try";
 const TAB_LABEL: Record<Tab, string> = { build: "ساخت با ایجنت", spec: "ساختار", tests: "تست‌ها", versions: "نسخه‌ها", publish: "انتشار", catalog: "محصولات", inbox: "پیام‌ها", announce: "اطلاعیه", customers: "مشتریان", media: "فایل‌ها", channels: "کانال و گروه", records: "ثبت‌ها", try: "امتحانش کن" };
+
+// The workspace in three jobs: make the bot, put it in front of customers, run it day to day.
+type Group = "make" | "share" | "manage";
+const GROUPS: { key: Group; label: string; icon: React.ComponentProps<typeof Icon>["name"]; tabs: Tab[] }[] = [
+  { key: "make", label: "ساخت", icon: "tree", tabs: ["build", "spec", "tests", "versions", "catalog", "media"] },
+  { key: "share", label: "انتشار", icon: "live", tabs: ["publish", "channels"] },
+  { key: "manage", label: "مدیریت", icon: "list", tabs: ["records", "customers", "inbox", "announce"] },
+];
+const groupOf = (t: Tab): Group | null => GROUPS.find((g) => g.tabs.includes(t))?.key ?? null;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function Workspace() {
@@ -26,6 +35,8 @@ function Workspace() {
   const id = useSearchParams().get("id");
   const [bot, setBot] = useState<Bot | null>(null);
   const [tab, setTab] = useState<Tab>("build");
+  const lastInGroup = useRef<Partial<Record<Group, Tab>>>({});  // each section reopens where the owner left it
+  const beforeTry = useRef<Tab>("build");                          // phones: closing "try it" returns here
   const [error, setError] = useState("");
 
   const [chat, setChat] = useState<ChatMsg[]>([]);
@@ -168,6 +179,8 @@ function Workspace() {
   const hasContact = !!spec?.blocks?.some((b: any) => b.type === "contact");
   const tabs: Tab[] = spec ? (["build", "spec", "tests", "versions", ...(hasCatalog ? ["catalog"] : []), "publish", ...(hasContact ? ["inbox"] : []), ...(hasMedia ? ["media"] : []), "announce", "customers", "channels", "records", "try"] as Tab[]) : ["build"];
   const phoneTabs = tab === "build" || tab === "spec";
+  const group = groupOf(tab);
+  if (group) lastInGroup.current[group] = tab;
   const fieldLabels: Record<string, string> = { slot_label: "زمان" };
   for (const b of spec?.blocks ?? []) if ("fields" in b) for (const f of b.fields) fieldLabels[f.key] = f.label;
 
@@ -176,29 +189,57 @@ function Workspace() {
       <header className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3.5 sm:gap-4 sm:px-6">
         <Logo href="/bots/" size="sm" />
         <span className="hidden h-6 w-px bg-line sm:block" />
-        <div className="flex min-w-0 flex-[1_1_220px] flex-col">
+        <div className="flex min-w-0 flex-1 basis-0 flex-col">
           <span className="truncate text-[17px] font-extrabold">{bot.name}</span>
           <span className="text-xs text-mute">
             {running ? (spec ? `نسخه ${fa(bot.version)} · در حال ساخت نسخه‌ی بعد` : "در حال ساخت اولین نسخه") : spec ? `نسخه ${fa(bot.version)}${tests.length ? ` · ${fa(passed)}/${fa(tests.length)} تست موفق` : ""}` : "پیش‌نویس"}
           </span>
         </div>
-        {cost !== null && cost > 0 && <span className="rounded-lg border border-line px-2.5 py-1.5 text-xs text-mute" dir="ltr" title="هزینه‌ی هوش مصنوعی این ربات تا الان">هزینه‌ی AI: <span dir="ltr">${cost.toFixed(4)}</span></span>}
+        {cost !== null && cost > 0 && <span className="hidden rounded-lg border border-line px-2.5 py-1.5 text-xs text-mute sm:inline" dir="ltr" title="هزینه‌ی هوش مصنوعی این ربات تا الان">هزینه‌ی AI: <span dir="ltr">${cost.toFixed(4)}</span></span>}
+        {/* on phones the simulator is not beside the page, so "try it" lives in the header where it is always visible */}
+        {spec && (
+          <button aria-pressed={tab === "try"} onClick={() => setTab(tab === "try" ? beforeTry.current : (beforeTry.current = tab, "try"))}
+            className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3.5 text-sm font-bold lg:hidden ${tab === "try" ? "bg-mint text-ink" : "border border-mint-line bg-mint-bg text-mint-fg"}`}>
+            <Icon name="phone" size={16} /> {tab === "try" ? "بستن" : TAB_LABEL.try}
+          </button>
+        )}
       </header>
       <div className="h-[3px] bg-panel">
         {running && <div className="h-[3px] bg-saffron transition-all duration-700" style={{ width: `${Math.round(progressOf(events) * 100)}%` }} />}
       </div>
 
       {tabs.length > 1 && (
-        <nav className="flex gap-1 overflow-x-auto border-b border-line px-4 pt-2.5 text-sm sm:px-6" role="tablist">
-          {tabs.map((t) => (
-            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-              className={`min-h-11 shrink-0 border-b-2 px-3.5 ${t === "try" ? "lg:hidden" : ""} ${tab === t ? "border-saffron font-bold text-fg" : "border-transparent text-mute hover:text-fg"}`}>
-              {TAB_LABEL[t]}
-              {t === "tests" && tests.length > 0 && <span className={`mr-1.5 text-xs ${passed === tests.length ? "text-mint" : "text-bad-soft"}`}>{fa(passed)}/{fa(tests.length)}</span>}
-              {t === "records" && records.length > 0 && <span className="mr-1.5 text-xs text-mute">{fa(records.length)}</span>}
-            </button>
-          ))}
-        </nav>
+        <div className="border-b border-line">
+          <div role="tablist" aria-label="بخش‌های ربات" className="flex items-center gap-2 overflow-x-auto px-4 pt-3 sm:px-6">
+            {GROUPS.map((g) => {
+              const inGroup = g.tabs.filter((t) => tabs.includes(t));
+              if (!inGroup.length) return null;
+              const on = group === g.key;
+              return (
+                <button key={g.key} role="tab" aria-selected={on}
+                  onClick={() => setTab(lastInGroup.current[g.key] && inGroup.includes(lastInGroup.current[g.key]!) ? lastInGroup.current[g.key]! : inGroup[0])}
+                  className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-4 text-sm ${on ? "border-saffron bg-saffron/10 font-bold text-fg" : "border-line-2 text-fg-2 hover:border-line-3 hover:text-fg"}`}>
+                  <Icon name={g.icon} size={16} className={on ? "text-saffron" : "text-mute"} />
+                  {g.label}
+                  {g.key === "make" && tests.length > 0 && <span className={`text-xs ${passed === tests.length ? "text-mint" : "text-bad-soft"}`}>{fa(passed)}/{fa(tests.length)}</span>}
+                  {g.key === "manage" && records.length > 0 && <span className="rounded-full bg-raised px-1.5 text-xs text-fg-2">{fa(records.length)}</span>}
+                </button>
+              );
+            })}
+          </div>
+          {group && (
+            <nav role="tablist" aria-label="صفحه‌های این بخش" className="flex gap-1 overflow-x-auto px-4 pt-1 text-sm sm:px-6">
+              {GROUPS.find((g) => g.key === group)!.tabs.filter((t) => tabs.includes(t)).map((t) => (
+                <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+                  className={`min-h-11 shrink-0 border-b-2 px-3.5 ${tab === t ? "border-saffron font-bold text-fg" : "border-transparent text-mute hover:text-fg"}`}>
+                  {TAB_LABEL[t]}
+                  {t === "tests" && tests.length > 0 && <span className={`mr-1.5 text-xs ${passed === tests.length ? "text-mint" : "text-bad-soft"}`}>{fa(passed)}/{fa(tests.length)}</span>}
+                  {t === "records" && records.length > 0 && <span className="mr-1.5 text-xs text-mute">{fa(records.length)}</span>}
+                </button>
+              ))}
+            </nav>
+          )}
+        </div>
       )}
 
       <main className="flex flex-1 flex-wrap items-start gap-5 p-4 sm:p-6">
