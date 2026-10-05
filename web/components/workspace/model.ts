@@ -9,7 +9,7 @@ export type Schedule = {
 export type Slot = { id: string; label: string; capacity: number; weekday?: number | null; time?: string | null };
 export type Item = { id: string; name: string; price: number; options: { name: string; choices: string[] }[] };
 export type Block =
-  | { type: "message"; id: string; text: string; variants?: string[] }
+  | { type: "message"; id: string; text: string; variants?: string[]; media?: "none" | "image" | "document"; location?: { latitude: number; longitude: number } | null }
   | { type: "form"; id: string; title: string; fields: Field[]; done_text: string }
   | { type: "booking"; id: string; title: string; reminder_hours?: number; slots: Slot[]; waitlist: boolean; schedule?: Schedule | null; allow_cancel?: boolean; cancel_deadline_hours?: number; occurrences?: number; fields: Field[]; confirm_text: string; full_text: string; waitlist_text: string }
   | { type: "catalog_order"; id: string; title: string; items: Item[]; max_items: number; min_total: number; fields: Field[]; confirm_text: string; payment?: "none" | "online"; delivery_fee?: number; free_delivery_over?: number; discount_codes?: { code: string; percent: number; amount: number; min_total: number; max_uses: number }[] }

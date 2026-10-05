@@ -9,13 +9,14 @@ import { RecordsTab, StructureTab, TestsTab, VersionsTab } from "@/components/wo
 import { PublishTab } from "@/components/workspace/PublishTab";
 import { AnnounceTab } from "@/components/workspace/AnnounceTab";
 import { CustomersTab } from "@/components/workspace/CustomersTab";
+import { MediaTab } from "@/components/workspace/MediaTab";
 import { InboxTab } from "@/components/workspace/InboxTab";
 import { CatalogTab } from "@/components/workspace/CatalogTab";
 import { PhoneSim } from "@/components/workspace/PhoneSim";
 import { progressOf, type Bot, type ChatMsg, type Rec, type RunResult, type RunStatus, type TestRes, type Ver } from "@/components/workspace/model";
 
-type Tab = "build" | "spec" | "tests" | "versions" | "publish" | "catalog" | "inbox" | "announce" | "customers" | "records" | "try";
-const TAB_LABEL: Record<Tab, string> = { build: "ساخت با ایجنت", spec: "ساختار", tests: "تست‌ها", versions: "نسخه‌ها", publish: "انتشار", catalog: "محصولات", inbox: "پیام‌ها", announce: "اطلاعیه", customers: "مشتریان", records: "ثبت‌ها", try: "امتحانش کن" };
+type Tab = "build" | "spec" | "tests" | "versions" | "publish" | "catalog" | "inbox" | "announce" | "customers" | "media" | "records" | "try";
+const TAB_LABEL: Record<Tab, string> = { build: "ساخت با ایجنت", spec: "ساختار", tests: "تست‌ها", versions: "نسخه‌ها", publish: "انتشار", catalog: "محصولات", inbox: "پیام‌ها", announce: "اطلاعیه", customers: "مشتریان", media: "فایل‌ها", records: "ثبت‌ها", try: "امتحانش کن" };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function Workspace() {
@@ -161,8 +162,9 @@ function Workspace() {
   const spec = bot.spec;
   const passed = tests.filter((t) => t.passed).length;
   const hasCatalog = !!spec?.blocks?.some((b: any) => b.type === "catalog_order" && b.source === "table");
+  const hasMedia = !!spec?.blocks?.some((b: any) => b.type === "message" && b.media && b.media !== "none");
   const hasContact = !!spec?.blocks?.some((b: any) => b.type === "contact");
-  const tabs: Tab[] = spec ? (["build", "spec", "tests", "versions", ...(hasCatalog ? ["catalog"] : []), "publish", ...(hasContact ? ["inbox"] : []), "announce", "customers", "records", "try"] as Tab[]) : ["build"];
+  const tabs: Tab[] = spec ? (["build", "spec", "tests", "versions", ...(hasCatalog ? ["catalog"] : []), "publish", ...(hasContact ? ["inbox"] : []), ...(hasMedia ? ["media"] : []), "announce", "customers", "records", "try"] as Tab[]) : ["build"];
   const phoneTabs = tab === "build" || tab === "spec";
   const fieldLabels: Record<string, string> = { slot_label: "زمان" };
   for (const b of spec?.blocks ?? []) if ("fields" in b) for (const f of b.fields) fieldLabels[f.key] = f.label;
@@ -208,6 +210,7 @@ function Workspace() {
           {tab === "tests" && <TestsTab tests={tests} spec={spec} version={bot.version} />}
           {tab === "versions" && <VersionsTab versions={versions} spec={spec} />}
           {tab === "catalog" && spec && <CatalogTab botId={id!} />}
+          {tab === "media" && spec && <MediaTab botId={id!} />}
           {tab === "customers" && spec && <CustomersTab botId={id!} />}
           {tab === "announce" && spec && <AnnounceTab botId={id!} />}
           {tab === "inbox" && spec && <InboxTab botId={id!} />}

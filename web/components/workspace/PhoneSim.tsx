@@ -44,7 +44,16 @@ export function PhoneSim({ botId, version, labels, onActivity, className = "" }:
     try {
       const r = await api<{ actions: Action[] }>(`/bots/${botId}/simulate`, { body: { session_id: session, text: t } });
       setMsgs((m) => {
-        const mapped = r.actions.map((a): Msg => (a.type === "send" ? { from: "bot", text: a.text, buttons: a.buttons } : a.type === "notify_customer" ? { from: "note", text: "📨 پیام به مشتریِ دیگر در بله: " + a.text } : { from: "admin", text: a.text }));
+        const mapped = r.actions.map((a): Msg => {
+          if (a.type === "send") return { from: "bot", text: a.text, buttons: a.buttons };
+          if (a.type === "media") {
+            const what = a.kind === "image" ? "عکس" : "فایل";
+            return { from: "bot", text: a.uploaded ? `📎 ${what}: ${a.filename}` : `📎 ${what} (هنوز در تب «فایل‌ها» بارگذاری نشده)` };
+          }
+          if (a.type === "location") return { from: "bot", text: `📍 موقعیت روی نقشه (${a.latitude}, ${a.longitude})` };
+          if (a.type === "notify_customer") return { from: "note", text: "📨 پیام به مشتریِ دیگر در بله: " + a.text };
+          return { from: "admin", text: a.text };
+        });
         const first = r.actions[0];
         // like Bale: navigation (next page, category, back) edits the clicked message instead of adding one
         if (first?.type === "send" && first.edit && m.length && m[m.length - 1].from === "me") {

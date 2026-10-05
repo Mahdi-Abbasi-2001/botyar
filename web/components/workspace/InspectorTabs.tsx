@@ -72,7 +72,14 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
         </div>
       </>
     );
-  if (b.type === "message") return <p className="m-0 whitespace-pre-line text-sm leading-7 text-fg-2">{b.text}</p>;
+  if (b.type === "message")
+    return (
+      <>
+        <p className="m-0 whitespace-pre-line text-sm leading-7 text-fg-2">{b.text}</p>
+        {b.media && b.media !== "none" && <span className="text-xs text-mute">📎 {b.media === "image" ? "عکس" : "فایل"} ضمیمه می‌شود؛ از تب «فایل‌ها» بارگذاری کنید.</span>}
+        {b.location && <span className="text-xs text-mute">📍 موقعیت روی نقشه ({b.location.latitude}, {b.location.longitude})</span>}
+      </>
+    );
   if (b.type === "form") return <Fields fields={b.fields} />;
   if (b.type === "admin_notify") {
     const on = spec.blocks.find((x) => x.id === b.on);

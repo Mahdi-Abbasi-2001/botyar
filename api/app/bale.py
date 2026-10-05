@@ -23,7 +23,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import billing, dates, engine, faq_index
+from . import billing, dates, engine, faq_index, media
 from .config import settings
 from .db import SessionLocal
 from .models import Bot, BotListing, BotVersion, ChatLink, ChatSession, PaymentConfig, Publication, Record
@@ -138,8 +138,21 @@ def to_markup(buttons: list[dict], cb: dict) -> dict:
     return {"inline_keyboard": rows}
 
 
+def api_upload(token: str, method: str, fields: dict, file_field: str, filename: str, data: bytes, mime: str, timeout: float = 60):
+    """Multipart upload of a photo/document (Bale accepts multipart/form-data; JSON cannot carry file bytes)."""
+    r = httpx.post(f"{API}/bot{token}/{method}", data={k: str(v) for k, v in fields.items()},
+                   files={file_field: (filename, data, mime)}, timeout=timeout)
+    try:
+        d = r.json()
+    except Exception:
+        raise BaleError(f"HTTP {r.status_code}")
+    if not d.get("ok"):
+        raise BaleError(d.get("description") or f"HTTP {r.status_code}")
+    return d.get("result")
+
+
 def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_chat_id: str = "", edit_message_id: int | None = None,
-            wallet: str = "", ch: Channel = BALE, others: list[dict] | None = None) -> list[int]:
+            wallet: str = "", ch: Channel = BALE, others: list[dict] | None = None, files=None) -> list[int]:
     """Send the actions. Returns the record ids whose invoice could not be sent.
     Messages for customers on the OTHER messenger are appended to `others` for send_customer_actions."""
     cb: dict = {}
@@ -165,6 +178,18 @@ def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_
                 if a.get("buttons"):
                     payload["reply_markup"] = to_markup(a["buttons"], cb)
                 ch.call(token, "sendMessage", payload)
+            elif a["type"] == "media":
+                f = files(a["block"]) if files else None
+                if f is None:
+                    continue  # the owner has not uploaded the file yet: the text above still went out
+                if ch.name != "bale":  # the Telegram relay carries JSON only
+                    ch.call(token, "sendMessage", {"chat_id": chat_id, "text": "📎 ارسال فایل فعلاً فقط در بله پشتیبانی می‌شود."})
+                    continue
+                name, mime, data = f
+                method, field = ("sendPhoto", "photo") if a["kind"] == "image" else ("sendDocument", "document")
+                api_upload(token, method, {"chat_id": chat_id}, field, name, data, mime)
+            elif a["type"] == "location":
+                ch.call(token, "sendLocation", {"chat_id": chat_id, "latitude": a["latitude"], "longitude": a["longitude"]})
             elif a["type"] == "invoice":
                 if not wallet:
                     raise BaleError("no wallet token")
@@ -465,7 +490,8 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
         store = SqlStore(db, pub.bot_id, sandbox=False)
         actions = engine.handle(spec, state, t, store, matcher=faq_index.matcher_for(db, pub.bot_id, spec))
         others: list[dict] = []  # e.g. a waitlisted customer on the other messenger who just got the freed place
-        for rid in deliver(token, chat_id, actions, state, pub.admin_chat_id, clicked_message_id, wallet, ch, others):
+        for rid in deliver(token, chat_id, actions, state, pub.admin_chat_id, clicked_message_id, wallet, ch, others,
+                           files=lambda block_id: media.get_file(db, pub.bot_id, block_id)):
             rec = db.get(Record, rid)  # the invoice could not be sent: keep the order as an ordinary one and tell both sides
             if rec:
                 rec.data = {**rec.data, "status": "new", "_pay_failed": True}

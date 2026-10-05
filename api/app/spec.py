@@ -28,10 +28,17 @@ class MenuItem(BaseModel):
     block: str
 
 
+class MapPoint(BaseModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+
+
 class MessageBlock(BaseModel):
     type: Literal["message"] = "message"
     id: str
     text: str
+    media: Literal["none", "image", "document"] = "none"  # the owner uploads the actual photo/file for this block in the panel
+    location: MapPoint | None = None  # a map pin sent after the text
     variants: list[Annotated[str, Field(min_length=1, max_length=1500)]] = Field(default_factory=list, max_length=30)  # non-empty: each tap shows one of these at random (never the same twice in a row)
 
 

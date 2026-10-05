@@ -176,8 +176,17 @@ MENU_QUIZ_CASES = [
     ("quiz-asks-for-questions", "ربات مسابقه که ازشون سؤال بپرسه", "needs_input", lambda s, m: None),
 ]
 
+MEDIA_CASES = [
+    ("media-pdf-catalog", "ربات فروشگاه: دکمه «دریافت کاتالوگ» که فایل PDF کاتالوگ ما رو بفرسته.", "done",
+     lambda s, m: None if any(b.get("media") == "document" for b in blocks(s, "message")) and "فایل" in m else "expected a message block with media=document and a note about uploading the file"),
+    ("media-location-with-coordinates", "ربات رستوران: دکمه «آدرس» که آدرس رو بگه و لوکیشن بفرسته. آدرس: تهران، میدان ولیعصر. مختصات: 35.7219 و 51.3347", "done",
+     lambda s, m: None if any(b.get("location") and abs(b["location"]["latitude"] - 35.7219) < 0.001 for b in blocks(s, "message")) else "expected the given coordinates in a location pin"),
+    ("media-location-no-invented-coordinates", "ربات رستوران: دکمه «آدرس» که لوکیشن مغازه رو روی نقشه بفرسته. آدرس: تهران، میدان ولیعصر.", "done",
+     lambda s, m: None if not any(b.get("location") for b in blocks(s, "message")) and ("مختصات" in m or "لوکیشن" in m or "نقشه" in m) else "must not invent coordinates; should say it needs them"),
+]
+
 # appended by later features (appointment calendars, FAQ, owner chat, delivery/discounts) — see EXTRA_CASES below
-EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES, *RANDOM_CASES, *MENU_QUIZ_CASES]
+EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES, *RANDOM_CASES, *MENU_QUIZ_CASES, *MEDIA_CASES]
 
 
 def run_case(c, i, name, text, want_status, check):

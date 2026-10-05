@@ -46,6 +46,12 @@ def _texts(actions):
     """Everything a user would see: message text plus button labels."""
     parts = []
     for a in actions:
+        if a["type"] == "media":
+            parts.append("📎 " + ("عکس" if a["kind"] == "image" else "فایل"))
+            continue
+        if a["type"] == "location":
+            parts.append(f"📍 {a['latitude']}, {a['longitude']}")
+            continue
         parts.append(a["text"])
         parts.extend(b["text"] for b in a.get("buttons", []))
     return "\n".join(parts)

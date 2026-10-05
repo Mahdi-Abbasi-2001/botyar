@@ -4,7 +4,9 @@ export type Button = { text: string; data: string };
 export type Action =
   | { type: "send"; text: string; buttons: Button[]; edit?: boolean }
   | { type: "notify_admin"; text: string }
-  | { type: "notify_customer"; cust: string; text: string };
+  | { type: "notify_customer"; cust: string; text: string }
+  | { type: "media"; block: string; kind: "image" | "document"; uploaded?: boolean; filename?: string }
+  | { type: "location"; latitude: number; longitude: number };
 
 /** sessionStorage key for a description typed on /bots, sent to the agent when the workspace opens. */
 export const PENDING_KEY = (id: number | string) => `botyar:pending:${id}`;
@@ -44,12 +46,12 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
 }
 
 /** multipart upload (catalog import); same auth and Persian error handling as api(). */
-export async function apiUpload<T = any>(path: string, form: FormData): Promise<T> {
+export async function apiUpload<T = any>(path: string, form: FormData, method: "POST" | "PUT" = "POST"): Promise<T> {
   const token = getToken();
   let res: Response | null = null;
   for (let attempt = 1; attempt <= 2 && !res; attempt++) {
     try {
-      res = await fetch(BASE + "/api" + path, { method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form });
+      res = await fetch(BASE + "/api" + path, { method, headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form });
     } catch {
       if (attempt === 2) throw new Error("ارتباط با سرور برقرار نشد. اینترنت را بررسی کنید و دوباره تلاش کنید.");
       await new Promise((r) => setTimeout(r, 800));

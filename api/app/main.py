@@ -192,6 +192,11 @@ def simulate(bot_id: int, body: SimMessage, user: User = Depends(current_user), 
     actions = bot_engine.handle(spec, state, body.text, SqlStore(db, bot.id, sandbox=True), matcher=faq_index.matcher_for(db, bot.id, spec))
     row.state = state
     db.commit()
+    from . import media
+
+    for a in actions:  # the phone preview shows which file would be sent (the real file only goes out on Bale)
+        if a.get("type") == "media":
+            a.update(media.describe(db, bot.id, a["block"]))
     return {"actions": actions}
 
 
@@ -335,6 +340,10 @@ app.include_router(billing_router)
 from .customers import router as customers_router  # noqa: E402
 
 app.include_router(customers_router)
+
+from .media import router as media_router  # noqa: E402
+
+app.include_router(media_router)
 
 from .outreach import router as outreach_router  # noqa: E402
 

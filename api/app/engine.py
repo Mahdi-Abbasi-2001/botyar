@@ -262,6 +262,16 @@ def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matc
 
 
 # ---------- menu ----------
+def message_actions(block, session, rng, tail) -> list[dict]:
+    """A message block: its text (or a random variant), then the attached photo/file and map pin if it has them, then `tail`."""
+    out = [send(pick_text(block, session, rng))]
+    if block.media != "none":
+        out.append({"type": "media", "block": block.id, "kind": block.media})
+    if block.location is not None:
+        out.append({"type": "location", "latitude": block.location.latitude, "longitude": block.location.longitude})
+    return [*out, tail]
+
+
 def _from_menu(spec, session, text_n, store, now, rng=_RNG):
     if _cancel_blocks(spec) and (text_n == f"m:{len(spec.menu)}" or text_n == MY_LABEL):
         return _my_start(spec, session, store, now)
@@ -279,7 +289,7 @@ def _from_menu(spec, session, text_n, store, now, rng=_RNG):
 def _start_block(spec, session, block, store, now, rng):
     """Begin a block (reached from the main menu or from a sub-menu)."""
     if block.type == "message":
-        return [send(pick_text(block, session, rng)), menu_actions(spec)]
+        return message_actions(block, session, rng, menu_actions(spec))
     session.update(block=block.id, step=0, data={})
     if block.type == "menu":
         session["step"] = "pick"
@@ -1018,7 +1028,7 @@ def _submenu(spec, session, block: MenuBlock, text, store, now, rng):
         return [send("لطفاً یکی از گزینه‌ها را انتخاب کنید."), _submenu_prompt(block)]
     child = spec.block(item.block)
     if child.type == "message":  # reading a text keeps the customer in the sub-menu so they can browse its siblings
-        return [send(pick_text(child, session, rng)), _submenu_prompt(block)]
+        return message_actions(child, session, rng, _submenu_prompt(block))
     return _start_block(spec, session, child, store, now, rng)
 
 

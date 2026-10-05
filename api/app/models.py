@@ -243,3 +243,17 @@ class CustomerSeen(Base):
     first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     messages: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class BotFile(Base):
+    """A photo or document the owner attached to a message block; sent to customers as a file."""
+    __tablename__ = "bot_files"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    block_id: Mapped[str] = mapped_column(String(64))
+    kind: Mapped[str] = mapped_column(String(10))  # image | document
+    filename: Mapped[str] = mapped_column(String(120))
+    mime: Mapped[str] = mapped_column(String(80), default="application/octet-stream")
+    size: Mapped[int] = mapped_column(Integer, default=0)
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
