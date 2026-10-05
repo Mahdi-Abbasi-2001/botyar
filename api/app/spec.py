@@ -23,6 +23,11 @@ class FormField(BaseModel):
         return self
 
 
+class MenuItem(BaseModel):
+    label: str
+    block: str
+
+
 class MessageBlock(BaseModel):
     type: Literal["message"] = "message"
     id: str
@@ -257,6 +262,41 @@ class FeedbackBlock(BaseModel):
     thanks_text: str = "ممنون از نظر شما 🌟"
 
 
+class MenuBlock(BaseModel):
+    """A sub-menu: tapping its menu entry shows more buttons, each leading to another block (message, form, booking, another sub-menu...)."""
+    type: Literal["menu"] = "menu"
+    id: str
+    title: str  # shown above the buttons
+    items: list[MenuItem] = Field(min_length=1, max_length=10)
+
+
+class QuizQuestion(BaseModel):
+    question: str = Field(min_length=3, max_length=300)
+    options: list[Annotated[str, Field(min_length=1, max_length=60)]] = Field(min_length=2, max_length=5)
+    correct: int = Field(ge=0)  # index of the right option
+
+    @model_validator(mode="after")
+    def _in_range(self):
+        if self.correct >= len(self.options):
+            raise ValueError("correct must be the index of one of the options")
+        return self
+
+
+class QuizBlock(BaseModel):
+    """Multiple-choice questions with one right answer each; the customer gets a score at the end and the owner sees every result."""
+    type: Literal["quiz"] = "quiz"
+    id: str
+    title: str
+    questions: list[QuizQuestion] = Field(min_length=1, max_length=20)
+    result_text: str = "نتیجه‌ی شما: {score} از {total} ({percent}٪)"  # {score} {total} {percent} {id}
+    show_answers: bool = True  # tell right/wrong (and the right answer) after each question
+
+    @model_validator(mode="after")
+    def _placeholders(self):
+        check_placeholders([self.result_text], {"score", "total", "percent", "id"})
+        return self
+
+
 class AdminNotifyBlock(BaseModel):
     type: Literal["admin_notify"] = "admin_notify"
     id: str
@@ -265,14 +305,9 @@ class AdminNotifyBlock(BaseModel):
 
 
 Block = Annotated[
-    Union[MessageBlock, FormBlock, BookingBlock, CatalogOrderBlock, FaqBlock, ContactBlock, FeedbackBlock, AdminNotifyBlock],
+    Union[MessageBlock, FormBlock, BookingBlock, CatalogOrderBlock, FaqBlock, ContactBlock, FeedbackBlock, MenuBlock, QuizBlock, AdminNotifyBlock],
     Field(discriminator="type"),
 ]
-
-
-class MenuItem(BaseModel):
-    label: str
-    block: str
 
 
 class BotSpec(BaseModel):
@@ -295,6 +330,24 @@ class BotSpec(BaseModel):
         for b in self.blocks:
             if b.type == "admin_notify" and b.on not in ids:
                 raise ValueError(f"admin_notify '{b.id}' watches unknown block '{b.on}'")
+            if b.type == "menu":
+                for it in b.items:
+                    t = next((x for x in self.blocks if x.id == it.block), None)
+                    if t is None:
+                        raise ValueError(f"sub-menu '{b.id}' item '{it.label}' points to unknown block '{it.block}'")
+                    if t.type == "admin_notify":
+                        raise ValueError("a menu cannot point to an admin_notify block")
+        menus = {b.id: [i.block for i in b.items] for b in self.blocks if b.type == "menu"}
+
+        def visit(node, path):
+            if node in path:
+                raise ValueError(f"sub-menus loop back on themselves: {' -> '.join([*path, node])}")
+            for nxt in menus.get(node, []):
+                if nxt in menus:
+                    visit(nxt, [*path, node])
+
+        for root in menus:
+            visit(root, [])
         return self
 
     def block(self, block_id: str):

@@ -167,8 +167,17 @@ RANDOM_CASES = [
     ("random-no-invented-facts", "ربات کافه من که با دکمه «پیشنهاد امروز» یکی از پیشنهادهای ما رو تصادفی نشون بده", "needs_input", lambda s, m: None),
 ]
 
+MENU_QUIZ_CASES = [
+    ("submenu-products", "ربات فروشگاه: دکمه «محصولات» که دو دکمه «لپ‌تاپ» و «موبایل» نشون بده. لپ‌تاپ‌ها از ۲۰ میلیون تومان و موبایل‌ها از ۸ میلیون تومان شروع می‌شن.", "done",
+     lambda s, m: None if blocks(s, "menu") and len(blocks(s, "menu")[0]["items"]) == 2 and "۲۰" in json.dumps(s, ensure_ascii=False) + "20" else "expected a sub-menu with two items"),
+    ("quiz-with-questions", "ربات مسابقه با ۲ سؤال: پایتخت ایران کدومه؟ (تهران، اصفهان، شیراز) درست: تهران. و ۲+۲ چنده؟ (۳، ۴، ۵) درست: ۴. آخرش امتیاز رو بگو و به من خبر بده.", "done",
+     lambda s, m: None if blocks(s, "quiz") and len(blocks(s, "quiz")[0]["questions"]) == 2
+     and [q["options"][q["correct"]] for q in blocks(s, "quiz")[0]["questions"]] in (["تهران", "۴"], ["تهران", "4"]) else "quiz questions/correct answers not captured exactly"),
+    ("quiz-asks-for-questions", "ربات مسابقه که ازشون سؤال بپرسه", "needs_input", lambda s, m: None),
+]
+
 # appended by later features (appointment calendars, FAQ, owner chat, delivery/discounts) — see EXTRA_CASES below
-EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES, *RANDOM_CASES]
+EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES, *RANDOM_CASES, *MENU_QUIZ_CASES]
 
 
 def run_case(c, i, name, text, want_status, check):

@@ -15,7 +15,7 @@ from typing import Any, Protocol
 from . import dates
 from .engine_text import fa_digits, fa_norm, norm  # noqa: F401  (re-exported: engine.norm / engine.fa_norm / engine.fa_digits)
 from .faq_match import LexicalMatcher, MatcherUnavailable, RateLimited, decide
-from .spec import PLACEHOLDER, norm_code, BotSpec, BookingBlock, CatalogOrderBlock, ContactBlock, FaqBlock, FeedbackBlock, FormBlock, FormField, MessageBlock
+from .spec import PLACEHOLDER, norm_code, BotSpec, BookingBlock, CatalogOrderBlock, ContactBlock, FaqBlock, FeedbackBlock, MenuBlock, QuizBlock, FormBlock, FormField, MessageBlock
 
 log = logging.getLogger("botyar.engine")
 STALE_RESETS = {"count": 0}  # tests assert this stays 0 unless a bot really changed under a conversation
@@ -246,6 +246,10 @@ def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matc
             return _contact(spec, session, block, text, store, now)
         if block.type == "feedback":
             return _feedback(spec, session, block, text, store, now)
+        if block.type == "menu":
+            return _submenu(spec, session, block, text, store, now, rng)
+        if block.type == "quiz":
+            return _quiz(spec, session, block, text, store, now)
     except (StopIteration, IndexError, KeyError) as e:
         # The saved state belongs to an older version of the bot (the owner republished mid-conversation:
         # a block, field, slot or option it points to is gone). Never leave the customer in silence.
@@ -269,10 +273,20 @@ def _from_menu(spec, session, text_n, store, now, rng=_RNG):
         item = next((i for i in spec.menu if i.label == text_n), None)
     if item is None:
         return [menu_actions(spec, "متوجه نشدم. لطفاً از منو انتخاب کنید:")]
-    block = spec.block(item.block)
+    return _start_block(spec, session, spec.block(item.block), store, now, rng)
+
+
+def _start_block(spec, session, block, store, now, rng):
+    """Begin a block (reached from the main menu or from a sub-menu)."""
     if block.type == "message":
         return [send(pick_text(block, session, rng)), menu_actions(spec)]
     session.update(block=block.id, step=0, data={})
+    if block.type == "menu":
+        session["step"] = "pick"
+        return [_submenu_prompt(block)]
+    if block.type == "quiz":
+        session["data"] = {"score": 0}
+        return [send(block.title), _quiz_question(block, 0)]
     if block.type == "form":
         return [send(block.title), _ask(block.fields[0])]
     if block.type == "faq":
@@ -986,6 +1000,57 @@ def _faq(spec, session, block: FaqBlock, text, store, now, matcher):
     if kind == "suggest":
         return [send("منظورتان یکی از این سؤال‌هاست؟", [_btn(_short(block.entries[i].question, 50), f"fq:{i}") for i in idx] + [_btn("هیچ‌کدام", "fn")])]
     return _faq_unanswered(spec, session, block, store, now, query)
+
+
+# ---------- sub-menus ----------
+def _submenu_prompt(block: MenuBlock):
+    return send(block.title, [_btn(it.label, f"s:{n}") for n, it in enumerate(block.items)] + [_btn("بازگشت به منو", "/menu")])
+
+
+def _submenu(spec, session, block: MenuBlock, text, store, now, rng):
+    text_n = norm(text)
+    m = re.fullmatch(r"s:(\d+)", text_n)
+    if m and int(m.group(1)) < len(block.items):
+        item = block.items[int(m.group(1))]
+    else:
+        item = next((i for i in block.items if fa_norm(i.label) == fa_norm(text_n)), None)
+    if item is None:
+        return [send("لطفاً یکی از گزینه‌ها را انتخاب کنید."), _submenu_prompt(block)]
+    child = spec.block(item.block)
+    if child.type == "message":  # reading a text keeps the customer in the sub-menu so they can browse its siblings
+        return [send(pick_text(child, session, rng)), _submenu_prompt(block)]
+    return _start_block(spec, session, child, store, now, rng)
+
+
+# ---------- quiz ----------
+def _quiz_question(block: QuizBlock, i: int):
+    q = block.questions[i]
+    return send(f"سؤال {i + 1} از {len(block.questions)}:\n{q.question}", [_btn(o, f"qa:{j}") for j, o in enumerate(q.options)] + [_btn("بازگشت به منو", "/menu")])
+
+
+def _quiz(spec, session, block: QuizBlock, text, store, now):
+    text_n, d, i = norm(text), session["data"], session["step"]
+    q = block.questions[i]  # IndexError here = the quiz changed under a running customer: the stale-state guard resets
+    m = re.fullmatch(r"qa:(\d+)", text_n)
+    idx = int(m.group(1)) if m else next((j for j, o in enumerate(q.options) if fa_norm(o) == fa_norm(text_n)), -1)
+    if not 0 <= idx < len(q.options):
+        return [send("لطفاً یکی از گزینه‌ها را انتخاب کنید."), _quiz_question(block, i)]
+    right = idx == q.correct
+    d["score"] += int(right)
+    actions = []
+    if block.show_answers:
+        actions.append(send("✅ درست!" if right else f"❌ نادرست. پاسخ درست: {q.options[q.correct]}"))
+    if i + 1 < len(block.questions):
+        session["step"] = i + 1
+        return [*actions, _quiz_question(block, i + 1)]
+    total, score = len(block.questions), d["score"]
+    who = session.get("cust_name") or "مشتری"
+    row = store.add(block.id, {"score": score, "total": total, "percent": round(100 * score / total), "who": who, "status": "done", **_ident(session, now)})
+    actions.append(send(_fill(block.result_text, row)))
+    _notify(spec, block.id, f"{who}: {score} از {total}", actions, prefix=f"🎯 نتیجه‌ی آزمون · {block.title}")
+    _reset(session)
+    actions.append(menu_actions(spec))
+    return actions
 
 
 # ---------- feedback (1-5 stars + optional comment) ----------

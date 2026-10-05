@@ -78,6 +78,37 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
     const on = spec.blocks.find((x) => x.id === b.on);
     return <span className="text-sm leading-7 text-amber-fg">بعد از هر ثبت در «{on ? blockTitle(on) : b.on}»: «{b.text}»</span>;
   }
+  if (b.type === "menu")
+    return (
+      <div className="flex flex-col gap-1.5 text-sm">
+        {b.items.map((it) => {
+          const t = spec.blocks.find((x) => x.id === it.block);
+          return (
+            <div key={it.label} className="flex justify-between gap-2 rounded-[10px] bg-raised px-3 py-2">
+              <span className="font-semibold">{it.label}</span>
+              <span className="text-mute">{t ? blockTitle(t) : it.block}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  if (b.type === "quiz") {
+    const rs = records.filter((r) => r.collection === b.id && typeof r.data.score === "number");
+    const avg = rs.length ? rs.reduce((a, r) => a + (r.data.percent as number), 0) / rs.length : 0;
+    return (
+      <>
+        <div className="flex flex-col gap-1.5 text-sm">
+          {b.questions.map((q, i) => (
+            <div key={i} className="flex flex-col gap-0.5 rounded-[10px] bg-raised px-3 py-2">
+              <span className="font-semibold">{fa(i + 1)}. {q.question}</span>
+              <span className="text-mute">{q.options.map((o, j) => (j === q.correct ? `✅ ${o}` : o)).join(" · ")}</span>
+            </div>
+          ))}
+        </div>
+        <span className="text-xs text-mute">{rs.length ? `${fa(rs.length)} نفر شرکت کرده‌اند؛ میانگین نمره ${fa(Math.round(avg))}٪.` : "هنوز کسی شرکت نکرده است."}</span>
+      </>
+    );
+  }
   if (b.type === "feedback") {
     const rs = records.filter((r) => r.collection === b.id && typeof r.data.rating === "number");
     const avg = rs.length ? rs.reduce((a, r) => a + (r.data.rating as number), 0) / rs.length : 0;
@@ -318,6 +349,7 @@ export function RecordsTab({ records, spec, botId, onChanged }: { records: Rec[]
   const detail = (r: Rec) => {
     const d = r.data;
     if (d.question) return `سؤال: ${d.question}${d.note ? ` (${d.note})` : ""}`;
+    if (typeof d.score === "number") return `${d.who ?? ""}: ${d.score} از ${d.total}`;
     if (typeof d.rating === "number") return `${"⭐".repeat(d.rating)}${d.comment ? ` · ${d.comment}` : ""}`;
     if (d.slot_label) return d.slot_label;
     if (Array.isArray(d.items)) return `${d.items.map((i: any) => i.name).join("، ")} · ${toman(d.total ?? 0)}`;
