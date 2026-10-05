@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 import threading
 import time as _time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time as dtime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -16,9 +16,9 @@ from sqlalchemy.orm import Session
 
 from . import bale, engine
 from .auth import current_user
-from .dates import jalali_str, now_tehran
+from .dates import TEHRAN, jalali_str, now_tehran
 from .db import SessionLocal, get_db
-from .models import Bot, BotVersion, Broadcast, ChatSession, Publication, Record, User
+from .models import Bot, BotVersion, Broadcast, ChatSession, Publication, Record, ScheduledBroadcast, User
 from .spec import BotSpec
 from .store import SqlStore
 
@@ -103,6 +103,7 @@ def _loop():
             with SessionLocal() as db:
                 due_reminders(db, now_tehran())
                 expire_unpaid_orders(db, now_tehran())
+                due_scheduled(db, datetime.now(timezone.utc))
         except Exception:  # noqa: BLE001
             log.exception("reminder run failed")
 
@@ -161,25 +162,141 @@ def list_broadcasts(bot_id: int, user: User = Depends(current_user), db: Session
                        "created_at": b.created_at.isoformat()} for b in rows]}
 
 
+def launch_broadcast(db: Session, bot_id: int, text: str) -> Broadcast:
+    """Check the daily limit and the audience, store the announcement and start delivering it in the background.
+    Raises ValueError(message) when it cannot be sent (used by both the manual button and the scheduler)."""
+    day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
+    last = db.scalars(select(Broadcast).where(Broadcast.bot_id == bot_id).order_by(Broadcast.id.desc()).limit(BROADCASTS_PER_DAY)).all()
+    recent = sum(1 for b in last if (b.created_at if b.created_at.tzinfo else b.created_at.replace(tzinfo=timezone.utc)) > day_ago)
+    if recent >= BROADCASTS_PER_DAY:
+        raise ValueError(f"در هر شبانه‌روز حداکثر {BROADCASTS_PER_DAY} اطلاعیه (دستی و زمان‌بندی‌شده روی هم) فرستاده می‌شود تا مشتری‌ها ناراحت نشوند.")
+    custs = audience(db, bot_id)
+    if not custs:
+        raise ValueError("هنوز مشتری‌ای با ربات شما گفتگو نکرده است.")
+    row = Broadcast(bot_id=bot_id, text=text, audience=len(custs))
+    db.add(row)
+    db.commit()
+    threading.Thread(target=_deliver, args=(row.id, bot_id, custs, text), daemon=True).start()
+    return row
+
+
 @router.post("/api/bots/{bot_id}/broadcasts")
 def send_broadcast(bot_id: int, body: BroadcastIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     _owned_published(bot_id, user, db)
     text = body.text.strip()
     if not text:
         raise HTTPException(422, "متن اطلاعیه خالی است")
-    day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
-    last = db.scalars(select(Broadcast).where(Broadcast.bot_id == bot_id).order_by(Broadcast.id.desc()).limit(BROADCASTS_PER_DAY)).all()
-    recent = sum(1 for b in last if (b.created_at if b.created_at.tzinfo else b.created_at.replace(tzinfo=timezone.utc)) > day_ago)
-    if recent >= BROADCASTS_PER_DAY:
-        raise HTTPException(429, f"در هر شبانه‌روز حداکثر {BROADCASTS_PER_DAY} اطلاعیه می‌توانید بفرستید تا مشتری‌ها ناراحت نشوند.")
-    custs = audience(db, bot_id)
-    if not custs:
-        raise HTTPException(409, "هنوز مشتری‌ای با ربات شما گفتگو نکرده است.")
-    row = Broadcast(bot_id=bot_id, text=text, audience=len(custs))
+    try:
+        row = launch_broadcast(db, bot_id, text)
+    except ValueError as e:
+        raise HTTPException(429 if "حداکثر" in str(e) else 409, str(e))
+    return {"id": row.id, "audience": row.audience}
+
+
+# ---------- scheduled announcements ----------
+MAX_SCHEDULES = 5
+MAX_AHEAD_DAYS = 90
+
+
+class ScheduleIn(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+    mode: str  # once | daily
+    at: str = ""    # once: Tehran local "YYYY-MM-DDTHH:MM"
+    time: str = ""  # daily: Tehran "HH:MM"
+
+
+def _next_daily(hhmm: str, after: datetime) -> datetime:
+    """The next UTC instant strictly after `after` at hh:mm Tehran time."""
+    h, m = int(hhmm[:2]), int(hhmm[3:])
+    local = after.astimezone(TEHRAN)
+    cand = datetime.combine(local.date(), dtime(h, m), tzinfo=TEHRAN)
+    if cand <= after:
+        cand += timedelta(days=1)
+    return cand.astimezone(timezone.utc)
+
+
+def _sched_out(r: ScheduledBroadcast) -> dict:
+    nxt = r.next_run if r.next_run.tzinfo else r.next_run.replace(tzinfo=timezone.utc)
+    return {"id": r.id, "text": r.text, "mode": r.mode, "time": r.hhmm, "active": r.active, "next_run": nxt.astimezone(TEHRAN).isoformat(),
+            "last_run": r.last_run.isoformat() if r.last_run else None, "last_status": r.last_status}
+
+
+@router.get("/api/bots/{bot_id}/scheduled")
+def list_scheduled(bot_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    bot = db.get(Bot, bot_id)
+    if not bot or bot.user_id != user.id:
+        raise HTTPException(404, "ربات یافت نشد")
+    rows = db.scalars(select(ScheduledBroadcast).where(ScheduledBroadcast.bot_id == bot_id).order_by(ScheduledBroadcast.id.desc()).limit(30)).all()
+    return {"max": MAX_SCHEDULES, "items": [_sched_out(r) for r in rows]}
+
+
+@router.post("/api/bots/{bot_id}/scheduled")
+def create_scheduled(bot_id: int, body: ScheduleIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    _owned_published(bot_id, user, db)
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(422, "متن اطلاعیه خالی است")
+    if len(db.scalars(select(ScheduledBroadcast).where(ScheduledBroadcast.bot_id == bot_id, ScheduledBroadcast.active.is_(True))).all()) >= MAX_SCHEDULES:
+        raise HTTPException(409, f"حداکثر {MAX_SCHEDULES} اطلاعیه‌ی زمان‌بندی‌شده‌ی فعال می‌توانید داشته باشید.")
+    now = datetime.now(timezone.utc)
+    if body.mode == "once":
+        try:
+            when = datetime.fromisoformat(body.at).replace(tzinfo=TEHRAN).astimezone(timezone.utc)
+        except ValueError:
+            raise HTTPException(422, "تاریخ و ساعت نامعتبر است")
+        if when < now + timedelta(minutes=1):
+            raise HTTPException(422, "زمان ارسال باید در آینده باشد")
+        if when > now + timedelta(days=MAX_AHEAD_DAYS):
+            raise HTTPException(422, f"زمان ارسال حداکثر {MAX_AHEAD_DAYS} روز بعد می‌تواند باشد")
+        row = ScheduledBroadcast(bot_id=bot_id, text=text, mode="once", next_run=when)
+    elif body.mode == "daily":
+        if len(body.time) != 5 or body.time[2] != ":" or not (body.time[:2].isdigit() and body.time[3:].isdigit()) or int(body.time[:2]) > 23 or int(body.time[3:]) > 59:
+            raise HTTPException(422, "ساعت باید به شکل HH:MM باشد")
+        row = ScheduledBroadcast(bot_id=bot_id, text=text, mode="daily", hhmm=body.time, next_run=_next_daily(body.time, now))
+    else:
+        raise HTTPException(422, "نوع زمان‌بندی نامعتبر است")
     db.add(row)
     db.commit()
-    threading.Thread(target=_deliver, args=(row.id, bot_id, custs, text), daemon=True).start()
-    return {"id": row.id, "audience": len(custs)}
+    return _sched_out(row)
+
+
+@router.delete("/api/bots/{bot_id}/scheduled/{sid}")
+def cancel_scheduled(bot_id: int, sid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    bot = db.get(Bot, bot_id)
+    if not bot or bot.user_id != user.id:
+        raise HTTPException(404, "ربات یافت نشد")
+    r = db.get(ScheduledBroadcast, sid)
+    if r is None or r.bot_id != bot_id:
+        raise HTTPException(404, "یافت نشد")
+    r.active = False
+    db.commit()
+    return {"ok": True}
+
+
+def due_scheduled(db: Session, now: datetime) -> int:
+    """Run every scheduled announcement whose time has come. A one-time announcement runs once; a daily one moves to
+    tomorrow. A run that cannot be delivered (daily limit, no customers, bot unpublished) is recorded and skipped, never retried in a loop."""
+    n = 0
+    for r in db.scalars(select(ScheduledBroadcast).where(ScheduledBroadcast.active.is_(True))).all():
+        due = r.next_run if r.next_run.tzinfo else r.next_run.replace(tzinfo=timezone.utc)
+        if due > now:
+            continue
+        r.last_run = now
+        if r.mode == "daily":
+            r.next_run = _next_daily(r.hhmm, now)  # advance first: a crash must not resend every minute
+        else:
+            r.active = False
+        db.commit()
+        try:
+            if not _any_publication(db, r.bot_id):
+                raise ValueError("ربات منتشر نشده است")
+            launch_broadcast(db, r.bot_id, r.text)
+            r.last_status = "ارسال شد"
+            n += 1
+        except ValueError as e:
+            r.last_status = str(e)[:190]
+        db.commit()
+    return n
 
 
 def _deliver(broadcast_id: int, bot_id: int, custs: list[str], text: str):

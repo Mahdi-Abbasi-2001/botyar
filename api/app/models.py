@@ -257,3 +257,18 @@ class BotFile(Base):
     size: Mapped[int] = mapped_column(Integer, default=0)
     data: Mapped[bytes] = mapped_column(LargeBinary)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class ScheduledBroadcast(Base):
+    """An announcement to send later (once) or every day at a fixed Tehran time."""
+    __tablename__ = "scheduled_broadcasts"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    text: Mapped[str] = mapped_column(Text)
+    mode: Mapped[str] = mapped_column(String(8))  # once | daily
+    hhmm: Mapped[str] = mapped_column(String(5), default="")  # Tehran time of day (daily)
+    next_run: Mapped[datetime] = mapped_column(DateTime(timezone=True))  # UTC
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_run: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_status: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
