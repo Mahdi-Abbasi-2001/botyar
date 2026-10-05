@@ -44,19 +44,19 @@ Per-account monthly plans; every feature is in every plan, plans differ only in 
 | Free | 0 | 3 / 1 | 100 | 30 |
 | Basic | 149,000 | 3 / 1 | 500 | 100 |
 | Pro | 349,000 | 10 / 3 | 3,000 | 300 |
-| Agency | 1,490,000 | 50 / 10 | 3,000 | 1,500 |
+| Enterprise («سازمانی») | 1,490,000 | 50 / 10 | 3,000 | 1,500 |
 Why these anchors: a usage-billed builder's own sample bots cost 150–235k Toman/month; a flat-plan builder starts at 183k; a freelancer's single basic bot costs 2–8M once — so ~150–350k/month is in-market and cheap next to a freelancer. **The founder must still validate the numbers with owners.**
 In this demo build, upgrading is a **simulated payment**: the plan is activated immediately and the account page shows an invoice history marked «پرداخت آزمایشی» (no money moves, because there is no payment gateway yet). A switch (`BILLING_DEMO=false`) turns on the request-and-approve flow for a manual launch. Real subscription payment (e.g. ZarinPal) is **[blank — needs merchant onboarding]**.
 Later options: annual discount (the flat-plan builders give about 22–26%), one-off "we build it for you" service, white-label for agencies. Not taking a cut of customers' payments: money goes to the owner's own Bale wallet by design.
 
 ## 7. Unit economics
-Measured AI cost per request is $0.001–0.009 (median about $0.002). Worst-case AI cost per plan if the limit is fully used every month: Free 30 × $0.009 ≈ **$0.27**; Basic 100 × $0.009 ≈ **$0.90**; Pro 300 ≈ **$2.70**; Agency 1,500 ≈ **$13.50**. Customers chatting with bots cost **no AI**; the FAQ's embedding call is ≈ $0.0000003 per question [measured].
+Measured AI cost per request is $0.001–0.009 (median about $0.002). Worst-case AI cost per plan if the limit is fully used every month: Free 30 × $0.009 ≈ **$0.27**; Basic 100 × $0.009 ≈ **$0.90**; Pro 300 ≈ **$2.70**; Enterprise 1,500 ≈ **$13.50**. Customers chatting with bots cost **no AI**; the FAQ's embedding call is ≈ $0.0000003 per question [measured].
 Not yet known: hosting cost per bot (Liara plan price **[blank]**), USD→Toman rate used for the plan **[blank]**, payment-gateway fees **[blank]**, support time. Gross margin therefore cannot be stated yet; the AI cost is a small fraction of any plausible price.
 
 ## 8. Go-to-market
 1. **Demo video + live link** (this competition) and 3–5 pilot businesses (a clinic, a café, a salon) whose real feedback replaces the blanks above **[blank — founder]**.
 2. Industry templates per vertical (café, clinic, salon, class) as one-click starting points.
-3. Agencies/freelancers as resellers (Agency plan): they already sell bots for millions and can resell ours at a fraction of the effort.
+3. Agencies/freelancers as resellers (Enterprise plan, «سازمانی»): they already sell bots for millions and can resell ours at a fraction of the effort.
 4. Short "bot in 3 minutes" videos on Bale/Instagram; the shared-bot directory lists published businesses.
 
 ## 9. Roadmap

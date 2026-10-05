@@ -29,8 +29,8 @@ PLANS: dict[str, dict] = {
               "tagline": "یک کسب‌وکار کوچک با مشتری‌های ثابت"},
     "pro": {"name": "حرفه‌ای", "price": 349_000, "bots": 10, "live_bots": 3, "customers": 3000, "ai_requests": 300,
             "tagline": "کسب‌وکار پرمشتری یا چند شعبه"},
-    "agency": {"name": "آژانس", "price": 1_490_000, "bots": 50, "live_bots": 10, "customers": 3000, "ai_requests": 1500,
-               "tagline": "برای فریلنسرها و آژانس‌هایی که ربات مشتری می‌سازند"},
+    "agency": {"name": "سازمانی", "price": 1_490_000, "bots": 50, "live_bots": 10, "customers": 3000, "ai_requests": 1500,
+               "tagline": "برای سازمان‌ها، آژانس‌ها و فریلنسرهایی که چندین ربات اداره می‌کنند"},
 }
 INCLUDED = [  # every plan has every feature; plans differ only by the limits above
     "ساخت و اصلاح ربات با توضیح فارسی، با تست خودکار پیش از انتشار",
