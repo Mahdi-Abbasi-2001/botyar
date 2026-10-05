@@ -1,9 +1,9 @@
 """Plans, usage limits and upgrade requests.
 
-The limits are enforced (bots, live bots, AI requests, customers per live bot). Prices are PROPOSED numbers taken from the
-market research in docs/pricing-research.md and docs/competitor-sahbot.md; they are shown as «پیشنهادی» until the founder has
-validated them with owners. There is no online collection of subscription money yet: an owner sends an upgrade request and an
-admin (ADMIN_EMAILS) activates the plan by hand."""
+The limits are enforced (bots, live bots, AI requests, customers per live bot). Prices are PROPOSED numbers (see
+docs/business-plan.md); they are shown as «پیشنهادی» until the founder has validated them with owners. There is no payment
+gateway yet: in demo mode (settings.billing_demo) an upgrade simulates a successful payment and activates the plan at once;
+otherwise an owner sends an upgrade request and an admin (ADMIN_EMAILS) activates the plan by hand."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone

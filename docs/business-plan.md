@@ -7,8 +7,8 @@ Describe your Bale bot in Persian; an agent builds it, tests it before it goes l
 
 ## 2. The problem
 Small Iranian businesses (cafés, clinics, salons, gyms, shops, teachers) live on messengers, but a working bot today means either:
-- **hiring a freelancer**: a basic Bale bot costs **2–8 million Toman**, a shop bot **12–30 million**, custom work from **30 million**; each extra feature (payment, booking, AI support) adds **1.5–7 million** [sourced: https://filtori.com/tools/, 1405]; or
-- **building it yourself** in a visual/no-code tool such as SahBot: powerful, but you must learn blocks, plugin tags and a daily "diamond/points" cost model (they even run a course session on how to calculate the bill) [sourced: https://sahbot.com/doc.html].
+- **hiring a freelancer**: a basic Bale bot costs **2–8 million Toman**, a shop bot **12–30 million**, custom work from **30 million**; each extra feature (payment, booking, AI support) adds **1.5–7 million** [sourced: a public bot price guide, 1405; re-check before the pitch]; or
+- **building it yourself** in an existing visual/no-code bot builder: powerful, but you must learn blocks and plugin syntax, and some meter the bill per feature per day plus per message, with a course session just on how to calculate it [sourced: the builders' own public documentation].
 Both options are slow, and changes later (a new price, a new class time) need the same effort again.
 
 ## 3. The solution (what exists today, in production)
@@ -23,17 +23,17 @@ Both options are slow, and changes later (a new price, a new class time) need th
 
 ## 4. Market
 - Bale: **16.5 million monthly active users (May 2023, Iranian ICT ministry); 35 million+ registered** [sourced earlier in research; re-verify before the pitch].
-- Number of small businesses using bots in Iran: **[blank — not found; do not guess]**. Proxy: SahBot is a knowledge-based company running since 2017 with 8 channels and a paid usage model, i.e. demand is proven.
+- Number of small businesses using bots in Iran: **[blank — not found; do not guess]**. Proxy: established Iranian bot-builder companies already sell to this market with paid plans, i.e. demand is proven.
 - Reachable first segment (our product fits today): appointment-based and order-based small businesses on Bale: clinics, salons, cafés, bakeries, classes, gyms, small shops. Count: **[blank]**.
 
 ## 5. Competition (public information, read 2026-10-05)
-| | Botyar | SahBot (صهبات) | AradBot | Freelancer |
+| | Botyar | Visual/no-code builders with usage billing | Flat-plan bot builders | Freelancers |
 |---|---|---|---|---|
-| How you build | **describe in Persian** | blocks, plugins, advanced scripting | not yet researched in depth | brief + waiting |
-| Tested before publish | **yes, automatic** | not seen in docs | not researched | manual, depends |
-| Price model | flat monthly per plan [proposed] | daily diamonds + per-message points (diamond 20 Toman, point 3 Toman, +10% VAT); their own sample bots use 246–390 diamonds/day ≈ 150–235k Toman/month [sourced: price calculator inside their panel, https://sahbot.com/] | flat plans 183k / 287k / 609k Toman/month [sourced: https://aradbot.com/feature/] | one-off 2–30M Toman |
-| Channels | Bale, Telegram | Bale, Telegram, Eitaa, iGap, Rubika, Soroush, WhatsApp, SMS | — | any |
-| Breadth | focused: booking, orders, FAQ, forms, payments | very broad (shop, cron, group manager, API/AI, custom code) | — | unlimited |
+| How you build | **describe in Persian** | blocks, plugins, advanced scripting | button/menu configuration | brief + waiting |
+| Tested before publish | **yes, automatic** | not seen in their documentation | not researched | manual, depends |
+| Price model | flat monthly per plan [proposed] | per feature per day plus per message (about 20 Toman per "diamond", 3 Toman per "point", +10% VAT); their own sample bots work out to roughly 150–235k Toman/month [sourced: the builder's own price calculator, read 2026-10-05] | flat plans of 183k / 287k / 609k Toman/month, about 22–26% off when paid yearly [sourced: public price page, read 2026-10-05] | one-off 2–30M Toman |
+| Channels | Bale, Telegram | many (Bale, Telegram, Eitaa, iGap, Rubika, Soroush, WhatsApp, SMS) | — | any |
+| Breadth | focused: booking, orders, FAQ, forms, payments, community tools | very broad (shop, scheduled posts, group manager, API/AI, custom code) | — | unlimited |
 Honest position: we do **not** win on breadth. We win on **time to a working, tested bot for a non-technical owner**, and on **predictable pricing**.
 
 ## 6. Business model [proposed, not validated]
@@ -45,9 +45,9 @@ Per-account monthly plans; every feature is in every plan, plans differ only in 
 | Basic | 149,000 | 3 / 1 | 500 | 100 |
 | Pro | 349,000 | 10 / 3 | 3,000 | 300 |
 | Agency | 1,490,000 | 50 / 10 | 3,000 | 1,500 |
-Why these anchors: SahBot's own sample bots cost 150–235k Toman/month in diamonds alone; AradBot's flat plans start at 183k; a freelancer's single basic bot costs 2–8M once — so ~150–350k/month is in-market and cheap next to a freelancer. **The founder must still validate the numbers with owners.**
+Why these anchors: a usage-billed builder's own sample bots cost 150–235k Toman/month; a flat-plan builder starts at 183k; a freelancer's single basic bot costs 2–8M once — so ~150–350k/month is in-market and cheap next to a freelancer. **The founder must still validate the numbers with owners.**
 In this demo build, upgrading is a **simulated payment**: the plan is activated immediately and the account page shows an invoice history marked «پرداخت آزمایشی» (no money moves, because there is no payment gateway yet). A switch (`BILLING_DEMO=false`) turns on the request-and-approve flow for a manual launch. Real subscription payment (e.g. ZarinPal) is **[blank — needs merchant onboarding]**.
-Later options: annual discount (AradBot gives ~22–26%), one-off "we build it for you" service, white-label for agencies. Not taking a cut of customers' payments: money goes to the owner's own Bale wallet by design.
+Later options: annual discount (the flat-plan builders give about 22–26%), one-off "we build it for you" service, white-label for agencies. Not taking a cut of customers' payments: money goes to the owner's own Bale wallet by design.
 
 ## 7. Unit economics
 Measured AI cost per request is $0.001–0.009 (median about $0.002). Worst-case AI cost per plan if the limit is fully used every month: Free 30 × $0.009 ≈ **$0.27**; Basic 100 × $0.009 ≈ **$0.90**; Pro 300 ≈ **$2.70**; Agency 1,500 ≈ **$13.50**. Customers chatting with bots cost **no AI**; the FAQ's embedding call is ≈ $0.0000003 per question [measured].
