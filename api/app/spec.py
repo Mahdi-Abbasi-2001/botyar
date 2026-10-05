@@ -29,12 +29,28 @@ class MessageBlock(BaseModel):
     text: str
 
 
+PLACEHOLDER = re.compile(r"\{(\w+)\}")
+
+
+def check_placeholders(texts: list[str], allowed: set[str]):
+    """{field_key} in a confirmation text is replaced by what the customer typed; anything else would be sent literally, so reject it."""
+    for t in texts:
+        for key in PLACEHOLDER.findall(t):
+            if key not in allowed:
+                raise ValueError(f"unknown placeholder {{{key}}}; allowed: {sorted(allowed)}")
+
+
 class FormBlock(BaseModel):
     type: Literal["form"] = "form"
     id: str
     title: str
     fields: list[FormField] = Field(min_length=1)
-    done_text: str = "اطلاعات شما ثبت شد. ممنون!"
+    done_text: str = "اطلاعات شما ثبت شد. ممنون!"  # may contain {field_key}: replaced by the customer's answer
+
+    @model_validator(mode="after")
+    def _placeholders(self):
+        check_placeholders([self.done_text], {f.key for f in self.fields})
+        return self
 
 
 ShortId = Annotated[str, Field(pattern=r"^[a-z0-9_]{1,24}$")]  # goes into callback_data (Bale max 64 bytes)
@@ -128,6 +144,7 @@ class BookingBlock(BaseModel):
     def _one_kind(self):
         if bool(self.slots) == (self.schedule is not None):
             raise ValueError("a booking block needs either `slots` (fixed events/classes) or `schedule` (appointments from working hours), not both and not neither")
+        check_placeholders([self.confirm_text, self.waitlist_text], {f.key for f in self.fields} | {"slot_label", "date", "time", "staff"})
         return self
 
 
@@ -199,6 +216,7 @@ class CatalogOrderBlock(BaseModel):
     def _items(self):
         if len({norm_code(c.code) for c in self.discount_codes}) != len(self.discount_codes):
             raise ValueError("duplicate discount code")
+        check_placeholders([self.confirm_text], {f.key for f in self.fields})
         if self.source == "inline" and not self.items:
             raise ValueError("an inline catalog_order needs at least one item (or use source='table')")
         return self

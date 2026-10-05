@@ -14,7 +14,7 @@ from typing import Any, Protocol
 from . import dates
 from .engine_text import fa_digits, fa_norm, norm  # noqa: F401  (re-exported: engine.norm / engine.fa_norm / engine.fa_digits)
 from .faq_match import LexicalMatcher, MatcherUnavailable, RateLimited, decide
-from .spec import norm_code, BotSpec, BookingBlock, CatalogOrderBlock, ContactBlock, FaqBlock, FeedbackBlock, FormBlock, FormField, MessageBlock
+from .spec import PLACEHOLDER, norm_code, BotSpec, BookingBlock, CatalogOrderBlock, ContactBlock, FaqBlock, FeedbackBlock, FormBlock, FormField, MessageBlock
 
 log = logging.getLogger("botyar.engine")
 STALE_RESETS = {"count": 0}  # tests assert this stays 0 unless a bot really changed under a conversation
@@ -267,6 +267,11 @@ def _from_menu(spec, session, text_n, store, now):
 
 
 # ---------- form ----------
+def _fill(text: str, data: dict) -> str:
+    """Put the customer's own answers into a confirmation text ({name} -> what they typed)."""
+    return PLACEHOLDER.sub(lambda m: str(data.get(m.group(1), m.group(0))), text)
+
+
 def _form(spec, session, block: FormBlock, text, store):
     idx = session["step"]
     field = block.fields[idx]
@@ -278,7 +283,7 @@ def _form(spec, session, block: FormBlock, text, store):
         session["step"] = idx + 1
         return [_ask(block.fields[idx + 1])]
     row = store.add(block.id, dict(session["data"]))
-    actions = [send(block.done_text)]
+    actions = [send(_fill(block.done_text, row))]
     _notify(spec, block.id, _summary(row), actions)
     _reset(session)
     actions.append(menu_actions(spec))
@@ -369,7 +374,7 @@ def _commit_slot(spec, session, block: BookingBlock, store, now):
 
 def _finish_booking(spec, session, block, store, now, row, status, text):
     """Confirmation + owner notice; for a reschedule the old booking is released only now that the new place is certain."""
-    actions = [send(text)]
+    actions = [send(_fill(text, row))]
     old_id = session["data"].get("_replace")
     if old_id and status == "confirmed":
         old = next(iter(store.find(block.id, id=old_id)), None)
@@ -863,7 +868,7 @@ def _order(spec, session, block: CatalogOrderBlock, text, store, now):
         return actions
     if block.payment == "online" and not session.get("pay_ok"):
         breakdown += "\nپرداخت آنلاین هنوز برای این ربات فعال نشده؛ مدیر درباره‌ی پرداخت با شما هماهنگ می‌کند."
-    actions = [send(f"{block.confirm_text}\n{lines}{breakdown}\nجمع کل: {total:,} تومان")]
+    actions = [send(f"{_fill(block.confirm_text, row)}\n{lines}{breakdown}\nجمع کل: {total:,} تومان")]
     _notify(spec, block.id, f"سفارش #{row['id']} - جمع {total:,} تومان" + (f" (کد {code.code})" if code else "") + f"\n{lines}", actions)
     _reset(session)
     actions.append(menu_actions(spec))

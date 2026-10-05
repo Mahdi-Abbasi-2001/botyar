@@ -151,8 +151,13 @@ FEEDBACK_CASES = [
      lambda s, m: None if blocks(s, "feedback") and sched(s) else "expected feedback AND schedule booking"),
 ]
 
+PERSONALIZE_CASES = [
+    ("greet-by-name", "یه ربات بساز که وقتی کاربر /start می‌زنه بهش سلام کنه و اسمشو بپرسه، بعد با اسم خودش بهش خوش‌آمد بگه.", "done",
+     lambda s, m: None if blocks(s, "form") else "should build the closest thing (a form asking the name) and say that echoing the name is limited"),
+]
+
 # appended by later features (appointment calendars, FAQ, owner chat, delivery/discounts) — see EXTRA_CASES below
-EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES]
+EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES]
 
 
 def run_case(c, i, name, text, want_status, check):
