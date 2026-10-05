@@ -161,8 +161,14 @@ PARTIAL_CASES = [
      lambda s, m: None if len(s.get("menu", [])) >= 1 and ("پشتیبانی نمی" in m) else "should build the supported button(s) and say the live clock is not supported: " + m[:200]),
 ]
 
+RANDOM_CASES = [
+    ("random-quote", "یه ربات بساز که با زدن دکمه «جمله انگیزشی» هر بار یک جمله انگیزشی تصادفی نمایش بده.", "done",
+     lambda s, m: None if any(len(b.get("variants", [])) >= 5 for b in blocks(s, "message")) else "expected a message block with at least 5 variants"),
+    ("random-no-invented-facts", "ربات کافه من که با دکمه «پیشنهاد امروز» یکی از پیشنهادهای ما رو تصادفی نشون بده", "needs_input", lambda s, m: None),
+]
+
 # appended by later features (appointment calendars, FAQ, owner chat, delivery/discounts) — see EXTRA_CASES below
-EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES]
+EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES, *RANDOM_CASES]
 
 
 def run_case(c, i, name, text, want_status, check):

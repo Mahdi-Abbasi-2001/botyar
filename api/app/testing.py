@@ -61,6 +61,7 @@ def _fresh_store(spec: BotSpec, catalog: list[dict] | None) -> engine.MemoryStor
 
 def run_scenario(spec: BotSpec, sc: TestScenario, catalog: list[dict] | None = None) -> dict:
     store = _fresh_store(spec, catalog)
+    rng = engine.Cycle()  # random messages show variants in order, so tests are deterministic
     failures: list[str] = []
     transcript: list[dict] = []
     try:
@@ -70,12 +71,12 @@ def run_scenario(spec: BotSpec, sc: TestScenario, catalog: list[dict] | None = N
                 sess["cust"] = f"t:setup{n}"
                 sess["pay_ok"] = sess["pay_sim"] = True
                 for msg in s.steps:
-                    engine.handle(spec, sess, msg, store, dates.TEST_NOW)
+                    engine.handle(spec, sess, msg, store, dates.TEST_NOW, rng=rng)
         sess = engine.new_session()
         sess["cust"] = "t:main"
         sess["pay_ok"] = sess["pay_sim"] = True
         for i, st in enumerate(sc.steps, 1):
-            actions = engine.handle(spec, sess, st.say, store, dates.TEST_NOW)
+            actions = engine.handle(spec, sess, st.say, store, dates.TEST_NOW, rng=rng)
             text = _texts(actions)
             transcript.append({"user": st.say, "bot": text})
             for needle in st.reply_contains:

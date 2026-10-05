@@ -5,6 +5,7 @@ Actions: {"type": "send", "text", "buttons": [{"text","data"}]} | {"type": "noti
 """
 from __future__ import annotations
 
+import random
 import re
 import logging
 import math
@@ -186,8 +187,34 @@ def _summary(data: dict) -> str:
     return "\n".join(f"{k}: {v}" for k, v in data.items() if not k.startswith("_"))
 
 
-def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matcher=None) -> list[dict]:
+class Cycle:
+    """Deterministic stand-in for the random generator: 0, 1, 2, ... (used by the agent's tests)."""
+
+    def __init__(self):
+        self.n = -1
+
+    def randrange(self, k: int) -> int:
+        self.n += 1
+        return self.n % k
+
+
+_RNG = random.SystemRandom()
+
+
+def pick_text(block, session: dict, rng) -> str:
+    """The message to send: the block's text, or one of its variants chosen at random but never the one shown last time."""
+    opts = block.variants or [block.text]
+    last = session.setdefault("last", {}).get(block.id)
+    idx = rng.randrange(len(opts))
+    if len(opts) > 1 and idx == last:
+        idx = (idx + 1) % len(opts)
+    session["last"][block.id] = idx
+    return opts[idx]
+
+
+def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matcher=None, rng=None) -> list[dict]:
     now = now or dates.now_tehran()  # injectable so tests run on a fixed clock
+    rng = rng or _RNG
     text_n = norm(text)
     if text_n in MENU_WORDS:
         _reset(session)
@@ -201,7 +228,7 @@ def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matc
         return _test_pay(spec, session, int(m.group(1)), store, now)
 
     if session["block"] is None:
-        return _from_menu(spec, session, text_n, store, now)
+        return _from_menu(spec, session, text_n, store, now, rng)
 
     try:
         if session["block"] == MY_BLOCK:
@@ -231,7 +258,7 @@ def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matc
 
 
 # ---------- menu ----------
-def _from_menu(spec, session, text_n, store, now):
+def _from_menu(spec, session, text_n, store, now, rng=_RNG):
     if _cancel_blocks(spec) and (text_n == f"m:{len(spec.menu)}" or text_n == MY_LABEL):
         return _my_start(spec, session, store, now)
     item = None
@@ -244,7 +271,7 @@ def _from_menu(spec, session, text_n, store, now):
         return [menu_actions(spec, "متوجه نشدم. لطفاً از منو انتخاب کنید:")]
     block = spec.block(item.block)
     if block.type == "message":
-        return [send(block.text), menu_actions(spec)]
+        return [send(pick_text(block, session, rng)), menu_actions(spec)]
     session.update(block=block.id, step=0, data={})
     if block.type == "form":
         return [send(block.title), _ask(block.fields[0])]

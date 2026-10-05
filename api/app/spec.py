@@ -27,6 +27,7 @@ class MessageBlock(BaseModel):
     type: Literal["message"] = "message"
     id: str
     text: str
+    variants: list[Annotated[str, Field(min_length=1, max_length=1500)]] = Field(default_factory=list, max_length=30)  # non-empty: each tap shows one of these at random (never the same twice in a row)
 
 
 PLACEHOLDER = re.compile(r"\{(\w+)\}")

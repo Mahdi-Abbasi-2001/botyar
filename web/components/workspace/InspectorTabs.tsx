@@ -63,6 +63,15 @@ function Fields({ fields }: { fields: { key: string; label: string; kind: keyof 
 }
 
 function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] }) {
+  if (b.type === "message" && b.variants?.length)
+    return (
+      <>
+        <span className="text-xs text-mute">هر بار یکی از {fa(b.variants.length)} متن زیر به‌صورت تصادفی نشان داده می‌شود (هیچ‌وقت دو بار پشت‌سرهم تکراری نیست):</span>
+        <div className="flex flex-col gap-1.5 text-sm">
+          {b.variants.map((v, i) => <span key={i} className="rounded-[10px] bg-raised px-3 py-2">{v}</span>)}
+        </div>
+      </>
+    );
   if (b.type === "message") return <p className="m-0 whitespace-pre-line text-sm leading-7 text-fg-2">{b.text}</p>;
   if (b.type === "form") return <Fields fields={b.fields} />;
   if (b.type === "admin_notify") {
