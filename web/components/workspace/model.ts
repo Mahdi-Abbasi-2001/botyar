@@ -15,11 +15,13 @@ export type Block =
   | { type: "catalog_order"; id: string; title: string; items: Item[]; max_items: number; min_total: number; fields: Field[]; confirm_text: string; payment?: "none" | "online"; delivery_fee?: number; free_delivery_over?: number; discount_codes?: { code: string; percent: number; amount: number; min_total: number; max_uses: number }[] }
   | { type: "menu"; id: string; title: string; items: { label: string; block: string }[] }
   | { type: "quiz"; id: string; title: string; questions: { question: string; options: string[]; correct: number }[]; result_text?: string; show_answers?: boolean }
+  | { type: "referral"; id: string; title: string; text?: string; goal: number; reward_text?: string }
+  | { type: "anon_chat"; id: string; title: string; intro_text?: string }
   | { type: "feedback"; id: string; title: string; prompt_text?: string; comment_text?: string; thanks_text?: string }
   | { type: "contact"; id: string; title: string; prompt_text?: string; sent_text?: string }
   | { type: "faq"; id: string; title: string; entries: { question: string; answer: string }[]; prompt_text?: string; not_found_text?: string }
   | { type: "admin_notify"; id: string; on: string; text: string };
-export type Spec = { name: string; welcome: string; menu: { label: string; block: string }[]; blocks: Block[] };
+export type Spec = { name: string; welcome: string; menu: { label: string; block: string }[]; blocks: Block[]; gate?: { channel: string; text: string; join_url?: string } | null };
 export type Bot = { id: number; name: string; version: number; spec: Spec | null };
 
 export type Rec = { id: number; collection: string; data: Record<string, any>; created_at: string };
@@ -31,7 +33,7 @@ export type RunResult = { message: string; version?: number; tests?: TestRes[]; 
 export type RunStatus = "running" | "needs_input" | "done" | "failed" | "declined";
 
 export const BLOCK_KIND: Record<Block["type"], string> = {
-  message: "پیام", form: "فرم", booking: "نوبت‌دهی", catalog_order: "سفارش", admin_notify: "اعلان به مدیر", faq: "پرسش‌های متداول", contact: "پیام به مدیر", feedback: "نظرسنجی", menu: "زیرمنو", quiz: "آزمون",
+  message: "پیام", form: "فرم", booking: "نوبت‌دهی", catalog_order: "سفارش", admin_notify: "اعلان به مدیر", faq: "پرسش‌های متداول", contact: "پیام به مدیر", feedback: "نظرسنجی", menu: "زیرمنو", quiz: "آزمون", referral: "دعوت دوستان", anon_chat: "چت ناشناس",
 };
 export const FIELD_KIND: Record<Field["kind"], string> = { text: "متن", phone: "موبایل · بررسی قالب", number: "عدد", choice: "انتخابی" };
 

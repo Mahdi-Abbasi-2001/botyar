@@ -11,10 +11,11 @@ from app.db import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import BuilderRun, Product, Record, VersionTests  # noqa: E402
 
-PUBLIC = {("POST", "/api/auth/login"), ("POST", "/api/auth/register"), ("GET", "/api/health"), ("GET", "/api/templates"),
+PUBLIC = {("POST", "/api/auth/login"), ("POST", "/api/auth/register"), ("GET", "/api/health"), ("GET", "/api/templates"), ("GET", "/api/plans"),
           ("POST", "/api/hook/shared/{secret}"), ("POST", "/api/hook/own/{pub_id}/{secret}"),
           ("POST", "/api/tghook/shared/{secret}"), ("POST", "/api/tghook/own/{pub_id}/{secret}")}
-NO_BOT = {("GET", "/api/bots"), ("POST", "/api/bots"), ("POST", "/api/bots/draft"), ("GET", "/api/me")}  # scoped to the caller, no bot id
+NO_BOT = {("GET", "/api/bots"), ("POST", "/api/bots"), ("POST", "/api/bots/draft"), ("GET", "/api/me"),
+          ("GET", "/api/me/plan"), ("POST", "/api/me/upgrade"), ("GET", "/api/admin/upgrades"), ("POST", "/api/admin/upgrades/{rid}")}  # scoped to the caller, no bot id
 
 
 @pytest.fixture()

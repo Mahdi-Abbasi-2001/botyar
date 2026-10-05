@@ -194,9 +194,11 @@ def simulate(bot_id: int, body: SimMessage, user: User = Depends(current_user), 
     db.commit()
     from . import media
 
-    for a in actions:  # the phone preview shows which file would be sent (the real file only goes out on Bale)
+    for i, a in enumerate(actions):  # the phone preview shows which file would be sent (the real file only goes out on Bale)
         if a.get("type") == "media":
             a.update(media.describe(db, bot.id, a["block"]))
+        elif str(a.get("type", "")).startswith("anon_"):  # pairing needs two real customers: the preview only explains it
+            actions[i] = {"type": "send", "text": "(گفتگوی ناشناس فقط بین دو مشتری واقعی در بله یا تلگرام کار می‌کند؛ اینجا نمونه‌اش را نمی‌شود دید.)", "buttons": []}
     return {"actions": actions}
 
 
@@ -344,6 +346,14 @@ app.include_router(customers_router)
 from .media import router as media_router  # noqa: E402
 
 app.include_router(media_router)
+
+from .communities import router as communities_router  # noqa: E402
+
+app.include_router(communities_router)
+
+from .referral import router as referral_router  # noqa: E402
+
+app.include_router(referral_router)
 
 from .outreach import router as outreach_router  # noqa: E402
 

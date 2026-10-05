@@ -23,10 +23,10 @@ from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import billing, dates, engine, faq_index, media
+from . import anon, billing, communities, dates, engine, faq_index, gate, media, referral
 from .config import settings
 from .db import SessionLocal
-from .models import Bot, BotListing, BotVersion, ChatLink, ChatSession, PaymentConfig, Publication, Record
+from .models import Bot, BotListing, BotVersion, ChatLink, BannedCustomer, ChatSession, CustomerSeen, PaymentConfig, Publication, Record
 from .spec import BotSpec
 from .store import SqlStore
 
@@ -130,6 +130,9 @@ def to_markup(buttons: list[dict], cb: dict) -> dict:
     rows = []
     for b in buttons:
         data = b["data"]
+        if data.startswith("url:"):  # a link button (e.g. "join our channel")
+            rows.append([{"text": engine.fa_digits(b["text"]), "url": data[4:]}])
+            continue
         if len(data.encode()) > 64:
             key = f"~{len(cb)}"
             cb[key] = data
@@ -200,7 +203,10 @@ def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_
                 # a message for ANOTHER customer (e.g. promoted from the waitlist), possibly on the other messenger
                 cust = str(a.get("cust", ""))
                 if cust.startswith(mine):
-                    ch.call(token, "sendMessage", {"chat_id": cust[len(mine):], "text": engine.fa_digits(a["text"])[:4096]})
+                    payload = {"chat_id": cust[len(mine):], "text": engine.fa_digits(a["text"])[:4096]}
+                    if a.get("buttons"):
+                        payload["reply_markup"] = to_markup(a["buttons"], {})
+                    ch.call(token, "sendMessage", payload)
                 elif others is not None:
                     others.append(a)
             elif a["type"] == "notify_admin" and admin_chat_id:
@@ -272,6 +278,14 @@ def _paid(db: Session, token: str, msg: dict):
         deliver(token, chat_id, actions + [engine.menu_actions(spec)], {}, pub.admin_chat_id)
 
 
+def shared_username_for(ch: Channel) -> str:
+    if ch.name == "bale":
+        return shared_username()
+    from . import telegram
+
+    return telegram.shared_username()
+
+
 def say(token: str, chat_id: str, text: str, ch: Channel = BALE):
     try:
         ch.call(token, "sendMessage", {"chat_id": chat_id, "text": text})
@@ -297,7 +311,10 @@ def send_customer_actions(db: Session, bot_id: int, actions: list[dict]) -> int:
             continue
         for a in wanted:
             try:
-                ch.call(token, "sendMessage", {"chat_id": a["cust"][len(mine):], "text": engine.fa_digits(a["text"])[:4096]})
+                payload = {"chat_id": a["cust"][len(mine):], "text": engine.fa_digits(a["text"])[:4096]}
+                if a.get("buttons"):
+                    payload["reply_markup"] = to_markup(a["buttons"], {})
+                ch.call(token, "sendMessage", payload)
                 sent += 1
             except Exception as e:  # noqa: BLE001 - e.g. the customer blocked the bot
                 log.warning("customer message failed: %s", e)
@@ -334,6 +351,7 @@ def directory(db: Session, ch: Channel, page: int, edit: bool = False) -> dict:
 
 
 # ---------- update handling ----------
+_gate_notice: dict[int, object] = {}  # bot id -> day the owner was last told the join check cannot be made
 _cap_notice: dict[int, object] = {}  # bot id -> day the owner was last told the customer cap is full
 _locks: dict[int, threading.Lock] = defaultdict(threading.Lock)  # serialise a bot's bookings (capacity checks)
 _seen: dict[str, int] = {}
@@ -368,6 +386,11 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
         return
     if ch.payments and (update.get("message") or {}).get("successful_payment"):
         _paid(db, token, update["message"])
+        return
+
+    chat_obj = (update.get("channel_post") or update.get("message") or {}).get("chat") or {}
+    if "channel_post" in update or chat_obj.get("type") in ("group", "supergroup", "channel"):
+        communities.handle_update(db, ch, kind, own_pub, update, token)  # groups and channels: forwarding, moderation, linking
         return
 
     cq, msg = update.get("callback_query"), update.get("message")
@@ -409,6 +432,9 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
 
     pub = own_pub
     welcome_now = False
+    refrow = None
+    if kind == "own" and t.startswith("/start"):
+        refrow = referral.resolve(db, t[6:].strip())
     if kind == "shared":
         # A customer reaches a business's bot through its link (ble.ir/<bot>?start=CODE, t.me/<bot>?start=CODE: the
         # messenger sends "/start CODE") or by picking it from the directory. A code typed as a message is NOT accepted.
@@ -426,7 +452,10 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
         found = None
         payload = t[6:].strip() if t.startswith("/start") else ""
         picked = re.fullmatch(r"bdir:(\d{1,12})", t)
-        if re.fullmatch(r"[A-Za-z0-9]{4,12}", payload):
+        refrow = referral.resolve(db, payload)
+        if refrow is not None:  # an invite link: it names the business through the inviter
+            found = db.scalars(select(Pub).where(Pub.bot_id == refrow.bot_id, Pub.mode == "shared")).first()
+        elif re.fullmatch(r"[A-Za-z0-9]{4,12}", payload):
             found = db.scalars(select(Pub).where(Pub.code == payload.upper(), Pub.mode == "shared")).first()
         elif picked:
             cand = db.get(Pub, int(picked.group(1)))
@@ -475,7 +504,27 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
         if frm.get("first_name"):
             state["cust_name"] = str(frm["first_name"])[:40]
         state["cust"] = skey  # stable customer identity (set last: the welcome path above replaces the whole state)
+        if spec.gate is not None and not (t in ("/stop", "/resume")):
+            verdict = gate.verify(ch, token, spec, state, chat_id)
+            if state.get("gate_error") and pub.admin_chat_id and _gate_notice.get(pub.bot_id) != dates.now_tehran().date():
+                _gate_notice[pub.bot_id] = dates.now_tehran().date()
+                say(token, pub.admin_chat_id, "⚠️ بررسی عضویت در کانال انجام نشد (ربات را در کانال ادمین کنید و نام کانال را بررسی کنید)؛ فعلاً مشتری‌ها بدون بررسی وارد می‌شوند.", ch)
+            if verdict == "blocked":
+                row.state = state
+                db.commit()
+                deliver(token, chat_id, [gate.prompt(spec, ch.name)], state, ch=ch)
+                row.state = state
+                db.commit()
+                return
+            if t == "gate:check":
+                t = "/start"
+        if db.scalars(select(BannedCustomer).where(BannedCustomer.bot_id == pub.bot_id, BannedCustomer.key == skey)).first():
+            row.state = state
+            db.commit()
+            say(token, chat_id, "دسترسی شما به این ربات مسدود شده است.", ch)
+            return
         bot = db.get(Bot, pub.bot_id)
+        was_new = db.scalars(select(CustomerSeen).where(CustomerSeen.bot_id == pub.bot_id, CustomerSeen.key == skey)).first() is None
         if bot is not None and not billing.track_customer(db, bot, skey, state.get("cust_name", "")):
             row.state = state  # a NEW customer beyond the plan's monthly cap: politely refused, the owner is told once a day
             db.commit()
@@ -485,10 +534,27 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
                 _cap_notice[pub.bot_id] = today
                 say(token, pub.admin_chat_id, "⚠️ ظرفیت ماهانه‌ی مشتری‌های پلن شما پر شده و مشتری جدید پذیرفته نمی‌شود. برای ظرفیت بیشتر از بخش «پلن‌ها» در بات‌یار ارتقا دهید.", ch)
             return
+        ref_block = next((b for b in spec.blocks if b.type == "referral"), None)
+        if refrow is not None and was_new and refrow.bot_id == pub.bot_id:
+            owed = referral.convert(db, pub.bot_id, refrow, skey, ref_block.goal if ref_block else None)
+            if owed:
+                others_ref = list(owed)
+                db.flush()
+            else:
+                others_ref = []
+        else:
+            others_ref = []
+        if ref_block is not None:  # this customer's personal link and invite count, for the referral block
+            code = referral.code_for(db, pub.bot_id, skey)
+            username = pub.bot_username or (shared_username_for(ch) if pub.mode == "shared" else "")
+            state["ref"] = {"link": referral.link(ch.name, username, code), "count": referral.count_for(db, pub.bot_id, skey)}
         wallet = wallet_token(db, pub) if ch.payments else ""
         state["pay_ok"], state["pay_sim"] = bool(wallet), False  # pay_sim (the fake pay button) must never be on in a real chat
         store = SqlStore(db, pub.bot_id, sandbox=False)
         actions = engine.handle(spec, state, t, store, matcher=faq_index.matcher_for(db, pub.bot_id, spec))
+        anon_others: list[dict] = []
+        if any(a["type"].startswith("anon_") for a in actions):
+            actions, anon_others = anon.run(db, bot, spec, state, skey, actions)
         others: list[dict] = []  # e.g. a waitlisted customer on the other messenger who just got the freed place
         for rid in deliver(token, chat_id, actions, state, pub.admin_chat_id, clicked_message_id, wallet, ch, others,
                            files=lambda block_id: media.get_file(db, pub.bot_id, block_id)):
@@ -502,3 +568,9 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
         db.commit()
         if others:
             send_customer_actions(db, pub.bot_id, others)
+        if anon_others:
+            send_customer_actions(db, pub.bot_id, anon_others)
+        if others_ref:
+            send_customer_actions(db, pub.bot_id, others_ref)
+            if ref_block is not None and pub.admin_chat_id and any("به هدف رسیدید" in a["text"] for a in others_ref):
+                say(token, pub.admin_chat_id, "🏆 یکی از مشتری‌ها به هدف دعوت رسید؛ جایزه‌اش را از بخش مشتریان/دعوت‌ها ببینید.", ch)

@@ -15,7 +15,7 @@ from typing import Any, Protocol
 from . import dates
 from .engine_text import fa_digits, fa_norm, norm  # noqa: F401  (re-exported: engine.norm / engine.fa_norm / engine.fa_digits)
 from .faq_match import LexicalMatcher, MatcherUnavailable, RateLimited, decide
-from .spec import PLACEHOLDER, norm_code, BotSpec, BookingBlock, CatalogOrderBlock, ContactBlock, FaqBlock, FeedbackBlock, MenuBlock, QuizBlock, FormBlock, FormField, MessageBlock
+from .spec import PLACEHOLDER, norm_code, BotSpec, BookingBlock, CatalogOrderBlock, ContactBlock, FaqBlock, FeedbackBlock, MenuBlock, QuizBlock, ReferralBlock, AnonChatBlock, FormBlock, FormField, MessageBlock
 
 log = logging.getLogger("botyar.engine")
 STALE_RESETS = {"count": 0}  # tests assert this stays 0 unless a bot really changed under a conversation
@@ -217,11 +217,13 @@ def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matc
     rng = rng or _RNG
     text_n = norm(text)
     if text_n in MENU_WORDS:
+        leave = _leave_anon(spec, session)
         _reset(session)
-        return [send(spec.welcome), menu_actions(spec)]
+        return [*leave, send(spec.welcome), menu_actions(spec)]
     if text_n in CANCEL_WORDS:
+        leave = _leave_anon(spec, session)
         _reset(session)
-        return [menu_actions(spec, "انصراف انجام شد.")]
+        return [*leave, menu_actions(spec, "انصراف انجام شد.")]
 
     m = re.fullmatch(r"pay:(\d+)", text_n)
     if m and session.get("pay_sim"):  # test payment button: the simulator and the agent's tests only, never a real chat
@@ -250,6 +252,8 @@ def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matc
             return _submenu(spec, session, block, text, store, now, rng)
         if block.type == "quiz":
             return _quiz(spec, session, block, text, store, now)
+        if block.type == "anon_chat":
+            return _anon(spec, session, block, text, now)
     except (StopIteration, IndexError, KeyError) as e:
         # The saved state belongs to an older version of the bot (the owner republished mid-conversation:
         # a block, field, slot or option it points to is gone). Never leave the customer in silence.
@@ -291,6 +295,12 @@ def _start_block(spec, session, block, store, now, rng):
     if block.type == "message":
         return message_actions(block, session, rng, menu_actions(spec))
     session.update(block=block.id, step=0, data={})
+    if block.type == "referral":
+        _reset(session)
+        return _referral(spec, session, block)
+    if block.type == "anon_chat":
+        session["step"] = "idle"
+        return [send(block.title), send(block.intro_text, [_btn("🔍 پیدا کردن شریک گفتگو", "ac:find"), _btn("بازگشت به منو", "/menu")])]
     if block.type == "menu":
         session["step"] = "pick"
         return [_submenu_prompt(block)]
@@ -1030,6 +1040,59 @@ def _submenu(spec, session, block: MenuBlock, text, store, now, rng):
     if child.type == "message":  # reading a text keeps the customer in the sub-menu so they can browse its siblings
         return message_actions(child, session, rng, _submenu_prompt(block))
     return _start_block(spec, session, child, store, now, rng)
+
+
+# ---------- anonymous chat (pairing and relaying are done by the channel adapter, see anon.py) ----------
+def _leave_anon(spec, session) -> list[dict]:
+    """Going back to the menu while waiting or chatting must also release the partner / the queue place."""
+    if session.get("block") is None:
+        return []
+    b = next((x for x in spec.blocks if x.id == session["block"]), None)
+    if b is not None and b.type == "anon_chat" and session.get("step") in ("waiting", "chat"):
+        return [{"type": "anon_end", "block": b.id}]
+    return []
+
+
+def _anon_buttons():
+    return [_btn("⛔ پایان گفتگو", "ac:end"), _btn("🔄 شریک بعدی", "ac:next"), _btn("🚫 گزارش تخلف", "ac:report")]
+
+
+def _anon(spec, session, block: AnonChatBlock, text, now):
+    text_n, step = norm(text), session.get("step")
+    if step == "idle":
+        if text_n == "ac:find":
+            session["step"] = "waiting"
+            return [send("در حال جستجوی شریک گفتگو… هر وقت پیدا شد خبرتان می‌کنیم.", [_btn("لغو جستجو", "ac:end")]), {"type": "anon_find", "block": block.id}]
+        return [send(block.intro_text, [_btn("🔍 پیدا کردن شریک گفتگو", "ac:find"), _btn("بازگشت به منو", "/menu")])]
+    if step == "waiting":
+        if text_n == "ac:end":
+            session["step"] = "idle"
+            return [{"type": "anon_end", "block": block.id}, send("جستجو لغو شد.", [_btn("🔍 جستجوی دوباره", "ac:find"), _btn("بازگشت به منو", "/menu")])]
+        return [send("هنوز کسی پیدا نشده؛ منتظر بمانید یا لغو کنید.", [_btn("لغو جستجو", "ac:end")])]
+    # step == "chat"
+    if text_n == "ac:end":
+        session["step"] = "idle"
+        return [{"type": "anon_end", "block": block.id}, send("گفتگو پایان یافت.", [_btn("🔍 جستجوی شریک جدید", "ac:find"), _btn("بازگشت به منو", "/menu")])]
+    if text_n == "ac:next":
+        session["step"] = "waiting"
+        return [{"type": "anon_end", "block": block.id}, send("در حال جستجوی شریک جدید…", [_btn("لغو جستجو", "ac:end")]), {"type": "anon_find", "block": block.id}]
+    if text_n == "ac:report":
+        session["step"] = "idle"
+        return [{"type": "anon_report", "block": block.id}, send("گزارش شما برای مدیر ثبت شد و گفتگو پایان یافت. ممنون.", [_btn("🔍 جستجوی شریک جدید", "ac:find"), _btn("بازگشت به منو", "/menu")])]
+    return [{"type": "anon_relay", "block": block.id, "text": text.strip()[:500]}]
+
+
+# ---------- referral (invite links) ----------
+def _referral(spec, session, block: ReferralBlock):
+    """The channel adapter puts this customer's personal link and invite count into session["ref"] before every turn."""
+    ref = session.get("ref") or {}
+    count = int(ref.get("count", 0))
+    lines = [block.text, ""]
+    lines.append(f"لینک اختصاصی شما:\n{ref['link']}" if ref.get("link") else "(لینک اختصاصی فقط در بله و تلگرام ساخته می‌شود)")
+    lines.append(f"دعوت‌های موفق: {count} از {block.goal}")
+    if count >= block.goal:
+        lines += ["", block.reward_text]
+    return [send("\n".join(lines)), menu_actions(spec)]
 
 
 # ---------- quiz ----------

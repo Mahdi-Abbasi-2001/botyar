@@ -23,6 +23,24 @@ class FormField(BaseModel):
         return self
 
 
+class JoinGate(BaseModel):
+    """Customers must be members of this channel before the bot talks to them (checked on Bale/Telegram; the owner must make the
+    bot an admin of the channel). If the check itself fails, customers are let in: a setup mistake must never lock them out."""
+    channel: str  # "@username" or a numeric chat id
+    text: str = "برای استفاده از ربات، ابتدا در کانال ما عضو شوید و سپس «عضو شدم» را بزنید."
+    join_url: str = Field(default="", max_length=200)  # optional; built from the @username when empty
+
+    @model_validator(mode="after")
+    def _channel(self):
+        c = self.channel.strip()
+        if not re.fullmatch(r"@[A-Za-z0-9_]{4,64}|-?\d{5,20}", c):
+            raise ValueError("channel must be an @username (letters, digits, underscore) or a numeric chat id")
+        self.channel = c
+        if self.join_url and not self.join_url.startswith("https://"):
+            raise ValueError("join_url must start with https://")
+        return self
+
+
 class MenuItem(BaseModel):
     label: str
     block: str
@@ -304,6 +322,26 @@ class QuizBlock(BaseModel):
         return self
 
 
+class ReferralBlock(BaseModel):
+    """Every customer gets a personal invite link; people who arrive through it as brand-new customers are counted for them.
+    The reward is the owner's own text, handed out by the owner (nothing is paid automatically)."""
+    type: Literal["referral"] = "referral"
+    id: str
+    title: str
+    text: str = "دوستانتان را با لینک اختصاصی خودتان دعوت کنید."
+    goal: int = Field(default=5, ge=1, le=1000)
+    reward_text: str = "تبریک! به هدف رسیدید. برای دریافت جایزه با مدیر هماهنگ کنید."
+
+
+class AnonChatBlock(BaseModel):
+    """Two customers are paired and chat without seeing who the other is (Bale/Telegram only; needs two real customers at once).
+    Text only; links and phone numbers are not passed on; either side can end the chat or report the other, and the owner can ban people."""
+    type: Literal["anon_chat"] = "anon_chat"
+    id: str
+    title: str
+    intro_text: str = "با یک نفر ناشناس گفتگو کنید. نام و مشخصات شما دیده نمی‌شود. لطفاً مؤدب باشید؛ تخلف را می‌توانید گزارش دهید."
+
+
 class AdminNotifyBlock(BaseModel):
     type: Literal["admin_notify"] = "admin_notify"
     id: str
@@ -312,7 +350,7 @@ class AdminNotifyBlock(BaseModel):
 
 
 Block = Annotated[
-    Union[MessageBlock, FormBlock, BookingBlock, CatalogOrderBlock, FaqBlock, ContactBlock, FeedbackBlock, MenuBlock, QuizBlock, AdminNotifyBlock],
+    Union[MessageBlock, FormBlock, BookingBlock, CatalogOrderBlock, FaqBlock, ContactBlock, FeedbackBlock, MenuBlock, QuizBlock, ReferralBlock, AnonChatBlock, AdminNotifyBlock],
     Field(discriminator="type"),
 ]
 
@@ -322,6 +360,7 @@ class BotSpec(BaseModel):
     welcome: str
     menu: list[MenuItem] = Field(min_length=1)
     blocks: list[Block] = Field(min_length=1)
+    gate: JoinGate | None = None  # forced channel join
 
     @model_validator(mode="after")
     def _refs(self):

@@ -272,3 +272,109 @@ class ScheduledBroadcast(Base):
     last_run: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_status: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class ReferralCode(Base):
+    """A customer's personal invite code (their link is the bot's link plus this code)."""
+    __tablename__ = "referral_codes"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    key: Mapped[str] = mapped_column(String(64))  # referrer customer key, "bale:<id>" / "tg:<id>"
+    code: Mapped[str] = mapped_column(String(12), unique=True, index=True)
+
+
+class ReferralJoin(Base):
+    """A brand-new customer who arrived through someone's invite link (each customer counts once, for one referrer)."""
+    __tablename__ = "referral_joins"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    referrer_key: Mapped[str] = mapped_column(String(64), index=True)
+    invited_key: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class LinkToken(Base):
+    """A one-time code the owner posts as `/link CODE` in a group or channel to attach that chat to their bot (valid 15 minutes)."""
+    __tablename__ = "link_tokens"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    code: Mapped[str] = mapped_column(String(16), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class ChatBinding(Base):
+    """A group or channel (on Bale or Telegram) that belongs to a business's bot."""
+    __tablename__ = "chat_bindings"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    ch: Mapped[str] = mapped_column(String(8))  # bale | tg
+    chat_id: Mapped[str] = mapped_column(String(32), index=True)
+    kind: Mapped[str] = mapped_column(String(10))  # group | channel
+    title: Mapped[str] = mapped_column(String(120), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class ForwardRule(Base):
+    """Posts published in the source channel are copied to the destination chat."""
+    __tablename__ = "forward_rules"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey("chat_bindings.id"), index=True)
+    dest_id: Mapped[int] = mapped_column(ForeignKey("chat_bindings.id"))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    forwarded: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str] = mapped_column(String(200), default="")
+
+
+class GroupRule(Base):
+    __tablename__ = "group_rules"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    binding_id: Mapped[int] = mapped_column(ForeignKey("chat_bindings.id"), unique=True, index=True)
+    delete_links: Mapped[bool] = mapped_column(Boolean, default=True)
+    delete_forwards: Mapped[bool] = mapped_column(Boolean, default=False)
+    banned_words: Mapped[list] = mapped_column(JSON, default=list)
+    max_warnings: Mapped[int] = mapped_column(Integer, default=3)  # 0 = only delete, never ban
+    welcome_text: Mapped[str] = mapped_column(String(500), default="")
+    deleted: Mapped[int] = mapped_column(Integer, default=0)
+    banned: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class GroupWarning(Base):
+    __tablename__ = "group_warnings"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    binding_id: Mapped[int] = mapped_column(ForeignKey("chat_bindings.id"), index=True)
+    user_id: Mapped[str] = mapped_column(String(32))
+    count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class AnonQueue(Base):
+    """Customers waiting for an anonymous chat partner."""
+    __tablename__ = "anon_queue"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    block_id: Mapped[str] = mapped_column(String(64))
+    key: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class AnonPair(Base):
+    """Two customers chatting anonymously. `log` keeps only the last few messages, so that a report can be reviewed; it is cleared when the chat ends normally."""
+    __tablename__ = "anon_pairs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    block_id: Mapped[str] = mapped_column(String(64))
+    a_key: Mapped[str] = mapped_column(String(64), index=True)
+    b_key: Mapped[str] = mapped_column(String(64), index=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    log: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class BannedCustomer(Base):
+    __tablename__ = "banned_customers"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    key: Mapped[str] = mapped_column(String(64), index=True)
+    reason: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

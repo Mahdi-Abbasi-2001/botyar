@@ -185,8 +185,24 @@ MEDIA_CASES = [
      lambda s, m: None if not any(b.get("location") for b in blocks(s, "message")) and ("مختصات" in m or "لوکیشن" in m or "نقشه" in m) else "must not invent coordinates; should say it needs them"),
 ]
 
+GATE_CASES = [
+    ("gate-with-channel", "ربات کافه با منوی لاته ۹۵ هزار و اسپرسو ۷۰ هزار تومان. مشتری‌ها باید اول عضو کانال @cafebench_channel بشن.", "done",
+     lambda s, m: None if (s.get("gate") or {}).get("channel") == "@cafebench_channel" and ("ادمین" in m or "مدیر" in m) and not (s.get("gate") or {}).get("join_url") else "expected gate.channel and an admin note: " + str(s.get("gate")) + " | " + m[:300]),
+    ("gate-asks-for-channel", "ربات کافه با منوی لاته ۹۵ هزار تومان. مشتری‌ها قبل از استفاده باید عضو کانال ما بشن.", "needs_input", lambda s, m: None),
+]
+
+REFERRAL_CASES = [
+    ("referral-basic", "ربات کافه با منوی لاته ۹۵ هزار تومان. مشتری‌ها بتونن دوستاشون رو دعوت کنن؛ با ۳ دعوت موفق یه قهوه رایگان بگیرن.", "done",
+     lambda s, m: None if blocks(s, "referral") and blocks(s, "referral")[0]["goal"] == 3 else "expected a referral block with goal 3"),
+]
+
+ANON_CASES = [
+    ("anon-chat", "ربات باشگاه دانشجویی که دانشجوها بتونن ناشناس با هم چت کنن.", "done",
+     lambda s, m: None if blocks(s, "anon_chat") and ("ناشناس" in m) else "expected an anon_chat block with an honest note"),
+]
+
 # appended by later features (appointment calendars, FAQ, owner chat, delivery/discounts) — see EXTRA_CASES below
-EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES, *RANDOM_CASES, *MENU_QUIZ_CASES, *MEDIA_CASES]
+EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES, *RANDOM_CASES, *MENU_QUIZ_CASES, *MEDIA_CASES, *GATE_CASES, *REFERRAL_CASES, *ANON_CASES]
 
 
 def run_case(c, i, name, text, want_status, check):

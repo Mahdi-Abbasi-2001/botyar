@@ -49,6 +49,9 @@ def _texts(actions):
         if a["type"] == "media":
             parts.append("📎 " + ("عکس" if a["kind"] == "image" else "فایل"))
             continue
+        if a["type"].startswith("anon_"):
+            parts.append("[گفتگوی ناشناس]")
+            continue
         if a["type"] == "location":
             parts.append(f"📍 {a['latitude']}, {a['longitude']}")
             continue

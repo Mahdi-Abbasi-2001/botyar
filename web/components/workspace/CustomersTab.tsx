@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import { fa } from "@/components/ui";
 import { ExportButtons } from "@/components/workspace/ExportButtons";
 
-type Row = { id: number; name: string; channel: string; messages: number; first_seen: string; last_seen: string };
+type Row = { id: number; banned?: boolean; name: string; channel: string; messages: number; first_seen: string; last_seen: string };
 type Data = { total: number; active_30d: number; cap: number; plan: string; page: number; page_size: number; items: Row[] };
 
 const card = "rounded-2xl border border-line-2 bg-panel p-4";
@@ -12,6 +12,7 @@ const day = (iso: string) => fa(new Date(iso).toLocaleDateString("fa-IR"));
 
 export function CustomersTab({ botId }: { botId: string }) {
   const [data, setData] = useState<Data | null>(null);
+  const [refs, setRefs] = useState<{ total: number; top: { name: string; invited: number }[] } | null>(null);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(0);
   const [error, setError] = useState("");
@@ -26,6 +27,17 @@ export function CustomersTab({ botId }: { botId: string }) {
   useEffect(() => {
     load();
   }, [load]);
+  useEffect(() => {
+    api<{ total: number; top: { name: string; invited: number }[] }>(`/bots/${botId}/referrals`).then(setRefs).catch(() => {});
+  }, [botId]);
+  async function toggleBan(r: Row) {
+    try {
+      await api(`/bots/${botId}/customers/${r.id}/${r.banned ? "unban" : "ban"}`, { method: "POST", body: {} });
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }
 
   const pages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
   return (
@@ -39,16 +51,22 @@ export function CustomersTab({ botId }: { botId: string }) {
           {fa(data.total)} نفر تا حالا به ربات پیام داده‌اند؛ {fa(data.active_30d)} نفر در ۳۰ روز گذشته فعال بوده‌اند (سقف پلن «{data.plan}»: {fa(data.cap.toLocaleString("en-US"))} نفر).
         </p>
       )}
+      {refs && refs.total > 0 && (
+        <section className={`${card} flex flex-col gap-1 text-sm`}>
+          <strong>برترین دعوت‌کننده‌ها ({fa(refs.total)} دعوت موفق)</strong>
+          {refs.top.map((t, i) => <span key={i}>{fa(i + 1)}. {t.name} — {fa(t.invited)} نفر</span>)}
+        </section>
+      )}
       {error && <p role="alert" className="m-0 text-sm text-red-400">{error}</p>}
       <input aria-label="جستجوی نام" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} placeholder="جستجوی نام…" className="min-h-11 rounded-xl border border-line-2 bg-raised px-3" />
       {data && data.items.length === 0 && <p className={`${card} m-0 text-sm text-mute`}>هنوز مشتری‌ای با ربات منتشرشده‌ی شما گفتگو نکرده است.</p>}
       {data && data.items.length > 0 && (
         <div className={`${card} overflow-x-auto p-0`}>
           <table className="w-full text-sm">
-            <thead><tr className="border-b border-line-2 text-mute"><th className="p-3 text-right">نام</th><th className="p-3 text-right">پیام‌رسان</th><th className="p-3 text-right">اولین پیام</th><th className="p-3 text-right">آخرین فعالیت</th><th className="p-3 text-right">تعداد پیام</th></tr></thead>
+            <thead><tr className="border-b border-line-2 text-mute"><th className="p-3 text-right">نام</th><th className="p-3 text-right">پیام‌رسان</th><th className="p-3 text-right">اولین پیام</th><th className="p-3 text-right">آخرین فعالیت</th><th className="p-3 text-right">تعداد پیام</th><th className="p-3 text-right"></th></tr></thead>
             <tbody>
               {data.items.map((r) => (
-                <tr key={r.id} className="border-b border-line-2 last:border-0"><td className="p-3">{r.name}</td><td className="p-3">{r.channel}</td><td className="p-3">{day(r.first_seen)}</td><td className="p-3">{day(r.last_seen)}</td><td className="p-3">{fa(r.messages)}</td></tr>
+                <tr key={r.id} className="border-b border-line-2 last:border-0"><td className="p-3">{r.name}</td><td className="p-3">{r.channel}</td><td className="p-3">{day(r.first_seen)}</td><td className="p-3">{day(r.last_seen)}</td><td className="p-3">{fa(r.messages)}</td><td className="p-3"><button onClick={() => toggleBan(r)} className={`text-xs underline ${r.banned ? "text-mint" : "text-mute hover:text-bad"}`}>{r.banned ? "رفع مسدودی" : "مسدود کن"}</button></td></tr>
               ))}
             </tbody>
           </table>

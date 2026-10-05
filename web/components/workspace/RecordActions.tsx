@@ -24,7 +24,20 @@ export function RecordActions({ botId, rec, onChanged }: { botId: string | numbe
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  const reported = st === "reported" && rec.data.reported_id != null;
   const open = isFaq ? st === "unanswered" : isOrder ? st in NEXT : st === "confirmed" || st === "waitlisted";
+  if (reported) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <button className={btn + " hover:!border-bad hover:!text-bad-soft"} disabled={busy}
+          onClick={async () => { setBusy(true); try { await api(`/bots/${botId}/customers/${rec.data.reported_id}/ban`, { method: "POST", body: {} }); setNote("مشتری مسدود شد و دیگر نمی‌تواند از ربات استفاده کند."); } catch (e: any) { setError(e.message); } finally { setBusy(false); } }}>
+          مسدود کردن مشتری گزارش‌شده ({rec.data.reported_name})
+        </button>
+        {note && <span className="text-xs text-mint-fg">{note}</span>}
+        {error && <span className="text-xs text-bad-soft">{error}</span>}
+      </div>
+    );
+  }
   if (!open && !note) return null;
 
   async function go(body: Record<string, unknown>) {

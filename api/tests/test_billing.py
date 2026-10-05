@@ -19,6 +19,9 @@ SPEC = {"name": "کافه", "welcome": "سلام", "menu": [{"label": "دربا�
 def world(monkeypatch):
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    from tests.conftest import REAL_FREE
+
+    monkeypatch.setitem(billing.PLANS, "free", dict(REAL_FREE))   # this file tests the real limits
     bale._seen.clear()
     bale._cap_notice.clear()
     monkeypatch.setattr(settings, "public_base_url", "https://example.test")

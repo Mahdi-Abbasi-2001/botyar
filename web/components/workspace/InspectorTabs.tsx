@@ -23,6 +23,7 @@ export function StructureTab({ spec, records, onEdit }: { spec: Spec; records: R
         </>
       ),
     },
+    ...(spec.gate ? [{ title: `عضویت اجباری در کانال · ${spec.gate.channel}`, body: <span className="text-sm leading-7 text-fg-2">مشتری تا عضو این کانال نشود به ربات دسترسی ندارد. ربات باید در کانال «ادمین» باشد؛ وضعیتش را در تب «کانال و گروه» ببینید.</span>, tone: "amber" as const }] : []),
     ...spec.blocks.map((b) => ({ title: `${BLOCK_KIND[b.type]} · ${blockTitle(b)}`, body: <BlockBody b={b} spec={spec} records={records} />, tone: tone(b) })),
   ];
   return (
@@ -85,6 +86,10 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
     const on = spec.blocks.find((x) => x.id === b.on);
     return <span className="text-sm leading-7 text-amber-fg">بعد از هر ثبت در «{on ? blockTitle(on) : b.on}»: «{b.text}»</span>;
   }
+  if (b.type === "referral")
+    return <span className="text-sm leading-7 text-fg-2">هر مشتری یک لینک اختصاصی می‌گیرد؛ هر مشتری جدیدی که با لینکش بیاید یک دعوت حساب می‌شود (هدف: {fa(b.goal)} دعوت). جایزه را خودتان تحویل می‌دهید؛ جدول برترین‌ها در تب «مشتریان» است.</span>;
+  if (b.type === "anon_chat")
+    return <span className="text-sm leading-7 text-fg-2">دو مشتری هم‌زمان بدون دیدن هویت هم گفتگو می‌کنند (فقط متن؛ لینک و شماره تلفن ارسال نمی‌شود). تخلف گزارش می‌شود و در «ثبت‌ها» می‌بینید؛ مشتری متخلف را از «مشتریان» مسدود کنید. فقط در بله و تلگرام کار می‌کند.</span>;
   if (b.type === "menu")
     return (
       <div className="flex flex-col gap-1.5 text-sm">
@@ -356,6 +361,7 @@ export function RecordsTab({ records, spec, botId, onChanged }: { records: Rec[]
   const detail = (r: Rec) => {
     const d = r.data;
     if (d.question) return `سؤال: ${d.question}${d.note ? ` (${d.note})` : ""}`;
+    if (d.status === "reported" && Array.isArray(d.log)) return `گزارش گفتگوی ناشناس: ${d.log.map((l: any) => `${l.from}: ${l.text}`).join(" ⏎ ")}`;
     if (typeof d.score === "number") return `${d.who ?? ""}: ${d.score} از ${d.total}`;
     if (typeof d.rating === "number") return `${"⭐".repeat(d.rating)}${d.comment ? ` · ${d.comment}` : ""}`;
     if (d.slot_label) return d.slot_label;

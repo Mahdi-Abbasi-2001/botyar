@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import bale, engine
+from . import anon, bale, engine
 from .auth import current_user
 from .dates import TEHRAN, jalali_str, now_tehran
 from .db import SessionLocal, get_db
@@ -96,6 +96,14 @@ def expire_unpaid_orders(db: Session, now) -> int:
     return total
 
 
+def expire_anon_waiting(db: Session, now: datetime) -> int:
+    msgs = anon.expire_waiting(db, now)
+    db.commit()
+    for bot_id, action in msgs:
+        bale.send_customer_actions(db, bot_id, [action])
+    return len(msgs)
+
+
 def _loop():
     while True:
         _time.sleep(60)
@@ -104,6 +112,7 @@ def _loop():
                 due_reminders(db, now_tehran())
                 expire_unpaid_orders(db, now_tehran())
                 due_scheduled(db, datetime.now(timezone.utc))
+                expire_anon_waiting(db, datetime.now(timezone.utc))
         except Exception:  # noqa: BLE001
             log.exception("reminder run failed")
 
