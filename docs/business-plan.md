@@ -17,6 +17,7 @@ Both options are slow, and changes later (a new price, a new class time) need th
 - **Block types** (all in the spec language): messages (random variants, photo/file, map pin), forms, bookings (fixed slots with capacity and waitlist, weekly repeats with Jalali dates, **individual appointments from working hours and staff**), orders and shops (catalog from CSV/Excel/paste/photo, stock, delivery fee, discount codes, **online payment inside Bale**), FAQ (retrieval only: answers are the owner's own sentences), quizzes, sub-menus, ratings, "talk to the owner" inbox, owner notifications.
 - **Owner panel**: records with cancel/status actions, inbox with replies delivered to the customer's chat, announcements (manual and scheduled, with `/stop` opt-out), customers list with Excel export, booking reminders, files tab, plan and usage page.
 - **Channels**: Bale (shared bot with links/QR and a directory, or the owner's own bot token); Telegram via a relay outside Iran.
+- **Community tools** (new, to be proven on real Bale): forced channel join, invite links with counting, anonymous chat with report/ban, post forwarding between channels, group moderation.
 - **Quality evidence**: 200+ automated tests, a committed agent regression harness (40+ real-model cases), mutation checks for business rules, fuzzing of conversations.
 
 ## 4. Market
@@ -58,7 +59,7 @@ Not yet known: hosting cost per bot (Liara plan price **[blank]**), USD→Toman 
 4. Short "bot in 3 minutes" videos on Bale/Instagram; the shared-bot directory lists published businesses.
 
 ## 9. Roadmap
-Done: see §3. Next (by value): subscription payments + invoices; more messengers (Eitaa, Rubika); template marketplace; analytics-driven suggestions ("40% leave at the phone-number step — shorten the form?"); forced channel-join and referral links (the Bale API exposes `getChatMember`; deep-link `start` parameters are not documented there); mini-app admin panel. Deliberately not planned: free-form AI chat with customers (cost, safety), group moderation, post forwarding.
+Done: see §3. Next (by value): subscription payments + invoices; more messengers (Eitaa, Rubika); template marketplace; analytics-driven suggestions ("40% leave at the phone-number step — shorten the form?"); mini-app admin panel; media forwarding between messengers. Deliberately not planned: free-form AI chat with customers (cost, safety).
 
 ## 10. Risks (honest)
 - **Incumbent adds an AI front-end.** Answer: the tested deterministic engine, the owner dashboard, price predictability.
