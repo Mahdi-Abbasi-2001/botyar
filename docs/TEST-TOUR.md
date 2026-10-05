@@ -123,6 +123,17 @@ Try each in a fresh bot (describe it to the agent in Persian, one sentence each)
 6. **Delivery fee + discount codes.** «هزینه ارسال ۳۰ هزار تومان، رایگان بالای ۲۰۰ هزار، کد YALDA ده درصد، حداکثر ۵ بار». At checkout the bot asks «کد تخفیف دارید؟»; try a wrong code, the right code in lowercase, and cancel an order to see the use come back.
 7. **Online payment.** «سفارش را آنلاین پرداخت کنند». In the simulator, after the last question you get a bill and a «💳 پرداخت (آزمایشی)» button; the owner notification arrives only after paying; an unpaid order is cancelled after 15 minutes. In the **انتشار** tab save the wallet token `WALLET-TEST-1111111111111111` (Bale's published test token) to try a real invoice on the shared bot with no real money. Real money needs your OWN bot token + your own wallet token from @botfather.
 
+### Station 4g — Plans, customers, files, map pins, scheduled announcements, sub-menus, quizzes (new)
+
+1. **Pricing and limits.** Open `/pricing/` (also linked from the landing page and the bots header): four plans, prices marked «پیشنهادی». Open `/account/` (پلن و مصرف): usage meters for bots, live bots, agent requests (30 days) and active customers per live bot. On the free plan, try to create a 4th bot: you get a clear 402 message with «ارتقا». Press «ثبت درخواست ارتقا»; an admin (account whose email is in `ADMIN_EMAILS`) sees the request on the same page and approves it; the limits change at once.
+2. **Customers tab (مشتریان).** After a customer talks to a published bot: name, messenger, first message, last activity, message count, search, Excel/CSV export. The chat id is never shown.
+3. **Photo/file.** Ask: «دکمه دریافت کاتالوگ که فایل PDF کاتالوگ رو بفرسته». A «فایل‌ها» tab appears: upload a PDF (≤5 MB). In the simulator the bubble shows «📎 فایل: name.pdf»; on Bale the real file arrives.
+4. **Map pin.** Ask with coordinates: «دکمه آدرس که لوکیشن بفرسته. مختصات: 35.7219 و 51.3347». Without coordinates the agent must say it needs them (it never invents them).
+5. **Scheduled announcements.** Tab «اطلاعیه» → «اطلاعیه‌ی زمان‌بندی‌شده»: once at a date/time or every day at HH:MM (Tehran). Counts toward the 3-per-day announcement limit.
+6. **Sub-menus.** «دکمه محصولات که دو دکمه لپ‌تاپ و موبایل نشون بده، هرکدوم توضیح خودش را بگوید».
+7. **Quiz.** Give the questions and correct answers yourself; the agent asks for them if you don't. A score appears at the end and each result is stored.
+8. **Random message / personalised confirmation.** «با زدن دکمه، هر بار یک جمله انگیزشی تصادفی نشان بده» and «اسمم رو بپرس و بعدش با اسم خوش‌آمد بگو».
+
 ### Station 4c — Customers cancelling («ثبت‌های من») (new)
 
 **What it is:** when a booking or order block allows it (the agent turns it on by default; say «مشتری نتونه لغو کنه» to turn it off), the bot's menu gets a built-in last button **«ثبت‌های من»**. The customer sees only their OWN active bookings/orders, taps one, confirms, and it is cancelled.

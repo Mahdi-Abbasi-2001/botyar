@@ -93,3 +93,7 @@ Compare AradBot's flat plans: 183,000–609,000 Toman/month (pricing-research.md
 - ~~Rials per diamond / point~~ — **found:** 20 and 3 Toman (+10% VAT).
 - Their user numbers, revenue, funding, and team size: not on any page read.
 - Whether they have any AI/natural-language assistant (nothing on the pages read).
+
+## 8. Decisions taken after this research (2026-10-05)
+Built because SahBot proves demand and our target owners need them: **photo/file sending**, **map pin**, **scheduled announcements** (their cron jobs), **customers list with export** (their "users" section), **sub-menus** (their nested menus), **quizzes** (their quiz forms), **enforced plans + a public pricing page** (their paid model, but flat).
+Considered and deliberately NOT built: *forced channel join* (feasible with Bale's `getChatMember`, but it needs the bot to be admin of the owner's channel, which the shared bot cannot be; fits channel owners rather than shops/clinics); *invite/referral links* (Bale's docs do not mention `start` deep-link parameters); *anonymous chat*, *group moderation*, *post forwarding between channels*, *poster/image composition*, *AI chat connection*, *custom code* (different customer or against our "customers never talk to an LLM" design); *more messengers* (Eitaa/Rubika/iGap/WhatsApp: a roadmap item, each needs its own adapter).
