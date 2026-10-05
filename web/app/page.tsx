@@ -1,33 +1,50 @@
 "use client";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 import { BlueprintPreview, TypedRequest, useTyping } from "@/components/TypingHero";
-import { Icon, Logo } from "@/components/ui";
+import { Icon, Logo, fa } from "@/components/ui";
+
+type Plan = { key: string; name: string; price: number; bots: number; live_bots: number; ai_requests: number; tagline: string };
 
 const PROOF = [
   { name: "ثبت موفق نوبت شنبه", lines: [["بیمار", "شنبه ساعت ۹ صبح"], ["ربات", "نام و نام خانوادگی؟"], ["ربات", "نوبت شما ثبت شد."]] },
   { name: "رد موبایل نامعتبر", lines: [["بیمار", "۱۲۳۴"], ["ربات", "شماره معتبر نیست. مثل ۰۹۱۲۱۲۳۴۵۶۷ وارد کنید."]] },
 ];
 
-const FEATURES: { icon: React.ComponentProps<typeof Icon>["name"]; title: string; text: string }[] = [
-  { icon: "calendar", title: "نوبت‌دهی و کلاس هفتگی", text: "سانس با ظرفیت، تکرار هر هفته با تاریخ شمسی، و لیست انتظار وقتی جا پر شد." },
-  { icon: "clock", title: "تقویم وقت‌دهی", text: "از ساعت کاری، مدت هر نوبت و وقت ناهار، زمان‌ها خودش ساخته می‌شود؛ برای هر همکار جدا." },
-  { icon: "cart", title: "فروشگاه و منو", text: "دسته‌بندی، سایز و رنگ، موجودی، سبد خرید، هزینه‌ی ارسال و کد تخفیف." },
-  { icon: "file", title: "ورود محصولات", text: "فایل اکسل، CSV، متن کپی‌شده یا حتی عکس لیست قیمت؛ اول پیش‌نمایش، بعد ذخیره." },
-  { icon: "card", title: "پرداخت آنلاین در بله", text: "فاکتور پرداخت داخل خود بله؛ سفارش پرداخت‌نشده بعد از چند دقیقه خودش لغو می‌شود." },
-  { icon: "help", title: "پرسش‌های متداول", text: "مشتری به زبان خودش می‌پرسد؛ جواب، همان جمله‌ای است که خودت نوشتی. چیزی از خودش نمی‌سازد." },
-  { icon: "repeat", title: "لغو و تغییر زمان", text: "«ثبت‌های من» برای هر مشتری؛ جای آزادشده خودکار به نفر اول لیست انتظار می‌رسد." },
-  { icon: "bell", title: "یادآوری و اطلاعیه", text: "یادآوری پیش از نوبت، و اطلاعیه برای همه‌ی مشتری‌ها با امکان لغو دریافت." },
-  { icon: "star", title: "پیام به مدیر و نظر مشتری", text: "پیام‌های مشتری در صندوق پنل، جوابت مستقیم در چت او؛ امتیاز ستاره‌ای و نظر." },
-  { icon: "chart", title: "مدیریت و خروجی", text: "لغو با دلیل، وضعیت سفارش (آماده‌سازی، آماده، تحویل) و خروجی اکسل از همه‌ی ثبت‌ها." },
+type Feature = { icon: React.ComponentProps<typeof Icon>["name"]; title: string; text: string };
+const FEATURE_GROUPS: { title: string; items: Feature[] }[] = [
+  { title: "نوبت و سفارش", items: [
+    { icon: "calendar", title: "نوبت‌دهی و کلاس هفتگی", text: "سانس با ظرفیت، تکرار هر هفته با تاریخ شمسی، و لیست انتظار وقتی جا پر شد." },
+    { icon: "clock", title: "تقویم وقت‌دهی", text: "از ساعت کاری، مدت هر نوبت و وقت ناهار، زمان‌ها خودش ساخته می‌شود؛ برای هر همکار جدا." },
+    { icon: "repeat", title: "لغو و تغییر زمان", text: "«ثبت‌های من» برای هر مشتری؛ جای آزادشده خودکار به نفر اول لیست انتظار می‌رسد." },
+    { icon: "cart", title: "فروشگاه و منو", text: "دسته‌بندی، سایز و رنگ، موجودی، سبد خرید، هزینه‌ی ارسال و کد تخفیف." },
+    { icon: "file", title: "ورود محصولات", text: "فایل اکسل، CSV، متن کپی‌شده یا حتی عکس لیست قیمت؛ اول پیش‌نمایش، بعد ذخیره." },
+    { icon: "card", title: "پرداخت آنلاین در بله", text: "فاکتور پرداخت داخل خود بله، مستقیم به کیف پول خودت؛ سفارش پرداخت‌نشده خودش لغو می‌شود." },
+    { icon: "list", title: "مدیریت و خروجی", text: "لغو با دلیل، وضعیت سفارش (آماده‌سازی، آماده، تحویل)، فهرست مشتری‌ها و خروجی اکسل از همه‌ی ثبت‌ها." },
+  ] },
+  { title: "گفت‌وگو با مشتری", items: [
+    { icon: "help", title: "پرسش‌های متداول", text: "مشتری به زبان خودش می‌پرسد؛ جواب، همان جمله‌ای است که خودت نوشتی. چیزی از خودش نمی‌سازد." },
+    { icon: "tree", title: "زیرمنو و آزمون", text: "منوهای تودرتو برای کسب‌وکارهای پرشاخه، و آزمون چندگزینه‌ای با امتیاز و نتیجه." },
+    { icon: "file", title: "عکس، فایل و لوکیشن", text: "عکس منو، فایل PDF یا نشانی روی نقشه، کنار پیام‌های ربات." },
+    { icon: "star", title: "پیام به مدیر و نظر مشتری", text: "پیام‌های مشتری در صندوق پنل، جوابت مستقیم در چت او؛ امتیاز ستاره‌ای و نظر." },
+    { icon: "bell", title: "یادآوری و اطلاعیه", text: "یادآوری پیش از نوبت، و اطلاعیه‌ی فوری یا زمان‌بندی‌شده برای همه‌ی مشتری‌ها، با امکان لغو دریافت." },
+  ] },
+  { title: "رشد کانال و گروه", items: [
+    { icon: "lock", title: "عضویت اجباری در کانال", text: "ربات فقط به عضوهای کانالت جواب می‌دهد؛ بقیه اول دعوت به عضویت می‌شوند." },
+    { icon: "chart", title: "لینک دعوت و جدول معرف‌ها", text: "هر مشتری لینک دعوت خودش را دارد؛ دعوت‌ها شمرده و معرف‌های برتر رتبه‌بندی می‌شوند." },
+    { icon: "chat", title: "چت ناشناس", text: "گفت‌وگوی ناشناس بین کاربران ربات، با گزارش تخلف و مسدودسازی." },
+    { icon: "shield", title: "مدیریت گروه و بازنشر پست", text: "حذف لینک و کلمه‌های ممنوع، اخطار و اخراج؛ و بازنشر خودکار پست‌ها بین کانال‌ها." },
+  ] },
 ];
 
 // a decorative 5×5 "QR" for the landing mock-up (real QR codes are generated in the publish tab)
 const QR_DOTS = [1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1].map(Boolean);
 
 const PROOF_NUMBERS: [string, string][] = [
-  ["۸ از ۸", "درخواست متنوع به ربات کامل و تست‌شده رسید"],
-  ["۱۲ تا ۴۳ ثانیه", "از پیام صاحب کسب‌وکار تا ربات آماده"],
-  ["حدود ۰٫۰۰۲ دلار", "میانگین هزینه‌ی هوش مصنوعی برای ساخت یک ربات"],
+  ["۵۴", "درخواست متنوع فارسی در ارزیابی خودکار ایجنت با مدل واقعی"],
+  ["حدود ۰٫۰۰۲ دلار", "میانگین هزینه‌ی هوش مصنوعی برای ساخت یا تغییر یک ربات"],
+  ["بیش از ۲۷۰", "تست خودکار برای موتور ربات‌ها و تک‌تک قابلیت‌هایش"],
   ["بدون مدل زبانی", "جواب پیام‌های مشتری؛ پرسش متداول فقط بین جمله‌های خودت جست‌وجو می‌شود"],
 ];
 
@@ -37,6 +54,8 @@ function Kicker({ children, mint }: { children: React.ReactNode; mint?: boolean 
 
 export default function Home() {
   const n = useTyping();
+  const [plans, setPlans] = useState<{ plans: Plan[]; prices_proposed: boolean } | null>(null);
+  useEffect(() => { api<{ plans: Plan[]; prices_proposed: boolean }>("/plans").then(setPlans).catch(() => {}); }, []);
   return (
     <div className="bp min-h-screen px-4 sm:px-6">
       <div className="mx-auto flex max-w-[1320px] flex-col gap-24 pb-16 sm:gap-32">
@@ -54,7 +73,7 @@ export default function Home() {
 
           <section className="flex flex-wrap items-start gap-12">
             <div className="flex min-w-0 flex-[1_1_540px] flex-col gap-5">
-              <span className="self-start rounded-full border border-line-2 px-3.5 py-1.5 text-[13px] text-fg-2">ایجنت ربات‌ساز برای پیام‌رسان بله</span>
+              <span className="self-start rounded-full border border-line-2 px-3.5 py-1.5 text-[13px] text-fg-2">ایجنت ربات‌ساز برای بله و تلگرام</span>
               <h1 className="m-0 text-5xl font-black leading-[1.2] sm:text-[68px]">
                 بگو چی می‌خوای،<br />ربات رو <span className="text-saffron">می‌سازم.</span>
               </h1>
@@ -158,15 +177,20 @@ export default function Home() {
             <h2 className="m-0 text-3xl font-black leading-snug sm:text-[44px]">کارهای روزمره‌ی کسب‌وکارت را بگو؛ ربات بلدش است.</h2>
             <p className="m-0 text-[17px] leading-8 text-fg-2">لازم نیست اسم این‌ها را بدانی. همان‌طور که برای یک همکار توضیح می‌دهی بنویس؛ ایجنت بخش درست را انتخاب می‌کند.</p>
           </div>
-          <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fill,minmax(250px,1fr))]">
-            {FEATURES.map((f) => (
-              <div key={f.title} className="flex flex-col gap-2 rounded-[18px] border border-line bg-panel p-[18px]">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-raised text-saffron"><Icon name={f.icon} size={20} /></span>
-                <span className="text-base font-extrabold">{f.title}</span>
-                <span className="text-sm leading-7 text-mute">{f.text}</span>
+          {FEATURE_GROUPS.map((g) => (
+            <div key={g.title} className="flex flex-col gap-3">
+              <h3 className="m-0 text-base font-extrabold text-fg-2">{g.title}</h3>
+              <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fill,minmax(250px,1fr))]">
+                {g.items.map((f) => (
+                  <div key={f.title} className="flex flex-col gap-2 rounded-[18px] border border-line bg-panel p-[18px]">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-raised text-saffron"><Icon name={f.icon} size={20} /></span>
+                    <span className="text-base font-extrabold">{f.title}</span>
+                    <span className="text-sm leading-7 text-mute">{f.text}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </section>
 
         <section className="flex flex-wrap items-center gap-12 rounded-[24px] border border-mint-line bg-mint-bg/40 p-6 sm:p-10">
@@ -185,7 +209,30 @@ export default function Home() {
                 <span className="text-[13px] leading-6 text-fg-2">{label}</span>
               </div>
             ))}
-            <span className="col-span-2 text-xs text-dim">اعداد از ارزیابی خودمان روی ۸ درخواست متنوع؛ هر بار اجرا کمی فرق می‌کند.</span>
+            <span className="col-span-2 text-xs text-dim">اعداد از ارزیابی‌ها و تست‌های خودمان؛ رفتار ایجنت در هر اجرا کمی فرق می‌کند.</span>
+          </div>
+        </section>
+
+        <section id="pricing" className="flex flex-col gap-6">
+          <div className="flex max-w-[760px] flex-col gap-2.5">
+            <Kicker>۶ · قیمت ساده</Kicker>
+            <h2 className="m-0 text-3xl font-black leading-snug sm:text-[44px]">یک قیمت ثابت ماهانه؛ همه‌ی امکانات در همه‌ی پلن‌ها.</h2>
+            <p className="m-0 text-[17px] leading-8 text-fg-2">پلن‌ها فقط در تعداد ربات، مشتری و درخواست به ایجنت فرق دارند؛ صورت‌حساب هر ماه ثابت است و شگفتی ندارد.</p>
+          </div>
+          {plans && (
+            <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
+              {plans.plans.map((pl) => (
+                <div key={pl.key} className={`flex flex-col gap-1.5 rounded-[18px] border bg-panel p-4 ${pl.key === "pro" ? "border-saffron" : "border-line"}`}>
+                  <span className="font-extrabold">{pl.name}</span>
+                  <span className="text-2xl font-black text-saffron">{fa(pl.price.toLocaleString("en-US"))} <span className="text-xs font-bold text-fg-2">تومان / ماه</span></span>
+                  <span className="text-xs leading-6 text-mute">{fa(pl.bots)} ربات · {fa(pl.live_bots)} منتشرشده · {fa(pl.ai_requests.toLocaleString("en-US"))} درخواست ایجنت در ماه</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-4">
+            <Link href="/pricing/" className="inline-flex min-h-11 items-center rounded-xl border border-line-2 px-4 font-bold hover:border-saffron">مقایسه‌ی کامل پلن‌ها</Link>
+            {plans?.prices_proposed && <span className="text-sm text-amber-fg">قیمت‌ها پیشنهادی است و هنوز با صاحبان کسب‌وکار سنجیده نشده.</span>}
           </div>
         </section>
 

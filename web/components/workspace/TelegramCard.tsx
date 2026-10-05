@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import { fa } from "@/components/ui";
+import { api, isPlanLimit } from "@/lib/api";
+import { PlanLimitNote, fa } from "@/components/ui";
 import { ShareLink } from "@/components/workspace/ShareLink";
 
 type Tg = {
@@ -18,7 +18,9 @@ export function TelegramCard({ botId }: { botId: string }) {
   const [mode, setMode] = useState<"shared" | "own">("shared");
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setErrorText] = useState("");
+  const [limitHit, setLimitHit] = useState(false);  // the last error was a plan limit (402)
+  const setError = (m: string, e?: unknown) => { setErrorText(m); setLimitHit(!!m && isPlanLimit(e)); };
 
   const load = useCallback(async () => {
     try {
@@ -26,7 +28,7 @@ export function TelegramCard({ botId }: { botId: string }) {
       setTg(s);
       if (!s.shared_bot_username) setMode("own");
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message, e);
     }
   }, [botId]);
 
@@ -41,7 +43,7 @@ export function TelegramCard({ botId }: { botId: string }) {
       setTg(await api<Tg>(`/bots/${botId}/telegram/publish`, { body: { mode: m, token: m === "own" ? token : undefined } }));
       setToken("");
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message, e);
     } finally {
       setBusy(false);
     }
@@ -54,7 +56,7 @@ export function TelegramCard({ botId }: { botId: string }) {
       await api(`/bots/${botId}/listing`, { method: "PUT", body: { listed } });
       await load();
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message, e);
     } finally {
       setBusy(false);
     }
@@ -66,7 +68,7 @@ export function TelegramCard({ botId }: { botId: string }) {
     try {
       setTg(await api<Tg>(`/bots/${botId}/telegram/unpublish`, { method: "POST", body: {} }));
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message, e);
     } finally {
       setBusy(false);
     }
@@ -82,7 +84,7 @@ export function TelegramCard({ botId }: { botId: string }) {
     );
   }
   const handle = tg.mode === "own" ? tg.bot_username : tg.shared_bot_username;
-  const err = error && <p className="mb-3 rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-bad">{error}</p>;
+  const err = error && (limitHit ? <PlanLimitNote text={error} className="mb-3" /> : <p className="mb-3 rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-bad">{error}</p>);
 
   if (!tg.published) {
     return (

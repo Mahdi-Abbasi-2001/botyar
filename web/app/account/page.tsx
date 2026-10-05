@@ -17,8 +17,8 @@ function Meter({ label, used, max }: { label: string; used: number; max: number 
   const pct = Math.min(100, Math.round((used / Math.max(max, 1)) * 100));
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex justify-between text-sm"><span>{label}</span><span className={pct >= 100 ? "text-red-400" : "text-fg-2"}>{fa(used)} از {fa(max.toLocaleString("en-US"))}</span></div>
-      <div className="h-2 overflow-hidden rounded-full bg-raised"><div className={`h-full ${pct >= 90 ? "bg-red-400" : "bg-saffron"}`} style={{ width: `${pct}%` }} /></div>
+      <div className="flex justify-between text-sm"><span>{label}</span><span className={pct >= 100 ? "text-bad-soft" : "text-fg-2"}>{fa(used)} از {fa(max.toLocaleString("en-US"))}</span></div>
+      <div className="h-2 overflow-hidden rounded-full bg-raised"><div className={`h-full ${pct >= 90 ? "bg-bad-soft" : "bg-saffron"}`} style={{ width: `${pct}%` }} /></div>
     </div>
   );
 }
@@ -28,7 +28,7 @@ export default function Account() {
   const [me, setMe] = useState<Me | null>(null);
   const [plans, setPlans] = useState<Plans | null>(null);
   const [reqs, setReqs] = useState<Req[]>([]);
-  const [pick, setPick] = useState("pro");
+  const [pick, setPick] = useState("");
   const [note, setNote] = useState("");
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
@@ -51,11 +51,12 @@ export default function Account() {
     api<Plans>("/plans").then(setPlans).catch(() => {});
   }, [router, load]);
 
-  async function upgrade() {
+  async function upgrade(plan: string, name: string) {
     setError("");
     setMsg("");
+    if (me?.demo && !confirm(`پلن «${name}» فعال شود؟ این پرداخت آزمایشی است و هیچ پولی کسر نمی‌شود.`)) return;
     try {
-      const r = await api<{ simulated?: boolean }>("/me/upgrade", { body: { plan: pick, note } });
+      const r = await api<{ simulated?: boolean }>("/me/upgrade", { body: { plan, note } });
       setMsg(r.simulated ? "✅ پرداخت آزمایشی با موفقیت انجام شد و پلن شما فعال شد (پولی کسر نشد)." : "درخواست شما ثبت شد؛ پس از بررسی پلن فعال می‌شود.");
       setNote("");
       await load();
@@ -102,20 +103,47 @@ export default function Account() {
               <Meter label="درخواست به ایجنت (۳۰ روز گذشته)" used={me.usage.ai_requests} max={me.plan.ai_requests} />
               {me.usage.per_bot.filter((b) => b.live).map((b) => <Meter key={b.id} label={`مشتری فعال · ${b.name}`} used={b.customers} max={me.plan.customers} />)}
             </section>
-            <section className={`${card} flex flex-col gap-3`}>
-              <h2 className="m-0 text-lg font-extrabold">ارتقای پلن</h2>
-              {me.demo && <p className="m-0 rounded-xl border border-amber-line bg-saffron/10 px-3 py-2 text-sm text-amber-fg">نسخه‌ی نمایشی: هنوز درگاه پرداخت وصل نیست؛ «پرداخت» شبیه‌سازی می‌شود، پلن بلافاصله فعال می‌شود و هیچ پولی کسر نمی‌شود.</p>}
-              {me.pending_request ? (
-                <p className="m-0 text-sm text-mute">درخواست ارتقا به پلن «{plans?.plans.find((p) => p.key === me.pending_request)?.name ?? me.pending_request}» در حال بررسی است.</p>
-              ) : (
-                <>
-                  <select aria-label="پلن" value={pick} onChange={(e) => setPick(e.target.value)} className="min-h-11 rounded-xl border border-line-2 bg-raised px-3">
-                    {plans?.plans.filter((p) => p.key !== "free").map((p) => <option key={p.key} value={p.key}>{p.name} — {fa(p.price.toLocaleString("en-US"))} تومان در ماه (پیشنهادی)</option>)}
-                  </select>
+            <section className={`${card} flex flex-col gap-4`}>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="m-0 text-lg font-extrabold">تغییر پلن</h2>
+                <Link href="/pricing/" className="text-sm text-saffron underline">مقایسه‌ی کامل پلن‌ها</Link>
+              </div>
+              {me.demo && <p className="m-0 rounded-xl border border-amber-line bg-saffron/10 px-3 py-2 text-sm leading-7 text-amber-fg">نسخه‌ی نمایشی: هنوز درگاه پرداخت وصل نیست؛ «پرداخت» شبیه‌سازی می‌شود، پلن بلافاصله فعال می‌شود و هیچ پولی کسر نمی‌شود.</p>}
+              {me.pending_request && <p className="m-0 text-sm text-mute">درخواست تغییر به پلن «{plans?.plans.find((p) => p.key === me.pending_request)?.name ?? me.pending_request}» در حال بررسی است.</p>}
+              <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+                {plans?.plans.filter((p) => p.key !== "free").map((p) => {
+                  const current = p.key === me.plan.key;
+                  const picked = !me.demo && pick === p.key && !current;
+                  return (
+                    <div key={p.key} className={`flex flex-col gap-2 rounded-2xl border p-4 ${current ? "border-mint-line bg-mint-bg/40" : picked ? "border-saffron bg-saffron/5" : "border-line-2"}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-base font-extrabold">{p.name}</span>
+                        {current && <span className="rounded-full bg-mint px-2 py-0.5 text-xs font-bold text-ink">پلن فعلی</span>}
+                      </div>
+                      <span className="text-xs leading-6 text-mute">{p.tagline}</span>
+                      <span className="text-xl font-black text-saffron">{fa(p.price.toLocaleString("en-US"))} <span className="text-xs font-bold text-fg-2">تومان / ماه</span></span>
+                      <span className="text-xs leading-6 text-fg-2">{fa(p.bots)} ربات · {fa(p.live_bots)} منتشرشده · {fa(p.ai_requests.toLocaleString("en-US"))} درخواست ایجنت</span>
+                      {!current && !me.pending_request && (
+                        me.demo ? (
+                          <button onClick={() => upgrade(p.key, p.name)} className="mt-auto min-h-11 rounded-xl bg-saffron px-3 text-sm font-bold text-ink hover:bg-saffron-hi">
+                            {p.price > me.plan.price ? "ارتقا" : "تغییر"} · پرداخت آزمایشی
+                          </button>
+                        ) : (
+                          <button onClick={() => setPick(p.key)} aria-pressed={picked} className={`mt-auto min-h-11 rounded-xl px-3 text-sm font-bold ${picked ? "bg-saffron text-ink" : "border border-line-2 hover:border-saffron"}`}>
+                            {picked ? "انتخاب شد" : "انتخاب این پلن"}
+                          </button>
+                        )
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {!me.demo && !me.pending_request && pick && pick !== me.plan.key && (
+                <div className="flex flex-col gap-3">
                   <textarea aria-label="توضیح" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="کسب‌وکارت چیست و چرا به این پلن نیاز داری؟ (اختیاری)" className="min-h-20 rounded-xl border border-line-2 bg-raised p-3" />
-                  <button onClick={upgrade} className="min-h-11 rounded-xl bg-saffron px-5 font-bold text-ink">{me.demo ? "پرداخت آزمایشی و فعال‌سازی" : "ثبت درخواست ارتقا"}</button>
-                  {!me.demo && <p className="m-0 text-xs leading-6 text-dim">پرداخت آنلاین اشتراک هنوز راه‌اندازی نشده؛ تیم بات‌یار با شما هماهنگ می‌کند و پلن را فعال می‌کند.</p>}
-                </>
+                  <button onClick={() => upgrade(pick, plans?.plans.find((x) => x.key === pick)?.name ?? pick)} className="min-h-11 rounded-xl bg-saffron px-5 font-bold text-ink">ثبت درخواست پلن «{plans?.plans.find((x) => x.key === pick)?.name}»</button>
+                  <p className="m-0 text-xs leading-6 text-dim">پرداخت آنلاین اشتراک هنوز راه‌اندازی نشده؛ تیم بات‌یار با شما هماهنگ می‌کند و پلن را فعال می‌کند.</p>
+                </div>
               )}
             </section>
             {me.plan.key !== "free" && <button onClick={cancelPlan} className="w-fit text-sm text-mute underline hover:text-bad">لغو اشتراک و برگشت به پلن رایگان</button>}

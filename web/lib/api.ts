@@ -40,10 +40,16 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const d = data.detail;
-    throw new Error(typeof d === "string" ? d : "خطایی رخ داد");
+    const err = new Error(typeof d === "string" ? d : "خطایی رخ داد");
+    if (res.status === 402) (err as PlanLimitError).planLimit = true;
+    throw err;
   }
   return data as T;
 }
+
+/** 402 from the backend: a plan limit (bots, live bots, agent requests). The UI shows it with a way to upgrade. */
+export type PlanLimitError = Error & { planLimit?: boolean };
+export const isPlanLimit = (e: unknown): boolean => !!(e as PlanLimitError)?.planLimit;
 
 /** multipart upload (catalog import); same auth and Persian error handling as api(). */
 export async function apiUpload<T = any>(path: string, form: FormData, method: "POST" | "PUT" = "POST"): Promise<T> {

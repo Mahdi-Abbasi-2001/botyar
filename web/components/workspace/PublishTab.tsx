@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import { fa } from "@/components/ui";
+import { api, isPlanLimit } from "@/lib/api";
+import { PlanLimitNote, fa } from "@/components/ui";
 import { ExportButtons } from "@/components/workspace/ExportButtons";
 import { RecordActions } from "@/components/workspace/RecordActions";
 import { PaymentCard } from "@/components/workspace/PaymentCard";
@@ -22,7 +22,9 @@ export function PublishTab({ botId }: { botId: string }) {
   const [mode, setMode] = useState<"shared" | "own">("shared");
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setErrorText] = useState("");
+  const [limitHit, setLimitHit] = useState(false);  // the last error was a plan limit (402)
+  const setError = (m: string, e?: unknown) => { setErrorText(m); setLimitHit(!!m && isPlanLimit(e)); };
   const [live, setLive] = useState<Live[]>([]);
 
   const load = useCallback(async () => {
@@ -30,7 +32,7 @@ export function PublishTab({ botId }: { botId: string }) {
       setPub(await api<Pub>(`/bots/${botId}/publication`));
       setLive(await api<Live[]>(`/bots/${botId}/records?sandbox=false`));
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message, e);
     }
   }, [botId]);
 
@@ -45,7 +47,7 @@ export function PublishTab({ botId }: { botId: string }) {
       setPub(await api<Pub>(`/bots/${botId}/publish`, { body: { mode: m, token: m === "own" ? token : undefined } }));
       setToken("");
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message, e);
     } finally {
       setBusy(false);
     }
@@ -57,7 +59,7 @@ export function PublishTab({ botId }: { botId: string }) {
     try {
       setPub(await api<Pub>(`/bots/${botId}/listing`, { method: "PUT", body: { listed } }));
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message, e);
     } finally {
       setBusy(false);
     }
@@ -69,7 +71,7 @@ export function PublishTab({ botId }: { botId: string }) {
     try {
       setPub(await api<Pub>(`/bots/${botId}/unpublish`, { method: "POST", body: {} }));
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message, e);
     } finally {
       setBusy(false);
     }
@@ -80,7 +82,7 @@ export function PublishTab({ botId }: { botId: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {error && <p className="rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-bad">{error}</p>}
+      {error && (limitHit ? <PlanLimitNote text={error} /> : <p className="rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-bad">{error}</p>)}
 
       {!pub.published ? (
         <>

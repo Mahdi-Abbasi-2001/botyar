@@ -2,8 +2,8 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { PENDING_KEY, api, getToken } from "@/lib/api";
-import { ErrorNote, Icon, Logo, fa } from "@/components/ui";
+import { PENDING_KEY, api, getToken, isPlanLimit } from "@/lib/api";
+import { ErrorNote, Icon, Logo, PlanLimitNote, fa } from "@/components/ui";
 import { BuilderTab } from "@/components/workspace/BuilderTab";
 import { RecordsTab, StructureTab, TestsTab, VersionsTab } from "@/components/workspace/InspectorTabs";
 import { PublishTab } from "@/components/workspace/PublishTab";
@@ -69,6 +69,7 @@ function Workspace() {
   const lastInGroup = useRef<Partial<Record<Group, Tab>>>({});  // each section reopens where the owner left it
   const beforeTry = useRef<Tab>("build");                          // phones: closing "try it" returns here
   const [error, setError] = useState("");
+  const [limit, setLimit] = useState("");  // the monthly agent-request limit was reached
 
   const [chat, setChat] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
@@ -144,6 +145,7 @@ function Workspace() {
     if (t.length < 2 || running) return;
     setInput("");
     setError("");
+    setLimit("");
     setRunning(true);
     setStamped(false);
     setEvents([]);
@@ -156,7 +158,8 @@ function Workspace() {
       // the request never reached the agent: undo the optimistic message and give the text back
       setChat((c) => c.slice(0, -1));
       setInput(t);
-      setError(e.message);
+      if (isPlanLimit(e)) setLimit(e.message);
+      else setError(e.message);
       setRunning(false);
       return;
     }
@@ -313,6 +316,7 @@ function Workspace() {
       <main className="flex flex-1 flex-wrap items-start gap-5 p-4 sm:p-6">
         <div className={`min-w-0 flex-[1_1_640px] flex-col gap-4 ${tab === "try" ? "hidden" : "flex"}`}>
           {error && <ErrorNote>{error}</ErrorNote>}
+          {limit && tab === "build" && <PlanLimitNote text={limit} />}
           {spec && tab !== "build" && <DeliveryBanner botId={id!} />}
           {tab === "build" && (
             <BuilderTab spec={spec} tests={tests} chat={chat} events={events} running={running} lastCost={lastCost} stamped={stamped}

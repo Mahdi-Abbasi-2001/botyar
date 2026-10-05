@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .engine_text import fa_digits
 from .auth import current_user
 from .config import settings
 from .db import get_db
@@ -89,7 +90,7 @@ def over(limit_name: str, plan: dict) -> HTTPException:
     msgs = {"bots": f"سقف ساخت ربات در پلن «{plan['name']}» ({plan['bots']} ربات) پر شده است. برای ربات بیشتر پلن را ارتقا دهید.",
             "live_bots": f"در پلن «{plan['name']}» فقط {plan['live_bots']} ربات می‌تواند هم‌زمان منتشر باشد. ربات دیگری را لغو انتشار کنید یا پلن را ارتقا دهید.",
             "ai_requests": f"سقف درخواست‌های ماهانه‌ی ایجنت در پلن «{plan['name']}» ({plan['ai_requests']} درخواست در ۳۰ روز) پر شده است. پلن را ارتقا دهید."}
-    return HTTPException(402, msgs[limit_name])
+    return HTTPException(402, fa_digits(msgs[limit_name]))  # Persian digits: the text sits in a Persian sentence
 
 
 def check_new_bot(db: Session, user: User):

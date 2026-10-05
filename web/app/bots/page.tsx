@@ -2,8 +2,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PENDING_KEY, api, getToken, setToken } from "@/lib/api";
-import { ErrorNote, Icon, Logo, TestBar, fa } from "@/components/ui";
+import { PENDING_KEY, api, getToken, isPlanLimit, setToken } from "@/lib/api";
+import { ErrorNote, Icon, Logo, PlanLimitNote, TestBar, fa } from "@/components/ui";
 import { ago } from "@/components/workspace/model";
 
 type BotRow = {
@@ -41,6 +41,7 @@ export default function Bots() {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [limit, setLimit] = useState("");  // plan limit: shown beside the button the owner pressed
 
   useEffect(() => {
     if (!getToken()) {
@@ -55,23 +56,27 @@ export default function Bots() {
     e.preventDefault();
     if (busy) return;
     setBusy(true);
+    setLimit("");
     try {
       const b = await api<BotRow>("/bots/draft", { method: "POST", body: {} });
       // the workspace picks this up and sends it to the agent straight away
       if (text.trim().length >= 2) sessionStorage.setItem(PENDING_KEY(b.id), text.trim());
       router.push(`/bot/?id=${b.id}`);
     } catch (e: any) {
-      setError(e.message);
+      if (isPlanLimit(e)) setLimit(e.message);
+      else setError(e.message);
       setBusy(false);
     }
   }
 
   async function fromTemplate(key: string) {
+    setLimit("");
     try {
       const b = await api<BotRow>("/bots", { body: { template: key } });
       router.push(`/bot/?id=${b.id}`);
     } catch (e: any) {
-      setError(e.message);
+      if (isPlanLimit(e)) setLimit(e.message);
+      else setError(e.message);
     }
   }
 
@@ -147,6 +152,7 @@ export default function Bots() {
                 <button key={x} type="button" onClick={() => setText(`برای ${x} ربات می‌خوام. `)} className="min-h-11 rounded-full border border-line-2 bg-raised px-3.5 text-[13px] text-fg-2 hover:text-fg">{x}</button>
               ))}
             </div>
+            {limit && <PlanLimitNote text={limit} />}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="text-[13px] text-dim">ایجنت اگر چیزی مبهم بود، کوتاه می‌پرسد.</span>
               <button disabled={busy} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-saffron px-5 font-extrabold text-ink hover:bg-saffron-hi disabled:opacity-60">
