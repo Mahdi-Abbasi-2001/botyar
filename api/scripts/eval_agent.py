@@ -156,8 +156,13 @@ PERSONALIZE_CASES = [
      lambda s, m: None if blocks(s, "form") else "should build the closest thing (a form asking the name) and say that echoing the name is limited"),
 ]
 
+PARTIAL_CASES = [
+    ("partial-live-clock", "یه ربات بساز که وقتی کاربر /start می‌زنه دو تا دکمه «ساعت فعلی» و «راهنما» نشون بده.", "done",
+     lambda s, m: None if len(s.get("menu", [])) >= 1 and ("پشتیبانی نمی" in m) else "should build the supported button(s) and say the live clock is not supported: " + m[:200]),
+]
+
 # appended by later features (appointment calendars, FAQ, owner chat, delivery/discounts) — see EXTRA_CASES below
-EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES]
+EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES]
 
 
 def run_case(c, i, name, text, want_status, check):
