@@ -28,3 +28,13 @@ REAL_FREE = dict(_billing.PLANS["free"])  # the real free-plan limits (only test
 def _generous_free_plan(monkeypatch):
     """Most tests create many bots and customers under one account; they must not trip the free plan's limits."""
     monkeypatch.setitem(_billing.PLANS, "free", {**REAL_FREE, "bots": 10_000, "live_bots": 10_000, "customers": 100_000, "ai_requests": 100_000})
+
+
+@pytest.fixture(autouse=True)
+def _clean_process_state():
+    """Module-level caches (update-id dedupe, notice dates, rate limits) must not leak from one test into the next."""
+    from app import anon, bale, communities
+
+    for d in (bale._seen, bale._cap_notice, bale._gate_notice, anon._hits, communities._admin_cache):
+        d.clear()
+    yield
