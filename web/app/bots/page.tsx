@@ -61,7 +61,11 @@ export default function Bots() {
     <div className="min-h-screen">
       <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line px-4 py-3.5 sm:px-6">
         <Logo size="sm" />
-        <button onClick={() => { setToken(null); router.push("/"); }} className="min-h-11 text-sm text-fg-2 hover:text-fg">خروج</button>
+        <nav className="flex items-center gap-4 text-sm">
+          <Link href="/account/" className="min-h-11 content-center text-fg-2 hover:text-fg">پلن و مصرف</Link>
+          <Link href="/pricing/" className="min-h-11 content-center text-fg-2 hover:text-fg">تعرفه‌ها</Link>
+          <button onClick={() => { setToken(null); router.push("/"); }} className="min-h-11 text-fg-2 hover:text-fg">خروج</button>
+        </nav>
       </header>
 
       <main className="mx-auto flex max-w-[1320px] flex-col gap-9 px-4 py-8 sm:px-6">

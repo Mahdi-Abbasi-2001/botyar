@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from . import engine as bot_engine
 from . import faq_index
+from . import billing
 from .auth import check_password, current_user, hash_password, make_token
 from .config import settings
 from .db import Base, engine, get_db
@@ -151,6 +152,7 @@ def list_bots(user: User = Depends(current_user), db: Session = Depends(get_db))
 
 @app.post("/api/bots")
 def create_bot(body: NewBot, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    billing.check_new_bot(db, user)
     if body.template not in TEMPLATES:
         raise HTTPException(400, "قالب نامعتبر است")
     spec = load_template(body.template)
@@ -225,6 +227,7 @@ class BuilderIn(BaseModel):
 
 @app.post("/api/bots/draft")
 def create_draft(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    billing.check_new_bot(db, user)
     bot = Bot(user_id=user.id, name="ربات جدید")
     db.add(bot)
     db.commit()
@@ -240,6 +243,7 @@ def builder_send(bot_id: int, body: BuilderIn, tasks: BackgroundTasks, user: Use
     running = db.scalar(select(BuilderRun).where(BuilderRun.bot_id == bot.id, BuilderRun.status == "running"))
     if running:
         raise HTTPException(409, "ایجنت هنوز در حال کار روی درخواست قبلی است")
+    billing.check_ai_request(db, user)
     since = datetime.now(timezone.utc) - timedelta(hours=24)
     used = db.scalar(select(func.count()).select_from(BuilderRun).join(Bot, Bot.id == BuilderRun.bot_id).where(Bot.user_id == user.id, BuilderRun.created_at >= since))
     if used >= DAILY_RUN_LIMIT:
@@ -323,6 +327,14 @@ app.include_router(export_router)
 from .records_ops import router as records_ops_router  # noqa: E402
 
 app.include_router(records_ops_router)
+
+from .billing import router as billing_router  # noqa: E402
+
+app.include_router(billing_router)
+
+from .customers import router as customers_router  # noqa: E402
+
+app.include_router(customers_router)
 
 from .outreach import router as outreach_router  # noqa: E402
 

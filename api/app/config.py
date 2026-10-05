@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     telegram_relay_url: str = ""   # e.g. https://botyar-relay.<org>.deno.net
     telegram_relay_key: str = ""   # shared secret: the relay refuses calls without it
     telegram_shared_bot_token: str = ""
+    admin_emails: str = ""  # comma-separated; these accounts may approve plan upgrade requests
 
 
 settings = Settings()

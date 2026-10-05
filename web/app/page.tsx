@@ -46,6 +46,7 @@ export default function Home() {
             <nav className="flex flex-wrap items-center gap-6 text-[15px]">
               <a href="#features" className="hidden text-fg-2 hover:text-fg sm:inline">چه کارهایی بلد است؟</a>
               <a href="#proof" className="hidden text-fg-2 hover:text-fg sm:inline">چطور مطمئن شوم؟</a>
+              <Link href="/pricing/" className="text-fg-2 hover:text-fg">تعرفه‌ها</Link>
               <Link href="/login/?mode=login" className="text-fg-2 hover:text-fg">ورود</Link>
               <Link href="/login/" className="inline-flex min-h-11 items-center rounded-xl bg-fg px-5 font-bold text-ink hover:bg-white">ساخت اولین ربات</Link>
             </nav>

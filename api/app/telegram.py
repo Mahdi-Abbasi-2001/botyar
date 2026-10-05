@@ -21,6 +21,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from . import bale, faq_index
+from . import billing
 from .auth import current_user
 from .config import settings
 from .db import get_db
@@ -141,6 +142,7 @@ def _new_code(db: Session, bot_id: int) -> str:
 @router.post("/api/bots/{bot_id}/telegram/publish")
 def tg_publish(bot_id: int, body: TgPublishIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     _own(bot_id, user, db)
+    billing.check_publish(db, user, bot_id)
     if not (enabled() and settings.public_base_url):
         raise HTTPException(503, "اتصال به تلگرام روی این سرور فعال نیست")
     latest = _latest(bot_id, db)

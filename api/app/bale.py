@@ -23,7 +23,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import dates, engine, faq_index
+from . import billing, dates, engine, faq_index
 from .config import settings
 from .db import SessionLocal
 from .models import Bot, BotListing, BotVersion, ChatLink, ChatSession, PaymentConfig, Publication, Record
@@ -309,6 +309,7 @@ def directory(db: Session, ch: Channel, page: int, edit: bool = False) -> dict:
 
 
 # ---------- update handling ----------
+_cap_notice: dict[int, object] = {}  # bot id -> day the owner was last told the customer cap is full
 _locks: dict[int, threading.Lock] = defaultdict(threading.Lock)  # serialise a bot's bookings (capacity checks)
 _seen: dict[str, int] = {}
 
@@ -449,6 +450,16 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
         if frm.get("first_name"):
             state["cust_name"] = str(frm["first_name"])[:40]
         state["cust"] = skey  # stable customer identity (set last: the welcome path above replaces the whole state)
+        bot = db.get(Bot, pub.bot_id)
+        if bot is not None and not billing.track_customer(db, bot, skey, state.get("cust_name", "")):
+            row.state = state  # a NEW customer beyond the plan's monthly cap: politely refused, the owner is told once a day
+            db.commit()
+            say(token, chat_id, billing.FULL_TEXT, ch)
+            today = dates.now_tehran().date()
+            if pub.admin_chat_id and _cap_notice.get(pub.bot_id) != today:
+                _cap_notice[pub.bot_id] = today
+                say(token, pub.admin_chat_id, "⚠️ ظرفیت ماهانه‌ی مشتری‌های پلن شما پر شده و مشتری جدید پذیرفته نمی‌شود. برای ظرفیت بیشتر از بخش «پلن‌ها» در بات‌یار ارتقا دهید.", ch)
+            return
         wallet = wallet_token(db, pub) if ch.payments else ""
         state["pay_ok"], state["pay_sim"] = bool(wallet), False  # pay_sim (the fake pay button) must never be on in a real chat
         store = SqlStore(db, pub.bot_id, sandbox=False)

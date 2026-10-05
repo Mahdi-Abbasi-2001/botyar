@@ -9,6 +9,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from . import bale, faq_index
+from . import billing
 from .auth import current_user
 from .config import settings
 from .db import get_db
@@ -67,6 +68,7 @@ def publication(bot_id: int, user: User = Depends(current_user), db: Session = D
 @router.post("/api/bots/{bot_id}/publish")
 def publish(bot_id: int, body: PublishIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     _own(bot_id, user, db)
+    billing.check_publish(db, user, bot_id)
     latest = _latest(bot_id, db)
     if latest is None:
         raise HTTPException(409, "ربات هنوز ساخته نشده است")

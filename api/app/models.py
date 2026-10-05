@@ -211,3 +211,35 @@ class PaymentConfig(Base):
     bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), unique=True, index=True)
     token_enc: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class Subscription(Base):
+    """Which plan an account is on (no row = free). Activated by an admin after the owner's upgrade request."""
+    __tablename__ = "subscriptions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, index=True)
+    plan: Mapped[str] = mapped_column(String(16), default="free")
+    note: Mapped[str] = mapped_column(String(300), default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class UpgradeRequest(Base):
+    __tablename__ = "upgrade_requests"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    plan: Mapped[str] = mapped_column(String(16))
+    note: Mapped[str] = mapped_column(String(500), default="")
+    status: Mapped[str] = mapped_column(String(10), default="pending")  # pending | approved | rejected
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class CustomerSeen(Base):
+    """Everyone who has written to a live bot (Bale chats): feeds the customers tab and the plan's monthly customer cap."""
+    __tablename__ = "customers_seen"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    key: Mapped[str] = mapped_column(String(64), index=True)  # "bale:<chat id>"
+    name: Mapped[str] = mapped_column(String(80), default="")
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    messages: Mapped[int] = mapped_column(Integer, default=0)
