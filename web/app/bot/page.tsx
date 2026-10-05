@@ -28,6 +28,37 @@ const GROUPS: { key: Group; label: string; icon: React.ComponentProps<typeof Ico
   { key: "manage", label: "مدیریت", icon: "list", tabs: ["records", "customers", "inbox", "announce"] },
 ];
 const groupOf = (t: Tab): Group | null => GROUPS.find((g) => g.tabs.includes(t))?.key ?? null;
+
+// Tabs that only fill up once real customers can reach the bot, and what each will show then.
+const AFTER_PUBLISH: Partial<Record<Tab, { icon: React.ComponentProps<typeof Icon>["name"]; title: string; text: string }>> = {
+  customers: { icon: "star", title: "مشتری‌ها بعد از انتشار اینجا می‌آیند",
+    text: "هر کسی که در بله یا تلگرام با ربات‌ت گفت‌وگو کند اینجا دیده می‌شود: نام، آخرین پیام و تعداد دوستانی که دعوت کرده. می‌توانی جست‌وجو کنی، خروجی اکسل بگیری یا کسی را مسدود کنی." },
+  announce: { icon: "bell", title: "اطلاعیه برای مشتری‌های ربات منتشرشده",
+    text: "بعد از انتشار، برای همه‌ی کسانی که با ربات گفت‌وگو کرده‌اند پیام بفرست یا آن را برای بعد زمان‌بندی کن. روزی حداکثر ۳ اطلاعیه، و هر کس با /stop می‌تواند دیگر دریافت نکند." },
+  channels: { icon: "chat", title: "کانال و گروه، بعد از انتشار",
+    text: "ربات منتشرشده را به کانال یا گروهت اضافه کن تا عضویت اجباری در کانال، شمارش دعوت‌ها، بازنشر خودکار پست‌ها و مدیریت گروه (حذف لینک و فحش، اخطار و اخراج) کار کند." },
+};
+
+function AfterPublish({ tab, onPublish, testsOk }: { tab: Tab; onPublish: () => void; testsOk: boolean }) {
+  const c = AFTER_PUBLISH[tab]!;
+  return (
+    <div className="flex flex-col items-start gap-4 rounded-[20px] border border-line bg-panel p-6 sm:p-8">
+      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-raised text-saffron"><Icon name={c.icon} size={24} /></span>
+      <h2 className="m-0 text-xl font-extrabold">{c.title}</h2>
+      <p className="m-0 max-w-[640px] text-[15px] leading-8 text-fg-2">{c.text}</p>
+      <ol className="m-0 flex list-none flex-wrap gap-2 p-0 text-sm text-mute">
+        {testsOk
+          ? <li className="rounded-full border border-mint-line bg-mint-bg px-3 py-1 text-mint-fg">۱. ساخته و تست شد ✓</li>
+          : <li className="rounded-full border border-bad-line bg-bad-bg px-3 py-1 text-bad-fg">۱. اول تست‌ها باید قبول شوند</li>}
+        <li className="rounded-full border border-amber-line bg-saffron/10 px-3 py-1 text-saffron">۲. انتشار روی بله یا تلگرام</li>
+        <li className="rounded-full border border-line-2 px-3 py-1">۳. اینجا پر می‌شود</li>
+      </ol>
+      <button onClick={onPublish} className="flex min-h-12 items-center gap-2 rounded-xl bg-saffron px-5 font-extrabold text-ink hover:bg-saffron-hi">
+        <Icon name="live" size={18} /> رفتن به انتشار
+      </button>
+    </div>
+  );
+}
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function Workspace() {
@@ -49,6 +80,8 @@ function Workspace() {
   const alive = useRef(true);
   const pendingSent = useRef(false);
 
+  type PubInfo = { published: boolean; up_to_date?: boolean; tests_ok?: boolean; latest_version?: number };
+  const [pub, setPub] = useState<{ bale: PubInfo | null; tg: PubInfo | null } | null>(null);
   const [records, setRecords] = useState<Rec[]>([]);
   const [tests, setTests] = useState<TestRes[]>([]);
   const [versions, setVersions] = useState<Ver[]>([]);
@@ -158,6 +191,16 @@ function Workspace() {
     return () => { alive.current = false; };
   }, [id, router, loadAll]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // where the bot is live; refreshed on every tab change so the header follows what the owner just did in «انتشار»
+  const hasSpec = !!bot?.spec;
+  useEffect(() => {
+    if (!id || !hasSpec) return;
+    Promise.all([
+      api<PubInfo>(`/bots/${id}/publication`).catch(() => null),
+      api<PubInfo & { enabled?: boolean }>(`/bots/${id}/telegram`).catch(() => null),
+    ]).then(([bale, tg]) => setPub({ bale, tg }));
+  }, [id, hasSpec, tab, bot?.version]);
+
   function editPart(where: string) {
     setTab("build");
     setInput(`در بخش «${where}»: `);
@@ -181,6 +224,10 @@ function Workspace() {
   const phoneTabs = tab === "build" || tab === "spec";
   const group = groupOf(tab);
   if (group) lastInGroup.current[group] = tab;
+  const liveOn = [pub?.bale?.published && "بله", pub?.tg?.published && "تلگرام"].filter(Boolean) as string[];
+  const stale = !!((pub?.bale?.published && !pub.bale.up_to_date) || (pub?.tg?.published && !pub.tg.up_to_date));
+  const live: "live" | "stale" | "off" | null = !pub ? null : liveOn.length ? (stale ? "stale" : "live") : "off";
+  const goPublish = () => setTab("publish");
   const fieldLabels: Record<string, string> = { slot_label: "زمان" };
   for (const b of spec?.blocks ?? []) if ("fields" in b) for (const f of b.fields) fieldLabels[f.key] = f.label;
 
@@ -195,7 +242,26 @@ function Workspace() {
             {running ? (spec ? `نسخه ${fa(bot.version)} · در حال ساخت نسخه‌ی بعد` : "در حال ساخت اولین نسخه") : spec ? `نسخه ${fa(bot.version)}${tests.length ? ` · ${fa(passed)}/${fa(tests.length)} تست موفق` : ""}` : "پیش‌نویس"}
           </span>
         </div>
-        {cost !== null && cost > 0 && <span className="hidden rounded-lg border border-line px-2.5 py-1.5 text-xs text-mute sm:inline" dir="ltr" title="هزینه‌ی هوش مصنوعی این ربات تا الان">هزینه‌ی AI: <span dir="ltr">${cost.toFixed(4)}</span></span>}
+        {cost !== null && cost > 0 && <span className="hidden rounded-lg border border-line px-2.5 py-1.5 text-xs text-mute xl:inline" dir="ltr" title="هزینه‌ی هوش مصنوعی این ربات تا الان">هزینه‌ی AI: <span dir="ltr">${cost.toFixed(4)}</span></span>}
+        {/* where the bot stands with customers, and the one-click way forward */}
+        {spec && live === "live" && (
+          <button onClick={goPublish} className="hidden min-h-11 items-center gap-2 rounded-xl bg-mint-bg px-3.5 text-sm text-mint-fg hover:bg-mint-bg/70 sm:flex">
+            <span className="anim-live h-2 w-2 rounded-full bg-mint" /> زنده روی {liveOn.join(" و ")}
+          </button>
+        )}
+        {spec && live === "stale" && (
+          <button onClick={goPublish} disabled={running} className="hidden min-h-11 items-center gap-2 rounded-xl border border-amber-line bg-saffron/10 px-3.5 text-sm font-bold text-saffron hover:bg-saffron/20 disabled:opacity-50 sm:flex">
+            <Icon name="live" size={16} /> انتشار نسخه‌ی {fa(bot.version)}
+          </button>
+        )}
+        {spec && live === "off" && (
+          <>
+            <span className="hidden text-sm text-mute md:inline">هنوز منتشر نشده</span>
+            <button onClick={goPublish} disabled={running} className="hidden min-h-11 items-center gap-2 rounded-xl bg-saffron px-4 text-sm font-extrabold text-ink hover:bg-saffron-hi disabled:opacity-50 sm:flex">
+              <Icon name="live" size={16} /> انتشار برای مشتری‌ها
+            </button>
+          </>
+        )}
         {/* on phones the simulator is not beside the page, so "try it" lives in the header where it is always visible */}
         {spec && (
           <button aria-pressed={tab === "try"} onClick={() => setTab(tab === "try" ? beforeTry.current : (beforeTry.current = tab, "try"))}
@@ -222,6 +288,8 @@ function Workspace() {
                   <Icon name={g.icon} size={16} className={on ? "text-saffron" : "text-mute"} />
                   {g.label}
                   {g.key === "make" && tests.length > 0 && <span className={`text-xs ${passed === tests.length ? "text-mint" : "text-bad-soft"}`}>{fa(passed)}/{fa(tests.length)}</span>}
+                  {g.key === "share" && live === "live" && <span className="h-2 w-2 rounded-full bg-mint" title={`زنده روی ${liveOn.join(" و ")}`} />}
+                  {g.key === "share" && live === "stale" && <span className="h-2 w-2 rounded-full bg-saffron" title="نسخه‌ی جدید منتشر نشده" />}
                   {g.key === "manage" && records.length > 0 && <span className="rounded-full bg-raised px-1.5 text-xs text-fg-2">{fa(records.length)}</span>}
                 </button>
               );
@@ -254,10 +322,11 @@ function Workspace() {
           {tab === "tests" && <TestsTab tests={tests} spec={spec} version={bot.version} />}
           {tab === "versions" && <VersionsTab versions={versions} spec={spec} />}
           {tab === "catalog" && spec && <CatalogTab botId={id!} />}
-          {tab === "channels" && spec && <ChannelsTab botId={id!} />}
+          {live === "off" && AFTER_PUBLISH[tab] && <AfterPublish tab={tab} onPublish={goPublish} testsOk={pub?.bale?.tests_ok !== false} />}
+          {tab === "channels" && spec && live !== "off" && <ChannelsTab botId={id!} />}
           {tab === "media" && spec && <MediaTab botId={id!} />}
-          {tab === "customers" && spec && <CustomersTab botId={id!} />}
-          {tab === "announce" && spec && <AnnounceTab botId={id!} />}
+          {tab === "customers" && spec && live !== "off" && <CustomersTab botId={id!} />}
+          {tab === "announce" && spec && live !== "off" && <AnnounceTab botId={id!} />}
           {tab === "inbox" && spec && <InboxTab botId={id!} />}
           {tab === "publish" && spec && <PublishTab botId={id!} />}
           {tab === "records" && spec && <RecordsTab records={records} spec={spec} botId={id!} onChanged={loadRecords} />}

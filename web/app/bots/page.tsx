@@ -3,9 +3,29 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PENDING_KEY, api, getToken, setToken } from "@/lib/api";
-import { ErrorNote, Icon, Logo, fa } from "@/components/ui";
+import { ErrorNote, Icon, Logo, TestBar, fa } from "@/components/ui";
+import { ago } from "@/components/workspace/model";
 
-type BotRow = { id: number; name: string; version: number };
+type BotRow = {
+  id: number; name: string; version: number;
+  tests?: { passed: number; total: number } | null;
+  live?: { messenger: "bale" | "tg"; version: number }[];
+  last_change?: { note: string; at: string } | null;
+};
+const MESSENGER = { bale: "بله", tg: "تلگرام" } as const;
+
+/** Where the bot stands, in one pill: draft / not published / live on … / a newer version waits. */
+function Status({ b }: { b: BotRow }) {
+  const live = b.live ?? [];
+  if (!b.version) return <span className="shrink-0 rounded-full border border-amber-line px-2.5 py-0.5 text-xs text-saffron">پیش‌نویس</span>;
+  if (!live.length) return <span className="shrink-0 rounded-full border border-line-3 px-2.5 py-0.5 text-xs text-fg-2">منتشر نشده</span>;
+  if (live.some((l) => l.version < b.version)) return <span className="shrink-0 rounded-full border border-amber-line bg-saffron/10 px-2.5 py-0.5 text-xs text-saffron">نسخه‌ی جدید منتشر نشده</span>;
+  return (
+    <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-mint-bg px-2.5 py-0.5 text-xs text-mint-fg">
+      <span className="h-1.5 w-1.5 rounded-full bg-mint" /> زنده روی {live.map((l) => MESSENGER[l.messenger]).join(" و ")}
+    </span>
+  );
+}
 type Tpl = { key: string; name: string };
 
 const TPL_INFO: Record<string, { desc: string; tags: string[] }> = {
@@ -56,6 +76,44 @@ export default function Bots() {
   }
 
   const first = bots !== null && bots.length === 0;
+  const hasBots = bots !== null && bots.length > 0;
+
+  const list = hasBots && (
+    <section className="flex flex-col gap-3.5">
+      <h1 className="m-0 text-[26px] font-black">ربات‌های من</h1>
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(300px,1fr))]">
+        {bots!.map((b) => {
+          const isLive = !!b.live?.length;
+          return (
+            <Link key={b.id} href={`/bot/?id=${b.id}`}
+              className={`flex flex-col gap-3 rounded-[18px] border bg-panel p-5 hover:border-saffron ${!b.version ? "border-dashed border-amber-line" : isLive ? "border-mint-line" : "border-line"}`}>
+              <div className="flex items-start justify-between gap-2.5">
+                <span className="text-[17px] font-extrabold leading-relaxed">{b.name}</span>
+                <Status b={b} />
+              </div>
+              {!b.version ? (
+                <span className="text-[13px] text-mute">هنوز ساخته نشده · ادامه‌ی گفت‌وگو با ایجنت</span>
+              ) : (
+                <>
+                  {b.tests && b.tests.total > 0 && (
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-28"><TestBar passed={b.tests.passed} total={b.tests.total} h={5} /></div>
+                      <span className={`text-xs ${b.tests.passed === b.tests.total ? "text-mint" : "text-bad-soft"}`}>{fa(b.tests.passed)}/{fa(b.tests.total)} تست</span>
+                    </div>
+                  )}
+                  {b.last_change && (
+                    <span className="line-clamp-2 text-[13px] leading-7 text-mute">
+                      نسخه {fa(b.version)} · {ago(b.last_change.at)}{b.last_change.note && <> · «{b.last_change.note}»</>}
+                    </span>
+                  )}
+                </>
+              )}
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
 
   return (
     <div className="min-h-screen">
@@ -70,11 +128,16 @@ export default function Bots() {
 
       <main className="mx-auto flex max-w-[1320px] flex-col gap-9 px-4 py-8 sm:px-6">
         {error && <ErrorNote>{error}</ErrorNote>}
+        {bots === null && !error && <p className="text-mute">در حال بارگذاری…</p>}
+        {/* returning owners come for their bots: the list first, the "new bot" box after it */}
+        {list}
         <div className="flex flex-wrap gap-5">
           <form onSubmit={startDescribed} className="bp flex min-w-0 flex-[2_1_560px] flex-col gap-4 rounded-[22px] border border-saffron bg-panel p-5 sm:p-6">
-            <h1 className="m-0 text-2xl font-black sm:text-[32px]">
-              {first ? <>سلام! اولین ربات‌ت را <span className="text-saffron">تعریف کن.</span></> : "ساخت ربات جدید با توضیح دادن"}
-            </h1>
+            {first ? (
+              <h1 className="m-0 text-2xl font-black sm:text-[32px]">سلام! اولین ربات‌ت را <span className="text-saffron">تعریف کن.</span></h1>
+            ) : (
+              <h2 className="m-0 text-xl font-black sm:text-2xl">ساخت ربات جدید با توضیح دادن</h2>
+            )}
             <label htmlFor="nb" className="text-sm text-fg-2">ربات جدیدت چه کاری انجام بدهد؟</label>
             <textarea id="nb" rows={3} value={text} onChange={(e) => setText(e.target.value)}
               placeholder="مثلاً: برای کافه‌ام ربات سفارش می‌خوام؛ منوی نوشیدنی و کیک، و سفارش که ثبت شد به من خبر بده."
@@ -113,31 +176,6 @@ export default function Bots() {
           </div>
         </div>
 
-        {!first && (
-          <section className="flex flex-col gap-3.5">
-            <h2 className="m-0 text-[22px] font-extrabold">ربات‌های من</h2>
-            {bots === null ? (
-              <p className="text-mute">در حال بارگذاری…</p>
-            ) : (
-              <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(320px,1fr))]">
-                {bots.map((b) => (
-                  <Link key={b.id} href={`/bot/?id=${b.id}`}
-                    className={`flex flex-col gap-3.5 rounded-[18px] border bg-panel p-5 hover:border-saffron ${b.version ? "border-line" : "border-dashed border-amber-line"}`}>
-                    <div className="flex items-start justify-between gap-2.5">
-                      <span className="text-[17px] font-extrabold leading-relaxed">{b.name}</span>
-                      {b.version ? (
-                        <span className="shrink-0 rounded-full border border-line-3 px-2.5 py-0.5 text-xs text-fg-2">نسخه {fa(b.version)}</span>
-                      ) : (
-                        <span className="shrink-0 rounded-full border border-amber-line px-2.5 py-0.5 text-xs text-saffron">پیش‌نویس</span>
-                      )}
-                    </div>
-                    <span className="text-[13px] text-mute">{b.version ? "باز کردن، امتحان کردن یا تغییر دادن" : "هنوز ساخته نشده · ادامه‌ی گفت‌وگو با ایجنت"}</span>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
         {first && (
           <p className="flex items-center gap-2.5 text-[13px] text-mute"><Icon name="shield" className="text-mint" /> هر نسخه قبل از تحویل با تست خودکار بررسی می‌شود.</p>
         )}

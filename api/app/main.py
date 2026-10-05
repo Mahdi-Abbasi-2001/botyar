@@ -147,7 +147,27 @@ def templates():
 @app.get("/api/bots")
 def list_bots(user: User = Depends(current_user), db: Session = Depends(get_db)):
     bots = db.scalars(select(Bot).where(Bot.user_id == user.id).order_by(Bot.id.desc())).all()
-    return [bot_out(b, db) | {"spec": None} for b in bots]
+    return [_bot_card(b, db) for b in bots]
+
+
+def _bot_card(bot: Bot, db: Session) -> dict:
+    """What the "my bots" list shows at a glance: live where (and which version), latest tests, last change."""
+    from . import bale
+    from .models import VersionTests
+
+    v = latest_version(bot.id, db)
+    out = {"id": bot.id, "name": bot.name, "version": v.version if v else 0, "spec": None, "tests": None, "live": [], "last_change": None}
+    if v is None:
+        return out
+    t = db.scalars(select(VersionTests).where(VersionTests.bot_id == bot.id, VersionTests.version == v.version)).first()
+    if t is not None:
+        out["tests"] = {"passed": sum(1 for r in t.results if r["passed"]), "total": len(t.results)}
+    for ch in bale.CHANNELS.values():
+        p = db.scalars(select(ch.pub_model).where(ch.pub_model.bot_id == bot.id)).first()
+        if p is not None:
+            out["live"].append({"messenger": ch.name, "version": p.version})
+    out["last_change"] = {"note": (v.note or "")[:120], "at": v.created_at.isoformat()}
+    return out
 
 
 @app.post("/api/bots")

@@ -150,3 +150,27 @@ def test_telegram_shared_bot_has_its_own_directory(env):
     assert [d for _, d in buttons(last_out(calls, 90, "tg"))] == ["bdir:1"]       # the Telegram publication, not the Bale one
     c.post(f"/api/tghook/shared/{telegram.shared_hook_secret()}", json=cb(90, "bdir:1"))
     assert "خوش آمدید" in [p for m, p in calls["tg"] if m == "sendMessage" and p["chat_id"] == "90"][-2]["text"]
+
+
+def test_bot_list_shows_where_each_bot_is_live_and_its_last_change(env):
+    from app.db import SessionLocal
+    from app.models import VersionTests
+
+    c, _ = env
+    H = owner(c, "cards@x.com")
+    both, bale_only, none = bot(c, H), bot(c, H), bot(c, H)
+    draft = c.post("/api/bots/draft", json={}, headers=H).json()["id"]
+    c.post(f"/api/bots/{both}/publish", json={"mode": "shared"}, headers=H)
+    c.post(f"/api/bots/{both}/telegram/publish", json={"mode": "shared"}, headers=H)
+    c.post(f"/api/bots/{bale_only}/publish", json={"mode": "shared"}, headers=H)
+    with SessionLocal() as db:
+        db.add(VersionTests(bot_id=none, version=1, scenarios=[], results=[{"name": "a", "passed": True, "failures": [], "transcript": []},
+                                                                           {"name": "b", "passed": False, "failures": ["x"], "transcript": []}]))
+        db.commit()
+    cards = {b["id"]: b for b in c.get("/api/bots", headers=H).json()}
+    assert sorted(x["messenger"] for x in cards[both]["live"]) == ["bale", "tg"] and cards[both]["live"][0]["version"] == 1
+    assert [x["messenger"] for x in cards[bale_only]["live"]] == ["bale"]
+    assert cards[none]["live"] == [] and cards[none]["tests"] == {"passed": 1, "total": 2}
+    assert cards[both]["tests"] is None and cards[both]["last_change"]["note"] and cards[both]["last_change"]["at"]
+    assert cards[draft]["version"] == 0 and cards[draft]["live"] == [] and cards[draft]["last_change"] is None
+    assert all(card["spec"] is None for card in cards.values())  # the list stays light
