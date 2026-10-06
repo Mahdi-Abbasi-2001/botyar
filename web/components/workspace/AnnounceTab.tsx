@@ -3,7 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { fa } from "@/components/ui";
 
-type Item = { id: number; text: string; audience: number; sent: number; failed: number; done: boolean; created_at: string };
+type Item = { id: number; text: string; audience: number; sent: number; failed: number; done: boolean; segment: string; created_at: string };
+type Segment = { id: string; label: string; size: number };
 type Info = { published: boolean; audience: number; per_day: number; items: Item[] };
 
 const card = "rounded-2xl border border-line-2 bg-panel p-4";
@@ -87,12 +88,17 @@ export function AnnounceTab({ botId }: { botId: string }) {
   const [info, setInfo] = useState<Info | null>(null);
   const [text, setText] = useState("");
   const [confirm, setConfirm] = useState(false);
+  // who it goes to: everyone, one part of the bot, one upcoming session (its people hear even after /stop), recent customers
+  const [segments, setSegments] = useState<Segment[]>([]);
+  const [segment, setSegment] = useState("all");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     try {
-      setInfo(await api<Info>(`/bots/${botId}/broadcasts`));
+      const i = await api<Info>(`/bots/${botId}/broadcasts`);
+      setInfo(i);
+      if (i.published) setSegments(await api<Segment[]>(`/bots/${botId}/broadcasts/segments`));
     } catch (e: any) {
       setError(e.message);
     }
@@ -110,7 +116,7 @@ export function AnnounceTab({ botId }: { botId: string }) {
     setBusy(true);
     setError("");
     try {
-      await api(`/bots/${botId}/broadcasts`, { body: { text } });
+      await api(`/bots/${botId}/broadcasts`, { body: { text, segment } });
       setText("");
       setConfirm(false);
       await load();
@@ -122,6 +128,8 @@ export function AnnounceTab({ botId }: { botId: string }) {
   }
 
   if (!info) return <p className="text-sm text-mute">{error || "در حال بارگذاری…"}</p>;
+  const chosen = segments.find((s) => s.id === segment);
+  const size = chosen ? chosen.size : info.audience;
   if (!info.published) return <p className={`${card} m-0 text-sm text-mute`}>ابتدا ربات را در بخش «انتشار» منتشر کنید؛ پس از آن می‌توانید برای مشتریان اطلاعیه بفرستید.</p>;
   return (
     <div className="flex flex-col gap-3">
@@ -130,14 +138,23 @@ export function AnnounceTab({ botId }: { botId: string }) {
         <p className="m-0 text-sm text-mute">
           اطلاعیه برای {fa(info.audience)} نفری که با ربات شما گفت‌وگو کرده‌اند ارسال می‌شود. هر مشتری با فرمان /stop می‌تواند دریافت اطلاعیه‌ها را لغو کند. حداکثر {fa(info.per_day)} اطلاعیه در هر شبانه‌روز ممکن است.
         </p>
+        {segments.length > 1 && (
+          <label className="flex flex-col gap-1.5 text-sm text-fg-2">
+            گیرندگان
+            <select value={segment} onChange={(e) => { setSegment(e.target.value); setConfirm(false); }} className="min-h-11 rounded-xl border border-line-2 bg-raised px-3 text-fg">
+              {segments.map((s) => <option key={s.id} value={s.id}>{fa(s.label)} ({fa(s.size)} نفر)</option>)}
+            </select>
+            {segment.startsWith("session:") && <span className="text-xs leading-6 text-mute">این پیام درباره‌ی نوبت خودِ گیرندگان است؛ به کسانی هم که دریافت اطلاعیه را لغو کرده‌اند می‌رسد.</span>}
+          </label>
+        )}
         <textarea aria-label="متن اطلاعیه" className="min-h-24 rounded-xl border border-line-2 bg-raised p-3" maxLength={1000} value={text} placeholder="برای مثال: این هفته همه‌ی دسرها ۲۰٪ تخفیف دارند."
           onChange={(e) => { setText(e.target.value); setConfirm(false); }} />
         {error && <p role="alert" className="m-0 text-sm text-red-400">{error}</p>}
         {!confirm ? (
-          <button className="min-h-11 rounded-xl bg-saffron px-5 font-bold text-ink disabled:opacity-50" disabled={!text.trim() || info.audience === 0} onClick={() => setConfirm(true)}>پیش‌نمایش و ارسال</button>
+          <button className="min-h-11 rounded-xl bg-saffron px-5 font-bold text-ink disabled:opacity-50" disabled={!text.trim() || size === 0} onClick={() => setConfirm(true)}>پیش‌نمایش و ارسال</button>
         ) : (
           <div className="flex flex-col gap-2 rounded-xl border border-saffron p-3">
-            <span className="text-sm">این پیام برای {fa(info.audience)} نفر ارسال می‌شود و پس از ارسال قابل بازگشت نیست:</span>
+            <span className="text-sm">این پیام برای {fa(size)} نفر{chosen && chosen.id !== "all" ? ` («${fa(chosen.label)}»)` : ""} ارسال می‌شود و پس از ارسال قابل بازگشت نیست:</span>
             <p className="m-0 whitespace-pre-line rounded-xl bg-raised p-3 text-sm leading-7">{text}</p>
             <div className="flex gap-2">
               <button className="min-h-11 flex-1 rounded-xl bg-saffron px-5 font-bold text-ink disabled:opacity-50" disabled={busy} onClick={send}>بله، ارسال شود</button>
@@ -150,6 +167,7 @@ export function AnnounceTab({ botId }: { botId: string }) {
       {info.items.map((i) => (
         <section key={i.id} className={`${card} flex flex-col gap-1`}>
           <p className="m-0 whitespace-pre-line text-sm leading-7">{i.text}</p>
+          {i.segment && <span className="text-xs text-fg-2">به: {fa(i.segment)}</span>}
           <span className="text-xs text-mute">{i.done ? `برای ${fa(i.sent)} نفر ارسال شد${i.failed ? ` · ${fa(i.failed)} ناموفق` : ""}` : `در حال ارسال… ${fa(i.sent)} از ${fa(i.audience)}`} · {fa(new Date(i.created_at).toLocaleString("fa-IR"))}</span>
         </section>
       ))}

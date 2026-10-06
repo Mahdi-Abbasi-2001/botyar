@@ -1,3 +1,9 @@
+import os
+
+# Before ANY app import: app.db binds its engine on first import, and the default is the local dev.db.
+# Tests drop and recreate every table, so they must never run against it.
+os.environ["DATABASE_URL"] = "sqlite:///./test.db"
+
 import pytest
 
 
@@ -17,6 +23,16 @@ def _no_background_scheduler(monkeypatch):
     from app import outreach
 
     monkeypatch.setattr(outreach, "start_scheduler", lambda: None)
+
+
+@pytest.fixture(autouse=True)
+def _no_startup_webhook_threads(monkeypatch):
+    """Each TestClient start would register the shared webhooks in a background thread; a thread outliving its test
+    lands in later ones (e.g. adds failures to the Telegram health counters). No test needs them."""
+    from app import bale, telegram
+
+    monkeypatch.setattr(bale, "ensure_shared_webhook", lambda: None)
+    monkeypatch.setattr(telegram, "ensure_shared_webhook", lambda: None)
 
 
 from app import billing as _billing  # noqa: E402

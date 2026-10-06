@@ -31,7 +31,7 @@ def test_engine_emits_actions_and_walks_the_states():
     out = handle(sp, s, "m:0", st)
     assert [b["data"] for a in out for b in a.get("buttons", [])] == ["ac:find", "/menu"] and s["step"] == "idle"
     out = handle(sp, s, "ac:find", st)
-    assert out[1] == {"type": "anon_find", "block": "anon"} and s["step"] == "waiting"
+    assert out[1] == {"type": "anon_find", "block": "anon", "topic": ""} and s["step"] == "waiting"
     out = handle(sp, s, "سلام؟", st)
     assert not [a for a in out if a["type"].startswith("anon_")] and s["step"] == "waiting"      # typing while waiting does nothing
     out = handle(sp, s, "/menu", st)                                                               # leaving while waiting releases the queue

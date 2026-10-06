@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 import threading
 import time as _time
-from datetime import datetime, time as dtime, timedelta, timezone
+from datetime import date, datetime, time as dtime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -18,7 +18,7 @@ from . import anon, bale, engine, outbox, webhooks
 from .auth import current_user
 from .dates import TEHRAN, jalali_str, now_tehran
 from .db import SessionLocal, get_db
-from .models import Bot, BotVersion, Broadcast, ChatSession, Publication, Record, ScheduledBroadcast, User
+from .models import Bot, BotVersion, Broadcast, ChatSession, OwnerDigest, Publication, Record, ScheduledBroadcast, User
 from .spec import BotSpec
 from .store import SqlStore
 
@@ -43,7 +43,8 @@ def _is_messenger_customer(cust: str) -> bool:
 
 # ---------- reminders ----------
 def reminder_text(b, r: dict, start) -> str:
-    return f"⏰ یادآوری: {r.get('slot_label', b.title)} — {jalali_str(start.date())} ساعت {start:%H:%M}.\nبرای لغو یا تغییر زمان، از «ثبت‌های من» در منو استفاده کنید."
+    tail = "\nلطفاً با دکمه‌های زیر اعلام کنید می‌آیید یا نه." if b.reminder_confirm else "\nبرای لغو یا تغییر زمان، از «ثبت‌های من» در منو استفاده کنید."
+    return f"⏰ یادآوری: {r.get('slot_label', b.title)} — {jalali_str(start.date())} ساعت {start:%H:%M}." + tail
 
 
 def due_reminders(db: Session, now) -> int:
@@ -72,7 +73,8 @@ def due_reminders(db: Session, now) -> int:
                     late = booked_at and datetime.fromisoformat(booked_at) >= start - timedelta(hours=b.reminder_hours)
                     store.update(b.id, r["id"], _reminded=True)  # mark first: a crash must never cause a repeat
                     if not late:
-                        todo.append({"type": "notify_customer", "cust": r["_cust"], "text": reminder_text(b, r, start)})
+                        todo.append({"type": "notify_customer", "cust": r["_cust"], "text": reminder_text(b, r, start),
+                                     "buttons": engine.reminder_buttons(spec, b, r)})
         db.commit()
         sent += bale.send_customer_actions(db, bot_id, todo)
     return sent
@@ -86,7 +88,7 @@ def expire_unpaid_orders(db: Session, now) -> int:
         if ver is None:
             continue
         spec = BotSpec.model_validate(ver.spec)
-        if not any(b.type == "catalog_order" and b.payment == "online" for b in spec.blocks):
+        if not any((b.type == "catalog_order" and b.payment in ("online", "card")) or (b.type == "booking" and b.deposit) for b in spec.blocks):
             continue
         with bale._locks[pub.bot_id]:
             actions = engine.expire_unpaid(spec, SqlStore(db, pub.bot_id, sandbox=False), now)
@@ -96,12 +98,99 @@ def expire_unpaid_orders(db: Session, now) -> int:
     return total
 
 
+def feedback_asks(db: Session, now) -> int:
+    """«از … راضی بودید؟» after appointments and delivered orders, for bots whose feedback block has `after`."""
+    total = 0
+    for pub in db.scalars(select(Publication)).all():
+        ver = db.scalars(select(BotVersion).where(BotVersion.bot_id == pub.bot_id, BotVersion.version == pub.version)).first()
+        if ver is None or not any(b.get("type") == "feedback" and b.get("after") for b in ver.spec.get("blocks", [])):
+            continue
+        spec = BotSpec.model_validate(ver.spec)
+        with bale._locks[pub.bot_id]:
+            actions = engine.feedback_requests(spec, SqlStore(db, pub.bot_id, sandbox=False), now)
+            db.commit()
+        total += bale.send_customer_actions(db, pub.bot_id, actions)
+    return total
+
+
+def restock_alerts(db: Session, now) -> int:
+    """«موجود شد خبرم کن»: tell the customers waiting for products that are back in stock."""
+    total = 0
+    bot_ids = set(db.scalars(select(Record.bot_id).where(Record.collection == engine.RESTOCK, Record.sandbox.is_(False))).all())
+    for bot_id in bot_ids:
+        pub = db.scalars(select(Publication).where(Publication.bot_id == bot_id)).first()
+        ver = db.scalars(select(BotVersion).where(BotVersion.bot_id == bot_id, BotVersion.version == pub.version)).first() if pub else None
+        if ver is None:
+            continue
+        spec = BotSpec.model_validate(ver.spec)
+        with bale._locks[bot_id]:
+            actions = engine.restock_notices(spec, SqlStore(db, bot_id, sandbox=False), now)
+            db.commit()
+        total += bale.send_customer_actions(db, bot_id, actions)
+    return total
+
+
 def expire_anon_waiting(db: Session, now: datetime) -> int:
-    msgs = anon.expire_waiting(db, now)
+    specs: dict[int, BotSpec | None] = {}
+
+    def limit_for(bot_id: int, block_id: str) -> int:
+        if bot_id not in specs:
+            from .models import TgPublication
+            pub = db.scalars(select(Publication).where(Publication.bot_id == bot_id)).first() or db.scalars(select(TgPublication).where(TgPublication.bot_id == bot_id)).first()
+            ver = db.scalars(select(BotVersion).where(BotVersion.bot_id == bot_id, BotVersion.version == pub.version)).first() if pub else None
+            specs[bot_id] = BotSpec.model_validate(ver.spec) if ver else None
+        b = next((x for x in (specs[bot_id].blocks if specs[bot_id] else []) if x.id == block_id), None)
+        return getattr(b, "max_minutes", 0) or 0
+
+    msgs = anon.expire_waiting(db, now) + anon.expire_long_chats(db, now, limit_for)
     db.commit()
     for bot_id, action in msgs:
         bale.send_customer_actions(db, bot_id, [action])
     return len(msgs)
+
+
+DIGEST_HOUR = 8  # Tehran
+
+
+def digest_enabled(db: Session, bot_id: int) -> bool:
+    row = db.scalars(select(OwnerDigest).where(OwnerDigest.bot_id == bot_id)).first()
+    return row is None or row.enabled
+
+
+def daily_digests(db: Session, now: datetime) -> int:
+    """Once a day from 8:00, every live bot whose owner linked a chat (and kept the summary on) gets its brief."""
+    if now.hour < DIGEST_HOUR:
+        return 0
+    today, sent = now.date().isoformat(), 0
+    for bot_id, version in _live_bots(db).items():
+        row = db.scalars(select(OwnerDigest).where(OwnerDigest.bot_id == bot_id)).first()
+        if row is None:
+            row = OwnerDigest(bot_id=bot_id, enabled=True, last_sent="")  # defaults apply only on insert: set them now
+            db.add(row)
+        if not row.enabled or row.last_sent == today:
+            continue
+        row.last_sent = today  # marked first: a crash must never send the summary twice
+        db.commit()
+        ver = db.scalars(select(BotVersion).where(BotVersion.bot_id == bot_id, BotVersion.version == version)).first()
+        text = engine.daily_summary(BotSpec.model_validate(ver.spec), SqlStore(db, bot_id, sandbox=False), now.date(), now.tzinfo) if ver else None
+        if text and bale.send_owner(db, bot_id, text):
+            sent += 1
+    return sent
+
+
+class DigestIn(BaseModel):
+    enabled: bool
+
+
+@router.put("/api/bots/{bot_id}/digest")
+def set_digest(bot_id: int, body: DigestIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if not db.scalars(select(Bot).where(Bot.id == bot_id, Bot.user_id == user.id)).first():
+        raise HTTPException(404, "ربات یافت نشد")
+    row = db.scalars(select(OwnerDigest).where(OwnerDigest.bot_id == bot_id)).first() or OwnerDigest(bot_id=bot_id, last_sent="")
+    row.enabled = body.enabled
+    db.add(row)
+    db.commit()
+    return {"daily_summary": row.enabled}
 
 
 def _jobs(ticks: int):
@@ -109,8 +198,11 @@ def _jobs(ticks: int):
     now_u = datetime.now(timezone.utc)
     work = [("reminders", lambda db: due_reminders(db, now_tehran())),
             ("unpaid orders", lambda db: expire_unpaid_orders(db, now_tehran())),
+            ("back in stock", lambda db: restock_alerts(db, now_tehran())),
+            ("feedback requests", lambda db: feedback_asks(db, now_tehran())),
             ("scheduled announcements", lambda db: due_scheduled(db, now_u)),
             ("anonymous waiting", lambda db: expire_anon_waiting(db, now_u)),
+            ("daily summaries", lambda db: daily_digests(db, now_tehran())),
             ("outbox", lambda db: outbox.process(db, now_u))]
     if ticks % 15 == 0:
         work.append(("webhooks", lambda db: webhooks.refresh(db)))
@@ -137,9 +229,9 @@ def start_scheduler():
 
 
 # ---------- announcements ----------
-def audience(db: Session, bot_id: int) -> list[str]:
+def audience(db: Session, bot_id: int, include_muted: bool = False) -> list[str]:
     """Customer keys ("bale:123", "tg:456") that talked to THIS bot on a messenger it is published on, are still
-    linked to it (shared bots) and did not send /stop."""
+    linked to it (shared bots) and did not send /stop (unless include_muted: news about their own booking)."""
     out = []
     for ch in bale.CHANNELS.values():
         pub = db.scalars(select(ch.pub_model).where(ch.pub_model.bot_id == bot_id)).first()
@@ -152,7 +244,7 @@ def audience(db: Session, bot_id: int) -> list[str]:
             linked = {c for (c,) in db.execute(select(ch.link_model.chat_id).where(ch.link_model.pub_id == pub.id))}
         for r in rows:
             chat = r.key[len(prefix):]
-            if (r.state or {}).get("muted") or (linked is not None and chat not in linked):
+            if ((r.state or {}).get("muted") and not include_muted) or (linked is not None and chat not in linked):
                 continue
             out.append(r.key)
     return out
@@ -164,6 +256,75 @@ def _any_publication(db: Session, bot_id: int) -> bool:
 
 class BroadcastIn(BaseModel):
     text: str = Field(min_length=1, max_length=1000)
+    segment: str = "all"  # all | block:<id> | session:<block id>:<slot id>:<ISO date> | recent:<days>
+
+
+def _live_spec(db: Session, bot_id: int) -> BotSpec | None:
+    ver = _live_bots(db).get(bot_id)
+    row = db.scalars(select(BotVersion).where(BotVersion.bot_id == bot_id, BotVersion.version == ver)).first() if ver else None
+    return BotSpec.model_validate(row.spec) if row else None
+
+
+def segments(db: Session, bot_id: int, today) -> list[dict]:
+    """The groups an announcement can go to, each with its label and size (the size counts reachable customers)."""
+    spec = _live_spec(db, bot_id)
+    if spec is None:
+        return []
+    store = SqlStore(db, bot_id, sandbox=False)
+    reach, reach_all = set(audience(db, bot_id)), set(audience(db, bot_id, include_muted=True))
+    out = [{"id": "all", "label": "همه‌ی مشتریان", "size": len(reach)}]
+    for days in (7, 30):
+        out.append({"id": f"recent:{days}", "label": f"فعال در {days} روز گذشته", "size": len(_segment_custs(db, spec, store, f"recent:{days}", today) & reach)})
+    for b in spec.blocks:
+        if not getattr(b, "fields", None) and b.type not in ("quiz", "feedback"):
+            continue
+        n = len(_segment_custs(db, spec, store, f"block:{b.id}", today) & reach)
+        if n:
+            out.append({"id": f"block:{b.id}", "label": f"کسانی که در «{getattr(b, 'title', b.id)}» ثبت دارند", "size": n})
+        if b.type == "booking":  # each upcoming session: its people hear about it even after /stop (it is their booking)
+            sessions: dict[tuple, set] = {}
+            for r in store.find(b.id):
+                if r.get("status") in ("confirmed", "waitlisted") and r.get("date") and r["date"] >= today.isoformat() and r.get("_cust"):
+                    sessions.setdefault((r.get("slot"), r["date"]), set()).add(r["_cust"])
+            for (slot, day), custs in sorted(sessions.items(), key=lambda kv: (kv[0][1], str(kv[0][0])))[:30]:
+                when = jalali_str(date.fromisoformat(day))
+                name = next((f"{s.label} — {when}" for s in b.slots if s.id == slot), f"نوبت‌های {when}")
+                out.append({"id": f"session:{b.id}:{slot}:{day}", "size": len(custs & reach_all), "label": f"{b.title} · {name}"})
+    return out
+
+
+def _segment_custs(db: Session, spec: BotSpec, store, segment: str, today) -> set[str]:
+    kind, _, rest = segment.partition(":")
+    if kind == "block":
+        return {r["_cust"] for r in store.find(rest) if r.get("_cust") and r.get("status") != "cancelled"}
+    if kind == "session":
+        block_id, slot, day = rest.split(":", 2)
+        return {r["_cust"] for r in store.find(block_id, slot=slot, date=day) if r.get("_cust") and r.get("status") in ("confirmed", "waitlisted")}
+    if kind == "recent":
+        since = (datetime.combine(today, dtime(0), tzinfo=TEHRAN) - timedelta(days=int(rest))).isoformat()
+        return {r["_cust"] for b in spec.blocks for r in store.find(b.id) if r.get("_cust") and str(r.get("_at", "")) >= since}
+    raise ValueError("گروه مخاطبان نامعتبر است.")
+
+
+def segment_audience(db: Session, bot_id: int, segment: str, today) -> tuple[list[str], str]:
+    """Who gets an announcement for this segment, and its label (empty for everyone)."""
+    if segment == "all":
+        return audience(db, bot_id), ""
+    spec = _live_spec(db, bot_id)
+    if spec is None:
+        return [], ""
+    opt = next((s for s in segments(db, bot_id, today) if s["id"] == segment), None)
+    if opt is None:
+        raise ValueError("گروه مخاطبان نامعتبر است یا دیگر وجود ندارد.")
+    base = audience(db, bot_id, include_muted=segment.startswith("session:"))
+    wanted = _segment_custs(db, spec, SqlStore(db, bot_id, sandbox=False), segment, today)
+    return [c for c in base if c in wanted], opt["label"]
+
+
+@router.get("/api/bots/{bot_id}/broadcasts/segments")
+def list_segments(bot_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    _owned_published(bot_id, user, db)
+    return segments(db, bot_id, now_tehran().date())
 
 
 def _owned_published(bot_id: int, user: User, db: Session):
@@ -183,10 +344,10 @@ def list_broadcasts(bot_id: int, user: User = Depends(current_user), db: Session
     rows = db.scalars(select(Broadcast).where(Broadcast.bot_id == bot_id).order_by(Broadcast.id.desc()).limit(20)).all()
     return {"published": published, "audience": len(audience(db, bot_id)) if published else 0, "per_day": BROADCASTS_PER_DAY,
             "items": [{"id": b.id, "text": b.text, "audience": b.audience, "sent": b.sent, "failed": b.failed, "done": b.done,
-                       "created_at": b.created_at.isoformat()} for b in rows]}
+                       "segment": b.segment_label or "", "created_at": b.created_at.isoformat()} for b in rows]}
 
 
-def launch_broadcast(db: Session, bot_id: int, text: str) -> Broadcast:
+def launch_broadcast(db: Session, bot_id: int, text: str, segment: str = "all") -> Broadcast:
     """Check the daily limit and the audience, store the announcement and start delivering it in the background.
     Raises ValueError(message) when it cannot be sent (used by both the manual button and the scheduler)."""
     day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
@@ -194,10 +355,10 @@ def launch_broadcast(db: Session, bot_id: int, text: str) -> Broadcast:
     recent = sum(1 for b in last if (b.created_at if b.created_at.tzinfo else b.created_at.replace(tzinfo=timezone.utc)) > day_ago)
     if recent >= BROADCASTS_PER_DAY:
         raise ValueError(f"در هر شبانه‌روز حداکثر {BROADCASTS_PER_DAY} اطلاعیه (دستی و زمان‌بندی‌شده با هم) ارسال می‌شود تا مشتریان آزرده نشوند.")
-    custs = audience(db, bot_id)
+    custs, label = segment_audience(db, bot_id, segment, now_tehran().date())
     if not custs:
-        raise ValueError("هنوز هیچ مشتری‌ای با ربات شما گفت‌وگو نکرده است.")
-    row = Broadcast(bot_id=bot_id, text=text, audience=len(custs))
+        raise ValueError("هنوز هیچ مشتری‌ای با ربات شما گفت‌وگو نکرده است." if segment == "all" else "در این گروه مشتری‌ای برای دریافت اطلاعیه نیست.")
+    row = Broadcast(bot_id=bot_id, text=text, audience=len(custs), segment_label=label)
     db.add(row)
     db.commit()
     threading.Thread(target=_deliver, args=(row.id, bot_id, custs, text), daemon=True).start()
@@ -211,7 +372,7 @@ def send_broadcast(bot_id: int, body: BroadcastIn, user: User = Depends(current_
     if not text:
         raise HTTPException(422, "متن اطلاعیه خالی است")
     try:
-        row = launch_broadcast(db, bot_id, text)
+        row = launch_broadcast(db, bot_id, text, body.segment)
     except ValueError as e:
         raise HTTPException(429 if "حداکثر" in str(e) else 409, str(e))
     return {"id": row.id, "audience": row.audience}

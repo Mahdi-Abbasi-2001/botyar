@@ -49,6 +49,8 @@ def _texts(actions):
         if a["type"] == "media":
             parts.append("📎 " + ("عکس" if a["kind"] == "image" else "فایل"))
             continue
+        if a["type"] == "notify_staff":  # goes to a staff member's own chat, never to the customer
+            continue
         if a["type"].startswith("anon_"):
             parts.append("[گفتگوی ناشناس]")
             continue
@@ -78,12 +80,12 @@ def run_scenario(spec: BotSpec, sc: TestScenario, catalog: list[dict] | None = N
             for n in range(max(0, min(s.times, 60))):
                 sess = engine.new_session()
                 sess["cust"] = f"t:setup{n}"
-                sess["pay_ok"] = sess["pay_sim"] = True
+                sess["pay_ok"] = sess["pay_sim"] = sess["test"] = True  # automated test: fixed clock, so order hours never close the shop; no «same details?» shortcut
                 for msg in s.steps:
                     engine.handle(spec, sess, msg, store, dates.TEST_NOW, rng=rng)
         sess = engine.new_session()
         sess["cust"] = "t:main"
-        sess["pay_ok"] = sess["pay_sim"] = True
+        sess["pay_ok"] = sess["pay_sim"] = sess["test"] = True
         for i, st in enumerate(sc.steps, 1):
             actions = engine.handle(spec, sess, st.say, store, dates.TEST_NOW, rng=rng)
             text = _texts(actions)

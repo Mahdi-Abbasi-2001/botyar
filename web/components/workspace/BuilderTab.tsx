@@ -110,10 +110,16 @@ export function BuilderTab(p: Props) {
           const qs = m.role === "assistant" ? parseQuestions(m.content) : null;
           if (qs && i === p.chat.length - 1 && lastQ) return <QuestionCards key={i} questions={qs} onSend={p.onSend} />;
           if (qs) return <PastQuestions key={i} questions={qs} />;
-          // the agent can't build this kind of bot: offer to send the request to the team as a support ticket
-          if (m.role === "assistant" && m.content.startsWith(DECLINE_MARK)) {
+          // something the agent can't build: the whole request (declined), or a detail a finished build left out.
+          // Either way the owner can send it to the team as a support ticket.
+          if (m.role === "assistant" && m.content.includes(DECLINE_MARK)) {
             const asked = p.chat.slice(0, i).reverse().find((x) => x.role === "user")?.content ?? "";
-            return <Declined key={i} botId={p.botId} message={m.content.slice(DECLINE_MARK.length)} request={asked} />;
+            if (m.content.startsWith(DECLINE_MARK)) {
+              const why = m.content.slice(DECLINE_MARK.length);
+              return <TicketOffer key={i} botId={p.botId} message={`🚧 ${why}`} context={why} request={asked} />;
+            }
+            const [built, missing] = m.content.split("\n" + DECLINE_MARK);
+            return <TicketOffer key={i} botId={p.botId} message={built} missing={missing} context={missing} request={`${missing}\n\nدرخواست اصلی: ${asked}`} />;
           }
           return m.role === "user" ? (
             <div key={i} className="anim-rise max-w-[92%] self-start whitespace-pre-line rounded-[14px_14px_4px_14px] bg-raised px-3.5 py-3 text-sm leading-8">{m.content}</div>
@@ -290,10 +296,11 @@ function MiniMap({ spec, tests, running, stamped, catalog }: { spec: Spec | null
   );
 }
 
-const DECLINE_MARK = "🚧 ";  // api/app/agent.py: starts the message in which the agent declined the request
+const DECLINE_MARK = "🚧 ";  // api/app/agent.py: starts a declined request, or the line of a build listing what was left out
 
-/** The agent explained it can't build this; the owner can hand the request to the Botyar team in one step. */
-function Declined({ botId, message, request }: { botId: string; message: string; request: string }) {
+/** The agent can't build something the owner asked for (`missing`: one detail of an otherwise finished bot);
+ *  the owner can hand it to the Botyar team as a support ticket in one step. */
+function TicketOffer({ botId, message, missing, context, request }: { botId: string; message: string; missing?: string; context: string; request: string }) {
   const [writing, setWriting] = useState(false);
   const [text, setText] = useState(request);
   const [busy, setBusy] = useState(false);
@@ -304,7 +311,7 @@ function Declined({ botId, message, request }: { botId: string; message: string;
     setBusy(true);
     setError("");
     try {
-      const t = await api<{ id: number }>("/tickets", { body: { kind: "unsupported", text, bot_id: Number(botId), context: message } });
+      const t = await api<{ id: number }>("/tickets", { body: { kind: "unsupported", text, bot_id: Number(botId), context } });
       setDone(t.id);
     } catch (e: any) {
       setError(e.message);
@@ -316,8 +323,9 @@ function Declined({ botId, message, request }: { botId: string; message: string;
   return (
     <div className="anim-rise flex max-w-[94%] gap-2 self-end">
       <div className="flex min-w-0 flex-col gap-3 rounded-[14px_14px_14px_4px] border border-line bg-panel px-3.5 py-3 text-sm leading-8">
-        <span className="whitespace-pre-line">🚧 {message}</span>
+        <span className="whitespace-pre-line">{message}</span>
         <div className="flex flex-col gap-2.5 rounded-xl border border-line-2 bg-raised p-3">
+          {missing && <span><b className="text-amber-fg">هنوز پشتیبانی نمی‌شود:</b> {missing}</span>}
           {done !== null ? (
             <span className="text-mint-fg">
               درخواست شما با شماره‌ی {fa(done)} برای تیم بات‌یار ثبت شد. پاسخ را در <Link href="/support/" className="font-bold underline">پشتیبانی</Link> می‌بینید.
@@ -337,7 +345,7 @@ function Declined({ botId, message, request }: { botId: string; message: string;
             </>
           ) : (
             <>
-              <span className="text-fg-2">اگر این نوع ربات برای کسب‌وکارتان مهم است، درخواستتان را برای تیم بات‌یار بفرستید تا بررسی شود؛ پاسخ را در بخش «پشتیبانی» می‌بینید.</span>
+              <span className="text-fg-2">{missing ? "ربات بدون این مورد ساخته شد. اگر برای کسب‌وکارتان مهم است" : "اگر این نوع ربات برای کسب‌وکارتان مهم است"}، درخواستتان را برای تیم بات‌یار بفرستید تا بررسی شود؛ پاسخ را در بخش «پشتیبانی» می‌بینید.</span>
               <button type="button" onClick={() => setWriting(true)} className="min-h-10 self-start rounded-xl border border-saffron px-4 font-bold text-saffron hover:bg-saffron/10">ثبت درخواست برای تیم بات‌یار</button>
             </>
           )}

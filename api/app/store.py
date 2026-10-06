@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import engine
-from .models import Product, Record
+from .models import Product, Record, TimeOff
 
 
 class SqlStore:
@@ -24,6 +24,11 @@ class SqlStore:
     def count(self, collection, **where):
         return sum(all(r.data.get(k) == v for k, v in where.items()) for r in self._rows(collection))
 
+    def time_off(self, block_id):
+        """Hours the owner closed (the same for the simulator and live customers)."""
+        q = select(TimeOff).where(TimeOff.bot_id == self.bot_id, TimeOff.block_id == block_id)
+        return [{"date": t.date, "start": t.start, "end": t.end, "staff": t.staff} for t in self.db.scalars(q)]
+
     # ---- product table (catalog_order with source="table") ----
     def _products(self, block_id):
         q = select(Product).where(Product.bot_id == self.bot_id, Product.block_id == block_id).order_by(Product.position, Product.id)
@@ -32,7 +37,7 @@ class SqlStore:
     @staticmethod
     def _dict(p: Product) -> dict:
         return {"id": p.id, "name": p.name, "category": p.category, "price": p.price, "stock": p.stock,
-                "options": p.options or [], "description": p.description}
+                "options": p.options or [], "description": p.description, "photo": bool(p.has_photo)}
 
     def categories(self, block_id):
         return engine.catalog_categories(self._products(block_id))

@@ -10,6 +10,33 @@ type Data = { total: number; active_30d: number; cap: number; plan: string; page
 const card = "rounded-2xl border border-line-2 bg-panel p-4";
 const day = (iso: string) => fa(new Date(iso).toLocaleDateString("fa-IR"));
 
+type FeedbackStats = { block: string; title: string; count: number; avg: number | null; weeks: { week: string; count: number; avg: number | null }[]; aspects: Record<string, number | null> };
+
+/** Average rating per week (last 12 weeks): is the service getting better? */
+function FeedbackCard({ f }: { f: FeedbackStats }) {
+  const one = (x: number) => fa(x.toFixed(1));
+  return (
+    <section className={`${card} flex flex-col gap-2 text-sm`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <strong>{f.title}: میانگین {f.avg != null ? one(f.avg) : "—"} از ۵</strong>
+        <span className="text-xs text-mute">{fa(f.count)} امتیاز در کل · هر ستون یک هفته</span>
+      </div>
+      <div className="flex h-24 items-end gap-1" role="img" aria-label="میانگین امتیاز هر هفته">
+        {f.weeks.map((w) => (
+          <div key={w.week} className="flex flex-1 flex-col items-center justify-end gap-1" title={`هفته‌ی ${fa(w.week)}: ${w.avg != null ? one(w.avg) : "بدون امتیاز"} (${fa(w.count)} نظر)`}>
+            {w.avg != null && <span className="text-[10px] text-mute">{one(w.avg)}</span>}
+            <div className={`w-full rounded-t ${w.avg == null ? "bg-line-2" : w.avg >= 4 ? "bg-mint" : w.avg >= 3 ? "bg-saffron" : "bg-bad"}`}
+              style={{ height: `${w.avg == null ? 4 : (w.avg / 5) * 72}px` }} />
+          </div>
+        ))}
+      </div>
+      {Object.keys(f.aspects).length > 0 && (
+        <span className="text-xs text-fg-2">{Object.entries(f.aspects).map(([a, v]) => `${a}: ${v != null ? one(v) : "—"}`).join(" · ")}</span>
+      )}
+    </section>
+  );
+}
+
 export function CustomersTab({ botId }: { botId: string }) {
   const [data, setData] = useState<Data | null>(null);
   const [refs, setRefs] = useState<{ total: number; top: { name: string; invited: number }[] } | null>(null);
@@ -27,8 +54,10 @@ export function CustomersTab({ botId }: { botId: string }) {
   useEffect(() => {
     load();
   }, [load]);
+  const [fb, setFb] = useState<FeedbackStats[]>([]);
   useEffect(() => {
     api<{ total: number; top: { name: string; invited: number }[] }>(`/bots/${botId}/referrals`).then(setRefs).catch(() => {});
+    api<FeedbackStats[]>(`/bots/${botId}/feedback/stats?weeks=12`).then(setFb).catch(() => {});
   }, [botId]);
   async function toggleBan(r: Row) {
     try {
@@ -51,6 +80,7 @@ export function CustomersTab({ botId }: { botId: string }) {
           تا این لحظه {fa(data.total)} نفر به ربات پیام داده‌اند و {fa(data.active_30d)} نفر در ۳۰ روز گذشته فعال بوده‌اند (سقف پلن «{data.plan}»: {fa(data.cap.toLocaleString("en-US"))} نفر).
         </p>
       )}
+      {fb.filter((f) => f.count > 0).map((f) => <FeedbackCard key={f.block} f={f} />)}
       {refs && refs.total > 0 && (
         <section className={`${card} flex flex-col gap-1 text-sm`}>
           <strong>برترین معرف‌ها ({fa(refs.total)} دعوت موفق)</strong>

@@ -2,9 +2,10 @@
 import { useState } from "react";
 import { CapacityBar, Icon, Stamp, TestBar, fa } from "../ui";
 import { RecordActions } from "./RecordActions";
+import { TimeOffCard } from "./TimeOffCard";
 import {
-  BLOCK_KIND, FIELD_KIND, ago, blockTitle, humanizeDiff, readableInput, scheduleLines, toman, weeklyText,
-  type Block, type Rec, type Spec, type TestRes, type Ver,
+  blockExtras, BLOCK_KIND, FIELD_KIND, ago, blockTitle, humanizeDiff, readableInput, scheduleLines, toman, weeklyText,
+  type Block, type Field, type Rec, type Spec, type TestRes, type Ver,
 } from "./model";
 
 function Empty({ children }: { children: React.ReactNode }) {
@@ -24,7 +25,7 @@ export function StructureTab({ spec, records, onEdit }: { spec: Spec; records: R
       ),
     },
     ...(spec.gate ? [{ title: `عضویت اجباری در کانال · ${spec.gate.channel}`, body: <span className="text-sm leading-7 text-fg-2">مشتری تا عضو این کانال نشود به ربات دسترسی ندارد. ربات باید مدیر (ادمین) کانال باشد؛ وضعیت آن را در بخش «کانال و گروه» ببینید.</span>, tone: "amber" as const }] : []),
-    ...spec.blocks.map((b) => ({ title: `${BLOCK_KIND[b.type]} · ${blockTitle(b)}`, body: <BlockBody b={b} spec={spec} records={records} />, tone: tone(b) })),
+    ...spec.blocks.map((b) => ({ title: `${BLOCK_KIND[b.type]} · ${blockTitle(b)}`, body: <><BlockBody b={b} spec={spec} records={records} /><Extras lines={blockExtras(b)} /></>, tone: tone(b) })),
   ];
   return (
     <div className="flex flex-col">
@@ -50,16 +51,34 @@ export function StructureTab({ spec, records, onEdit }: { spec: Spec; records: R
 
 const tone = (b: Block) => (b.type === "admin_notify" ? "amber" : b.type === "booking" || b.type === "catalog_order" ? "hot" : undefined) as "hot" | "amber" | undefined;
 
-function Fields({ fields }: { fields: { key: string; label: string; kind: keyof typeof FIELD_KIND; choices: string[] }[] }) {
+function Fields({ fields }: { fields: Field[] }) {
+  const label = (key: string) => fields.find((x) => x.key === key)?.label ?? key;
   return (
     <div className="flex flex-col gap-1.5 text-sm">
       {fields.map((f) => (
-        <div key={f.key} className="flex flex-wrap justify-between gap-2 rounded-[10px] bg-raised px-3 py-2">
-          <span>«{f.label}»</span>
-          <span className="text-mute">{f.kind === "choice" ? f.choices.join(" / ") : FIELD_KIND[f.kind]}</span>
+        <div key={f.key} className="flex flex-col gap-0.5 rounded-[10px] bg-raised px-3 py-2">
+          <div className="flex flex-wrap justify-between gap-2">
+            <span>«{f.label}»{!f.required && <span className="text-xs text-mute"> · اختیاری</span>}</span>
+            <span className="text-mute">
+              {f.kind === "choice" || f.kind === "multi"
+                ? (f.kind === "multi" ? "چندانتخابی: " : "") + f.choices.map((c, i) => (f.scores?.length ? `${c} (${fa(f.scores[i])})` : c)).join(" / ")
+                : FIELD_KIND[f.kind]}
+              {f.kind === "number" && (f.min_value != null || f.max_value != null) && ` (${fa(f.min_value ?? "")}–${fa(f.max_value ?? "")})`}
+            </span>
+          </div>
+          {f.show_if && <span className="text-xs text-mute">فقط اگر پاسخ «{label(f.show_if.field)}» {f.show_if.equals.map((v) => `«${v}»`).join(" یا ")} باشد</span>}
         </div>
       ))}
     </div>
+  );
+}
+
+function Extras({ lines }: { lines: string[] }) {
+  if (!lines.length) return null;
+  return (
+    <ul className="m-0 mt-1 flex list-none flex-col gap-1 p-0 text-xs leading-6 text-fg-2">
+      {lines.map((l) => <li key={l} className="flex gap-1.5"><span className="text-saffron">•</span>{l}</li>)}
+    </ul>
   );
 }
 
@@ -113,11 +132,22 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
           {b.questions.map((q, i) => (
             <div key={i} className="flex flex-col gap-0.5 rounded-[10px] bg-raised px-3 py-2">
               <span className="font-semibold">{fa(i + 1)}. {q.question}</span>
-              <span className="text-mute">{q.options.map((o, j) => (j === q.correct ? `✅ ${o}` : o)).join(" · ")}</span>
+              <span className="text-mute">
+                {b.personality?.length
+                  ? q.options.map((o, j) => `${o} ← ${b.personality!.find((x) => x.id === q.outcomes?.[j])?.title ?? "—"}`).join(" · ")
+                  : q.options.map((o, j) => (j === q.correct ? `✅ ${o}` : o)).join(" · ")}
+              </span>
+              {q.media === "image" && <span className="text-xs text-mute">🖼 همراه با عکس</span>}
             </div>
           ))}
         </div>
-        <span className="text-xs text-mute">{rs.length ? `${fa(rs.length)} نفر شرکت کرده‌اند و میانگین نمره ${fa(Math.round(avg))}٪ است.` : "هنوز کسی شرکت نکرده است."}</span>
+        {b.personality?.length ? (
+          <div className="flex flex-col gap-1 text-sm">
+            {b.personality.map((o) => <span key={o.id}><b>{o.title}</b>: <span className="text-mute">{o.text}</span></span>)}
+          </div>
+        ) : (
+          <span className="text-xs text-mute">{rs.length ? `${fa(rs.length)} نفر شرکت کرده‌اند و میانگین نمره ${fa(Math.round(avg))}٪ است.` : "هنوز کسی شرکت نکرده است."}</span>
+        )}
       </>
     );
   }
@@ -140,8 +170,10 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
         <div className="flex flex-col gap-1.5 text-sm">
           {b.entries.map((e, i) => (
             <div key={i} className="flex flex-col gap-0.5 rounded-[10px] bg-raised px-3 py-2">
-              <span className="font-semibold">{e.question}</span>
+              <span className="font-semibold">{e.category && <span className="ml-2 rounded bg-line-2 px-1.5 text-xs font-normal text-mute">{e.category}</span>}{e.question}</span>
+              {!!e.alternates?.length && <span className="text-xs text-dim">یا: {e.alternates.join(" · ")}</span>}
               <span className="text-mute">{e.answer}</span>
+              {(e.media === "image" || e.location) && <span className="text-xs text-mute">{[e.media === "image" && "🖼 همراه با عکس (بارگذاری در «فایل‌ها»)", e.location && "📍 همراه با نقشه"].filter(Boolean).join(" · ")}</span>}
             </div>
           ))}
         </div>
@@ -163,10 +195,21 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
             </div>
           ))}
         </div>
-        {(b.payment === "online" || !!b.delivery_fee || !!b.discount_codes?.length) && (
+        {(b.payment !== "none" || !!b.delivery_fee || !!b.delivery_zones?.length || !!b.discount_codes?.length || !!b.time_windows?.length || !!b.low_stock_alert) && (
           <div className="flex flex-col gap-1 text-sm text-fg-2">
             {b.payment === "online" && <span>پرداخت آنلاین داخل بله، مستقیم به کیف پول شما</span>}
+            {b.payment === "card" && <span>کارت‌به‌کارت به <b dir="ltr">{b.card_number}</b>{b.card_holder ? ` (${b.card_holder})` : ""}: مشتری رسید را می‌فرستد و شما در «ثبت‌ها» تأیید می‌کنید · بدون رسید تا {fa(b.card_wait_minutes ?? 60)} دقیقه، سفارش لغو می‌شود</span>}
+            {!!b.time_windows?.length && (
+              <span>زمان تحویل: {b.time_windows.map((w) => `${fa(w.start)} تا ${fa(w.end)}`).join("، ")}{b.per_window ? ` · هر بازه حداکثر ${fa(b.per_window)} سفارش` : ""}{(b.window_days ?? 1) > 1 ? ` · تا ${fa(b.window_days!)} روز آینده` : " · فقط امروز"}</span>
+            )}
+            {!!b.low_stock_alert && <span>وقتی موجودی محصولی به {fa(b.low_stock_alert)} عدد برسد، به شما خبر می‌دهد</span>}
             {!!b.delivery_fee && <span>هزینه‌ی ارسال: {toman(b.delivery_fee)}{b.free_delivery_over ? ` · رایگان برای سفارش‌های بالای ${toman(b.free_delivery_over)}` : ""}</span>}
+            {!!b.delivery_zones?.length && (
+              <span>
+                هزینه‌ی ارسال بر اساس محل (مشتری هنگام ثبت سفارش انتخاب می‌کند): {b.delivery_zones.map((z) => `${z.label} ${z.fee ? toman(z.fee) : "رایگان"}`).join(" · ")}
+                {b.free_delivery_over ? ` · رایگان برای سفارش‌های بالای ${toman(b.free_delivery_over)}` : ""}
+              </span>
+            )}
             {b.discount_codes?.map((c) => (
               <span key={c.code}>کد <b dir="ltr">{c.code}</b>: {c.percent ? `${fa(c.percent)}٪` : toman(c.amount)} تخفیف{c.min_total ? ` · برای سفارش‌های دست‌کم ${toman(c.min_total)}` : ""}{c.max_uses ? ` · ${fa(c.max_uses)} بار` : ""}</span>
             ))}
@@ -344,12 +387,19 @@ const STATUS: Record<string, [string, string]> = {
   waitlisted: ["لیست انتظار", "bg-mint text-ink font-bold"],
   new: ["سفارش جدید", "border border-saffron text-saffron"],
   cancelled: ["لغو شده", "border border-line-3 text-dim line-through"],
+  no_show: ["حاضر نشد", "border border-bad/50 text-bad-soft"],
   awaiting_payment: ["در انتظار پرداخت", "border border-line-2 text-mute"],
+  awaiting_transfer: ["منتظر واریز", "border border-line-2 text-mute"],
+  transfer_sent: ["واریز شد · منتظر تأیید شما", "border border-saffron bg-saffron/10 text-saffron"],
   preparing: ["در حال آماده‌سازی", "border border-saffron bg-saffron/10 text-saffron"],
   ready: ["آماده", "bg-mint text-ink font-bold"],
   done: ["تحویل شد", "border border-line-3 text-mute"],
   unanswered: ["بدون پاسخ", "border border-saffron bg-saffron/10 text-saffron"],
   handled: ["رسیدگی شد", "border border-line-3 text-mute"],
+  received: ["دریافت شد", "border border-saffron text-saffron"],
+  reviewing: ["در حال بررسی", "border border-saffron bg-saffron/10 text-saffron"],
+  accepted: ["پذیرفته شد", "bg-mint text-ink font-bold"],
+  rejected: ["رد شد", "border border-line-3 text-dim"],
 };
 const mask = (p?: string) => (p && p.length >= 8 ? `${p.slice(0, 4)} ••• ${p.slice(-4)}` : p ?? "—");
 
@@ -359,20 +409,27 @@ export function RecordsTab({ records, spec, botId, onChanged }: { records: Rec[]
   const bookings = spec.blocks.filter((b): b is Extract<Block, { type: "booking" }> => b.type === "booking");
   const rows = records.filter((r) => filter === "all" || (filter === "waitlisted" ? r.data.status === "waitlisted" : r.collection === filter));
 
-  if (!records.length) return <Empty>هنوز ثبتی انجام نشده است. در بخش «امتحان ربات» یک نوبت یا سفارش ثبت کنید تا اینجا نمایش داده شود.</Empty>;
+  const offCard = bookings.length > 0 && <TimeOffCard botId={botId} bookings={bookings.map((b) => ({ id: b.id, title: b.title, staff: b.schedule?.staff ?? [] }))} />;
+  if (!records.length) return <>{offCard}<Empty>هنوز ثبتی انجام نشده است. در بخش «امتحان ربات» یک نوبت یا سفارش ثبت کنید تا اینجا نمایش داده شود.</Empty></>;
 
   const detail = (r: Rec) => {
     const d = r.data;
-    if (d.question) return `سؤال: ${d.question}${d.note ? ` (${d.note})` : ""}`;
+    if (d.question) return `سؤال: ${d.question}${d.note ? ` (${d.note})` : ""}${d.answer ? ` · پاسخ شما: ${d.answer}` : ""}`;
     if (d.status === "reported" && Array.isArray(d.log)) return `گزارش گفت‌وگوی ناشناس: ${d.log.map((l: any) => `${l.from}: ${l.text}`).join(" ⏎ ")}`;
-    if (typeof d.score === "number") return `${d.who ?? ""}: ${d.score} از ${d.total}`;
-    if (typeof d.rating === "number") return `${"⭐".repeat(d.rating)}${d.comment ? ` · ${d.comment}` : ""}`;
-    if (d.slot_label) return d.slot_label;
-    if (Array.isArray(d.items)) return `${d.items.map((i: any) => i.name).join("، ")} · ${toman(d.total ?? 0)}`;
-    return Object.entries(d).filter(([k]) => !k.startsWith("_") && !["name", "phone", "status"].includes(k)).map(([, v]) => String(v)).join(" · ") || "—";
+    if (typeof d.score === "number" && d.total != null) return `${d.who ?? ""}: ${d.score} از ${d.total}`;  // a quiz result
+    if (typeof d.rating === "number")
+      return `${"⭐".repeat(d.rating)}${d.ratings ? ` (${Object.entries(d.ratings).map(([a, v]) => `${a} ${v}`).join("، ")})` : ""}${d.comment ? ` · ${d.comment}` : ""}${d.phone ? ` · تماس: ${d.phone}` : ""}`;
+    if (d.slot_label)
+      return d.slot_label + (d.party > 1 ? ` · ${d.party} نفر` : "") + (d.attend === "yes" ? " · ✅ حضور را تأیید کرد" : d.attend === "no" ? " · ❌ گفت نمی‌آید" : "");
+    if (Array.isArray(d.items)) return `${d.items.map((i: any) => i.name).join("، ")} · ${toman(d.total ?? 0)}${d.delivery_zone ? ` · ارسال به ${d.delivery_zone}` : ""}${d.delivery_time ? ` · تحویل ${d.delivery_time}` : ""}${d.transfer_ref ? ` · پیگیری واریز: ${d.transfer_ref}` : ""}`;
+    const head = typeof d.score === "number" ? `امتیاز ${fa(d.score)} · ` : "";
+    const note = d.owner_note ? ` · یادداشت شما: ${d.owner_note}` : "";
+    return head + (Object.entries(d).filter(([k]) => !k.startsWith("_") && !["name", "phone", "status", "score", "owner_note"].includes(k)).map(([, v]) => String(v)).join(" · ") || "—") + note;
   };
 
   return (
+    <>
+    {offCard}
     <div className="flex flex-col gap-5">
       <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {bookings.flatMap((b) => b.slots.flatMap((s) => {
@@ -435,5 +492,6 @@ export function RecordsTab({ records, spec, botId, onChanged }: { records: Rec[]
       </div>
       <span className="flex items-center gap-2 text-xs text-dim"><Icon name="shield" size={14} /> این‌ها ثبت‌های پیش‌نمایش‌اند و با «شروع دوباره» در شبیه‌ساز پاک می‌شوند.</span>
     </div>
+    </>
   );
 }

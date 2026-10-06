@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from .auth import current_user
 from .db import get_db
-from .models import Bot, CustomerSeen, ReferralCode, ReferralJoin, User
+from .models import Bot, CustomerSeen, Record, ReferralCode, ReferralJoin, User
 
 router = APIRouter()
 PAYLOAD = re.compile(r"r[a-z0-9]{7}")
@@ -43,22 +43,65 @@ def link(ch_name: str, username: str, code: str) -> str:
 
 
 def count_for(db: Session, bot_id: int, key: str) -> int:
-    return db.scalar(select(func.count()).select_from(ReferralJoin).where(ReferralJoin.bot_id == bot_id, ReferralJoin.referrer_key == key)) or 0
+    return db.scalar(select(func.count()).select_from(ReferralJoin).where(ReferralJoin.bot_id == bot_id, ReferralJoin.referrer_key == key,
+                                                                           ReferralJoin.confirmed.is_not(False))) or 0
 
 
-def convert(db: Session, bot_id: int, ref: ReferralCode, invited_key: str, goal: int | None) -> list[dict]:
-    """Record the invite and return notify_customer actions for the referrer. Call only when the invited customer is brand new."""
+def rewards(block, n: int) -> str:
+    """What reaching exactly n invites earns: the goal's reward and code, or a tier's."""
+    if block is None:
+        return ""
+    for goal, text, code in [(block.goal, block.reward_text, block.reward_code), *((t.goal, t.reward_text, t.reward_code) for t in block.tiers)]:
+        if n == goal:
+            return f"\nبه هدف رسیدید! 🎁\n{text}" + (f"\nکد تخفیف شما: {code}" if code else "")
+    return ""
+
+
+def next_goal(block, n: int) -> int:
+    return next((g for g in [block.goal, *(t.goal for t in block.tiers)] if g > n), 0)
+
+
+def _counted(db: Session, bot_id: int, referrer: str, block, ordered: bool = False) -> list[dict]:
+    n = count_for(db, bot_id, referrer)
+    goal = next_goal(block, n - 1) if block is not None else 0
+    head = "🎉 دوستی که دعوت کرده بودید اولین سفارش یا نوبتش را ثبت کرد!" if ordered else "🎉 یک نفر با لینک اختصاصی شما وارد شد!"
+    text = f"{head} دعوت‌های موفق: {n}" + (f" از {goal}" if goal else "") + rewards(block, n)
+    return [{"type": "notify_customer", "cust": referrer, "text": text}]
+
+
+def convert(db: Session, bot_id: int, ref: ReferralCode, invited_key: str, block=None) -> list[dict]:
+    """Record the invite and return notify_customer actions for the referrer. Call only when the invited customer is brand new.
+    With count_after="order" the invite waits (unconfirmed) until the friend's first order or booking (see confirm_pending)."""
     if ref.bot_id != bot_id or ref.key == invited_key:
         return []
     if db.scalars(select(ReferralJoin).where(ReferralJoin.bot_id == bot_id, ReferralJoin.invited_key == invited_key)).first():
         return []
-    db.add(ReferralJoin(bot_id=bot_id, referrer_key=ref.key, invited_key=invited_key))
+    pending = block is not None and block.count_after == "order"
+    db.add(ReferralJoin(bot_id=bot_id, referrer_key=ref.key, invited_key=invited_key, confirmed=not pending))
     db.flush()
-    n = count_for(db, bot_id, ref.key)
-    text = f"🎉 یک نفر با لینک اختصاصی شما وارد شد! دعوت‌های موفق: {n}" + (f" از {goal}" if goal else "")
-    if goal and n == goal:
-        text += "\nبه هدف رسیدید! 🎁"
-    return [{"type": "notify_customer", "cust": ref.key, "text": text}]
+    if pending:
+        return [{"type": "notify_customer", "cust": ref.key, "text": "👋 یک نفر با لینک اختصاصی شما وارد شد. وقتی اولین سفارش یا نوبتش را ثبت کند، دعوت برای شما حساب می‌شود."}]
+    return _counted(db, bot_id, ref.key, block)
+
+
+DONE = {"confirmed", "new", "preparing", "ready", "done", "transfer_sent"}  # a real booking or order (not cancelled, not unpaid)
+
+
+def confirm_pending(db: Session, bot_id: int, invited_key: str, spec, block) -> list[dict]:
+    """After a turn: a friend whose invite was waiting has now booked or ordered → the invite counts."""
+    if block is None or block.count_after != "order":
+        return []
+    join = db.scalars(select(ReferralJoin).where(ReferralJoin.bot_id == bot_id, ReferralJoin.invited_key == invited_key,
+                                                 ReferralJoin.confirmed.is_(False))).first()
+    if join is None:
+        return []
+    ids = [b.id for b in spec.blocks if b.type in ("booking", "catalog_order")]
+    rows = db.scalars(select(Record).where(Record.bot_id == bot_id, Record.sandbox.is_(False), Record.collection.in_(ids or [""]))).all()
+    if not any(r.data.get("_cust") == invited_key and r.data.get("status") in DONE for r in rows):
+        return []
+    join.confirmed = True
+    db.flush()
+    return _counted(db, bot_id, join.referrer_key, block, ordered=True)
 
 
 @router.get("/api/bots/{bot_id}/referrals")

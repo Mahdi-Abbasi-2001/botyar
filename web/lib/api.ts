@@ -4,9 +4,11 @@ export type Button = { text: string; data: string };
 export type Action =
   | { type: "send"; text: string; buttons: Button[]; edit?: boolean }
   | { type: "notify_admin"; text: string }
+  | { type: "notify_staff"; staff: string; text: string }
   | { type: "notify_customer"; cust: string; text: string }
   | { type: "media"; block: string; kind: "image" | "document"; uploaded?: boolean; filename?: string }
-  | { type: "location"; latitude: number; longitude: number };
+  | { type: "location"; latitude: number; longitude: number }
+  | { type: "contact"; phone: string; name: string };
 
 /** sessionStorage key for a description typed on /bots, sent to the agent when the workspace opens. */
 export const PENDING_KEY = (id: number | string) => `botyar:pending:${id}`;
@@ -94,6 +96,13 @@ export async function apiUpload<T = any>(path: string, form: FormData, method: "
   return data as T;
 }
 
+/** An authenticated image (e.g. a product photo) as a blob, or null when there is none. */
+export async function apiBlob(path: string): Promise<Blob | null> {
+  const token = getToken();
+  const res = await fetch(BASE + "/api" + path, { headers: token ? { Authorization: `Bearer ${token}` } : {} }).catch(() => null);
+  return res?.ok ? res.blob() : null;
+}
+
 /** Download an authenticated file (CSV/XLSX export): a plain link cannot send the Authorization header. */
 export async function downloadFile(path: string, fallbackName: string): Promise<void> {
   const token = getToken();
@@ -102,7 +111,9 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
     const d = await res.json().catch(() => ({}));
     throw new Error(typeof d.detail === "string" ? d.detail : "دریافت فایل انجام نشد.");
   }
-  const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? fallbackName;
+  const cd = res.headers.get("content-disposition") ?? "";
+  const utf = /filename\*=UTF-8''([^;]+)/i.exec(cd)?.[1];  // Persian file names arrive encoded here
+  const name = (utf && decodeURIComponent(utf)) || /filename="([^"]+)"/.exec(cd)?.[1] || fallbackName;
   const url = URL.createObjectURL(await res.blob());
   const a = document.createElement("a");
   a.href = url;

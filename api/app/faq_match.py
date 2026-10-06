@@ -56,8 +56,11 @@ class LexicalMatcher:
         q = tokens(query)
         out = []
         for i, e in enumerate(entries):
-            d = tokens(e.question)
-            out.append((i, 2 * len(q & d) / (len(q) + len(d)) if q and d else 0.0))
+            best = 0.0
+            for phrasing in [e.question, *getattr(e, "alternates", [])]:  # the entry scores as its best phrasing
+                d = tokens(phrasing)
+                best = max(best, 2 * len(q & d) / (len(q) + len(d)) if q and d else 0.0)
+            out.append((i, best))
         return sorted(out, key=lambda x: -x[1])
 
 

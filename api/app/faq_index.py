@@ -31,7 +31,8 @@ RATE_LIMIT, RATE_WINDOW = 30, 3600  # FAQ searches per customer per hour (each c
 
 
 def entry_hash(e) -> str:
-    return hashlib.sha1(f"{e.question}\n{e.answer}".encode()).hexdigest()
+    alts = getattr(e, "alternates", None)  # only when set, so entries indexed before alternates existed keep their hash
+    return hashlib.sha1((f"{e.question}\n{e.answer}" + (f"\n" + "\n".join(alts) if alts else "")).encode()).hexdigest()
 
 
 def _embed(texts: list[str], timeout: float = 6.0) -> tuple[np.ndarray, int]:
@@ -94,7 +95,7 @@ def ensure(db: Session, bot_id: int, spec: BotSpec, run_id: int = 0) -> dict:
             for pos, (h, e) in enumerate(chunk):
                 seen = {e.question}
                 docs.append((h, e.question))
-                for v in variants.get(pos, []):
+                for v in [*getattr(e, "alternates", []), *variants.get(pos, [])]:  # the owner's own phrasings first
                     if v not in seen:
                         seen.add(v)
                         docs.append((h, v))

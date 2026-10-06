@@ -35,7 +35,7 @@ export function MediaTab({ botId }: { botId: string }) {
     try {
       const form = new FormData();
       form.append("file", f);
-      await apiUpload(`/bots/${botId}/media/${slot.block}`, form, "PUT");
+      await apiUpload(`/bots/${botId}/media/${encodeURIComponent(slot.block)}`, form, "PUT");
       await load();
     } catch (err: any) {
       setError(err.message);
@@ -46,7 +46,7 @@ export function MediaTab({ botId }: { botId: string }) {
   async function remove(s: Slot) {
     setBusy(s.block);
     try {
-      await api(`/bots/${botId}/media/${s.block}`, { method: "DELETE" });
+      await api(`/bots/${botId}/media/${encodeURIComponent(s.block)}`, { method: "DELETE" });
       await load();
     } catch (err: any) {
       setError(err.message);

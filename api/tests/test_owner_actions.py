@@ -166,3 +166,13 @@ def test_once_preparing_the_customer_can_no_longer_cancel_and_sees_the_status():
     out = handle(spec, s, "m:2", st)
     text = "\n".join(a["text"] for a in out)
     assert "سفارش 1 — در حال آماده‌سازی" in text and not any("لغو:" in b["text"] for a in out for b in a["buttons"])
+
+
+
+def test_owner_marks_a_past_booking_as_no_show_via_the_api(world):
+    from datetime import date, timedelta
+    c, H, bid, add, sent = world
+    rid = add("b", {"slot": "once", "date": (date.today() - timedelta(days=2)).isoformat(), "status": "confirmed", "name": "x"})
+    r = act(c, H, bid, rid, action="status", status="no_show")
+    assert r.status_code == 200 and r.json()["status"] == "no_show"
+    assert act(c, H, bid, rid, action="status", status="ready").status_code == 409

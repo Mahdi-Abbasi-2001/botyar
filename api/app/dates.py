@@ -1,6 +1,7 @@
-"""Calendar helpers for recurring weekly slots: Tehran time, Persian weekdays, Gregorian -> Jalali."""
+"""Calendar helpers: Tehran time, Persian weekdays, Gregorian <-> Jalali, and reading a Jalali date a customer typed."""
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -40,6 +41,35 @@ def to_jalali(d: date) -> tuple[int, int, int]:
     else:
         jm, jd = 7 + (days - 186) // 30, 1 + (days - 186) % 30
     return jy, jm, jd
+
+
+MONTHS = ["فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"]
+_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+
+
+def from_jalali(jy: int, jm: int, jd: int) -> date | None:
+    """Jalali -> Gregorian; None for a day that does not exist (e.g. 30 Esfand of a common year)."""
+    if not (1 <= jm <= 12 and 1 <= jd <= 31 and 1200 <= jy <= 1600):
+        return None
+    guess = date(jy + 621, 3, 21) + timedelta(days=(jm - 1) * 31 if jm <= 7 else 186 + (jm - 7) * 30) + timedelta(days=jd - 1)
+    for delta in (0, -1, 1, -2, 2, -3, 3):
+        g = guess + timedelta(days=delta)
+        if to_jalali(g) == (jy, jm, jd):
+            return g
+    return None
+
+
+def parse_jalali(text: str, today: date | None = None) -> date | None:
+    """A date as people type it: «۱۴۰۳/۰۸/۱۵», «1403-8-15», «۱۵ آبان ۱۴۰۳», or «۱۵ آبان» (this year)."""
+    t = text.translate(_DIGITS).strip()
+    m = re.fullmatch(r"(\d{4})\s*[/\-.]\s*(\d{1,2})\s*[/\-.]\s*(\d{1,2})", t)
+    if m:
+        return from_jalali(int(m[1]), int(m[2]), int(m[3]))
+    m = re.fullmatch(r"(\d{1,2})\s*(" + "|".join(MONTHS) + r")(?:\s*(?:ماه)?\s*(\d{4}))?", t.replace("ماه ", "").strip())
+    if m:
+        year = int(m[3]) if m[3] else to_jalali(today or now_tehran().date())[0]
+        return from_jalali(year, MONTHS.index(m[2]) + 1, int(m[1]))
+    return None
 
 
 def jalali_str(d: date) -> str:

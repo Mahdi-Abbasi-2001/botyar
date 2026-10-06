@@ -1,30 +1,41 @@
 // Shapes returned by the API, plus helpers that turn them into words an owner understands.
 import { fa } from "../ui";
 
-export type Field = { key: string; label: string; kind: "text" | "phone" | "number" | "choice"; choices: string[]; required: boolean };
+export type Field = { key: string; label: string; kind: "text" | "phone" | "number" | "choice" | "multi" | "email" | "national_id" | "date" | "location" | "file"; choices: string[]; required: boolean;
+  min_value?: number | null; max_value?: number | null; show_if?: { field: string; equals: string[] } | null; scores?: number[] };
+export type FaqEntry = { question: string; answer: string; then?: string; then_label?: string; alternates?: string[]; category?: string; media?: "none" | "image"; location?: { latitude: number; longitude: number } | null };
 export type Schedule = {
   days: { weekday: number; start: string; end: string }[]; duration_minutes: number; capacity: number; days_ahead: number;
   staff: string[]; break_start?: string | null; break_end?: string | null;
+  services?: { id: string; name: string; duration_minutes: number; price: number; staff?: string[] }[];
+  staff_hours?: { staff: string; days: { weekday: number; start: string; end: string }[] }[];
 };
-export type Slot = { id: string; label: string; capacity: number; weekday?: number | null; time?: string | null };
-export type Item = { id: string; name: string; price: number; options: { name: string; choices: string[] }[] };
+export type Slot = { id: string; label: string; capacity: number; price?: number; weekday?: number | null; time?: string | null };
+export type Item = { id: string; name: string; price: number; options: { name: string; choices: string[]; prices?: number[] }[] };
 export type Block =
-  | { type: "message"; id: string; text: string; variants?: string[]; media?: "none" | "image" | "document"; location?: { latitude: number; longitude: number } | null }
-  | { type: "form"; id: string; title: string; fields: Field[]; done_text: string }
-  | { type: "booking"; id: string; title: string; reminder_hours?: number; slots: Slot[]; waitlist: boolean; schedule?: Schedule | null; allow_cancel?: boolean; cancel_deadline_hours?: number; occurrences?: number; fields: Field[]; confirm_text: string; full_text: string; waitlist_text: string }
-  | { type: "catalog_order"; id: string; title: string; items: Item[]; max_items: number; min_total: number; fields: Field[]; confirm_text: string; payment?: "none" | "online"; source?: "inline" | "table"; delivery_fee?: number; free_delivery_over?: number; discount_codes?: { code: string; percent: number; amount: number; min_total: number; max_uses: number }[] }
+  | { type: "message"; id: string; text: string; variants?: string[]; media?: "none" | "image" | "document" | "album"; album_size?: number; location?: { latitude: number; longitude: number } | null; links?: { label: string; url: string }[];
+      contact?: { phone: string; name: string } | null; hours?: { weekday: number; start: string; end: string }[] }
+  | { type: "form"; id: string; title: string; fields: Field[]; done_text: string; confirm_before_submit?: boolean; one_per_customer?: boolean; max_submissions?: number; closes_on?: string; review?: boolean; hot_score?: number }
+  | { type: "booking"; id: string; title: string; reminder_hours?: number; slots: Slot[]; waitlist: boolean; schedule?: Schedule | null; allow_cancel?: boolean; cancel_deadline_hours?: number; occurrences?: number; fields: Field[]; confirm_text: string; full_text: string; waitlist_text: string;
+      closed_dates?: string[]; min_notice_hours?: number; max_active_per_customer?: number; max_party?: number;
+      reminder_confirm?: boolean; no_show_limit?: number; repeat_weeks?: number; deposit?: number }
+  | { type: "catalog_order"; id: string; title: string; items: Item[]; max_items: number; min_total: number; fields: Field[]; confirm_text: string; payment?: "none" | "online" | "card"; card_number?: string; card_holder?: string; card_wait_minutes?: number; source?: "inline" | "table"; delivery_fee?: number; delivery_zones?: { label: string; fee: number }[]; free_delivery_over?: number; discount_codes?: { code: string; percent: number; amount: number; min_total: number; max_uses: number }[];
+      ask_quantity?: boolean; order_hours?: { weekday: number; start: string; end: string }[];
+      time_windows?: { start: string; end: string }[]; per_window?: number; window_days?: number; min_lead_minutes?: number;
+      restock_alerts?: boolean; low_stock_alert?: number; repeat_order?: boolean }
   | { type: "menu"; id: string; title: string; items: { label: string; block: string }[] }
-  | { type: "quiz"; id: string; title: string; questions: { question: string; options: string[]; correct: number }[]; result_text?: string; show_answers?: boolean }
-  | { type: "referral"; id: string; title: string; text?: string; goal: number; reward_text?: string }
-  | { type: "anon_chat"; id: string; title: string; intro_text?: string }
-  | { type: "feedback"; id: string; title: string; prompt_text?: string; comment_text?: string; thanks_text?: string }
-  | { type: "contact"; id: string; title: string; prompt_text?: string; sent_text?: string }
-  | { type: "faq"; id: string; title: string; entries: { question: string; answer: string }[]; prompt_text?: string; not_found_text?: string }
-  | { type: "admin_notify"; id: string; on: string; text: string };
+  | { type: "quiz"; id: string; title: string; questions: { question: string; options: string[]; correct: number; outcomes?: string[]; media?: "none" | "image" }[]; result_text?: string; show_answers?: boolean; shuffle?: boolean; pick?: number; pass_percent?: number; one_attempt?: boolean;
+      pass_code?: string; personality?: { id: string; title: string; text: string }[] }
+  | { type: "referral"; id: string; title: string; text?: string; goal: number; reward_text?: string; reward_code?: string; tiers?: { goal: number; reward_text: string; reward_code?: string }[]; count_after?: "join" | "order" }
+  | { type: "anon_chat"; id: string; title: string; intro_text?: string; topics?: string[]; max_minutes?: number }
+  | { type: "feedback"; id: string; title: string; prompt_text?: string; comment_text?: string; thanks_text?: string; aspects?: string[]; follow_up_below?: number; after?: string; after_hours?: number }
+  | { type: "contact"; id: string; title: string; prompt_text?: string; sent_text?: string; topics?: string[]; hours?: { weekday: number; start: string; end: string }[]; away_text?: string }
+  | { type: "faq"; id: string; title: string; entries: FaqEntry[]; prompt_text?: string; not_found_text?: string }
+  | { type: "admin_notify"; id: string; on: string; text: string; min_total?: number; max_rating?: number };
 export type Spec = { name: string; welcome: string; menu: { label: string; block: string }[]; blocks: Block[]; gate?: { channel: string; text: string; join_url?: string } | null };
 export type Bot = { id: number; name: string; version: number; spec: Spec | null };
 
-export type Rec = { id: number; collection: string; data: Record<string, any>; created_at: string };
+export type Rec = { id: number; collection: string; data: Record<string, any>; created_at: string; files?: Record<string, { name: string }> };
 export type TestRes = { name: string; passed: boolean; failures: string[]; transcript: { user: string; bot: string }[] };
 export type DiffRow = { path: string; before: any; after: any };
 export type Ver = { version: number; note: string; created_at: string; diff: DiffRow[]; tests_passed: number; tests_total: number };
@@ -35,7 +46,9 @@ export type RunStatus = "running" | "needs_input" | "done" | "failed" | "decline
 export const BLOCK_KIND: Record<Block["type"], string> = {
   message: "پیام", form: "فرم", booking: "نوبت‌دهی", catalog_order: "سفارش", admin_notify: "اطلاع به مدیر", faq: "پرسش‌های متداول", contact: "پیام به مدیر", feedback: "نظرسنجی", menu: "زیرمنو", quiz: "آزمون", referral: "دعوت دوستان", anon_chat: "چت ناشناس",
 };
-export const FIELD_KIND: Record<Field["kind"], string> = { text: "متن", phone: "شماره‌ی موبایل (با بررسی قالب)", number: "عدد", choice: "انتخابی" };
+export const FIELD_KIND: Record<Field["kind"], string> = {
+  text: "متن", phone: "شماره‌ی موبایل (با بررسی قالب)", number: "عدد", choice: "انتخابی", multi: "چندانتخابی", email: "ایمیل", national_id: "کد ملی (با بررسی)", date: "تاریخ شمسی", location: "موقعیت روی نقشه یا نشانی", file: "فایل (PDF، Word یا عکس)",
+};
 
 export function blockTitle(b: Block): string {
   if (b.type === "message") return b.text.length > 36 ? b.text.slice(0, 36) + "…" : b.text;
@@ -44,6 +57,84 @@ export function blockTitle(b: Block): string {
 }
 
 export const toman = (n: number) => `${n.toLocaleString("fa-IR")} تومان`;
+
+/** The optional settings of a block, as plain Persian lines for the structure tab (empty when none are set). */
+export function blockExtras(b: Block): string[] {
+  const out: string[] = [];
+  const n = (x: number) => x.toLocaleString("fa-IR");
+  if (b.type === "form") {
+    if (b.confirm_before_submit) out.push("پیش از ثبت، پاسخ‌ها برای تأیید به مشتری نشان داده می‌شود");
+    if (b.one_per_customer) out.push("هر مشتری فقط یک بار می‌تواند ثبت کند");
+    if (b.max_submissions) out.push(`حداکثر ${n(b.max_submissions)} ثبت؛ پس از آن فرم بسته می‌شود`);
+    if (b.closes_on) out.push(`مهلت ثبت تا ${b.closes_on.replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[+d])}`);
+    if (b.review) out.push("هر درخواست را در «ثبت‌ها» بررسی می‌کنید (پذیرفته / رد / در حال بررسی) و نتیجه برای مشتری ارسال می‌شود");
+    if (b.hot_score) out.push(`امتیازدهی: ثبت‌هایی با امتیاز ${n(b.hot_score)} یا بیشتر با 🔥 به شما اطلاع داده می‌شوند`);
+    else if (b.fields.some((f) => f.scores?.length)) out.push("امتیازدهی به پاسخ‌ها: امتیاز هر ثبت در «ثبت‌ها» دیده می‌شود");
+    if (b.fields.some((f) => f.kind === "file")) out.push("فایل‌های مشتری در چت مدیر ارسال می‌شوند و در «ثبت‌ها» قابل دریافت‌اند");
+  }
+  if (b.type === "booking") {
+    const sv = b.schedule?.services ?? [];
+    if (sv.length) out.push("خدمت‌ها: " + sv.map((s) => `${s.name} (${n(s.duration_minutes)} دقیقه${s.price ? `، ${toman(s.price)}` : ""}${s.staff?.length ? `، فقط ${s.staff.join(" و ")}` : ""})`).join("، "));
+    for (const h of b.schedule?.staff_hours ?? [])
+      out.push(`ساعت کاری ${h.staff}: ` + h.days.map((w) => `${WEEKDAYS[w.weekday]} ${w.start} تا ${w.end}`).join("؛ ").replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[+d]));
+    if (b.deposit) out.push(`بیعانه‌ی آنلاین ${toman(b.deposit)} برای قطعی شدن نوبت`);
+    if ((b.repeat_weeks ?? 0) > 1) out.push(`رزرو هفتگی پشت سر هم تا ${n(b.repeat_weeks!)} هفته`);
+    if (b.reminder_hours && b.reminder_confirm !== false) out.push("یادآوری با دکمه‌ی «می‌آیم / نمی‌توانم بیایم»");
+    if (b.no_show_limit) out.push(`پس از ${n(b.no_show_limit)} بار «حاضر نشد»، رزرو آنلاین برای آن مشتری بسته می‌شود`);
+    const priced = b.slots.filter((s) => s.price);
+    if (priced.length) out.push("قیمت: " + priced.map((s) => `${s.label} ${toman(s.price!)}`).join("، "));
+    if (b.closed_dates?.length) out.push("روزهای تعطیل: " + b.closed_dates.join("، ").replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[+d]));
+    if (b.min_notice_hours) out.push(`دست‌کم ${n(b.min_notice_hours)} ساعت پیش از شروع`);
+    if (b.max_active_per_customer) out.push(`حداکثر ${n(b.max_active_per_customer)} نوبت فعال برای هر مشتری`);
+    if ((b.max_party ?? 1) > 1) out.push(`رزرو گروهی تا ${n(b.max_party!)} نفر`);
+  }
+  if (b.type === "catalog_order") {
+    if (b.ask_quantity) out.push("تعداد هر قلم پرسیده می‌شود");
+    if (b.repeat_order !== false) out.push("مشتری قبلی می‌تواند سفارش قبلی‌اش را با یک دکمه تکرار کند");
+    if (b.source === "table" && b.restock_alerts !== false) out.push("زیر محصول ناموجود: «موجود شد خبرم کن»");
+    if (b.order_hours?.length) out.push("ساعت سفارش‌گیری: " + b.order_hours.map((w) => `${WEEKDAYS[w.weekday]} ${w.start} تا ${w.end}`).join("؛ ").replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[+d]));
+  }
+  const hours = (d: { weekday: number; start: string; end: string }[]) =>
+    d.map((w) => `${WEEKDAYS[w.weekday]} ${w.start} تا ${w.end}`).join("؛ ").replace(/\d/g, (x) => "۰۱۲۳۴۵۶۷۸۹"[+x]);
+  if (b.type === "message") {
+    if (b.links?.length) out.push("دکمه‌ی لینک: " + b.links.map((l) => l.label).join("، "));
+    if (b.hours?.length) out.push(`«الان باز / بسته» از روی ساعت کاری: ${hours(b.hours)}`);
+    if (b.contact) out.push(`کارت تماس: ${b.contact.name} (${b.contact.phone})`);
+    if (b.media === "album") out.push(`آلبوم ${n(b.album_size ?? 0)} عکس؛ عکس‌ها را در «فایل‌ها» بارگذاری کنید`);
+  }
+  if (b.type === "contact") {
+    if (b.topics?.length) out.push("موضوع پیام: " + b.topics.join("، "));
+    if (b.hours?.length) out.push(`بیرون از ساعت پاسخ‌گویی (${hours(b.hours)}) پاسخ خودکار «${b.away_text ?? ""}» فرستاده می‌شود`);
+  }
+  if (b.type === "referral") {
+    if (b.count_after === "order") out.push("هر دعوت پس از اولین سفارش یا نوبت دوست حساب می‌شود");
+    if (b.reward_code) out.push(`در هدف، کد تخفیف ${b.reward_code} خودکار فرستاده می‌شود`);
+    for (const t of b.tiers ?? []) out.push(`جایزه‌ی ${n(t.goal)} دعوت: ${t.reward_text}${t.reward_code ? ` (کد ${t.reward_code})` : ""}`);
+  }
+  if (b.type === "anon_chat") {
+    if (b.topics?.length) out.push("اتاق‌های گفت‌وگو: " + b.topics.join("، "));
+    if (b.max_minutes) out.push(`هر گفت‌وگو حداکثر ${n(b.max_minutes)} دقیقه`);
+  }
+  if (b.type === "admin_notify") {
+    if (b.min_total) out.push(`فقط سفارش‌های ${toman(b.min_total)} و بیشتر`);
+    if (b.max_rating) out.push(`فقط امتیازهای ${n(b.max_rating)} و کمتر`);
+  }
+  if (b.type === "feedback") {
+    if (b.after) out.push(`${n(b.after_hours ?? 2)} ساعت پس از هر نوبت یا تحویل سفارش، نظر مشتری خودکار پرسیده می‌شود (با ستاره‌ها در همان پیام)`);
+    if (b.aspects?.length) out.push("امتیاز جداگانه به: " + b.aspects.join("، "));
+    if (b.follow_up_below) out.push(`امتیاز کمتر از ${n(b.follow_up_below)}: شماره‌ی مشتری برای تماس مدیر پرسیده می‌شود`);
+  }
+  if (b.type === "quiz") {
+    if (b.pick) out.push(`هر بار ${n(b.pick)} سؤال تصادفی از ${n(b.questions.length)} سؤال`);
+    else if (b.shuffle) out.push("ترتیب سؤال‌ها تصادفی است");
+    if (b.pass_percent) out.push(`نمره‌ی قبولی ${n(b.pass_percent)}٪`);
+    if (b.one_attempt) out.push("هر نفر فقط یک بار");
+    if (b.pass_code) out.push(`قبول‌شدگان کد تخفیف ${b.pass_code} می‌گیرند`);
+    if (b.personality?.length) out.push("آزمون شخصیت؛ نتیجه‌ها: " + b.personality.map((o) => o.title).join("، "));
+    if (b.questions.some((q) => q.media === "image")) out.push("بعضی سؤال‌ها عکس دارند؛ عکس‌ها را در «فایل‌ها» بارگذاری کنید");
+  }
+  return out;
+}
 
 /** Turn button data the simulator sent ("s:sat9", "m:0", "i:latte") back into the label the user tapped. */
 export const WEEKDAYS = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"]; // 0 = Saturday
@@ -148,7 +239,7 @@ const FIELD_NAME: Record<string, string> = {
   text: "متن", title: "عنوان", confirm_text: "پیام تأیید", full_text: "پیام تکمیل ظرفیت", waitlist_text: "پیام لیست انتظار",
   done_text: "پیام پایان فرم", price: "قیمت", min_total: "حداقل مبلغ سفارش", max_items: "حداکثر تعداد آیتم", fields: "سؤال‌های فرم",
   slots: "زمان‌ها", items: "آیتم‌ها", on: "زمان ارسال پیام به مدیر", kind: "نوع", required: "اجباری", choices: "گزینه‌ها", options: "گزینه‌ها",
-  block: "مقصد", blocks: "بخش‌ها", type: "نوع",
+  block: "مقصد", blocks: "بخش‌ها", type: "نوع", delivery_fee: "هزینه‌ی ارسال", delivery_zones: "مناطق ارسال", free_delivery_over: "ارسال رایگان از مبلغ", fee: "هزینه‌ی ارسال",
 };
 
 export function showValue(v: any, key?: string): string {

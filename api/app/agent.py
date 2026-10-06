@@ -21,7 +21,35 @@ log = logging.getLogger("botyar.agent")
 MAX_DESIGN, MAX_REPAIR, MAX_CLARIFY_ROUNDS = 3, 3, 2
 
 
-DECLINE_MARK = "🚧 "  # starts a chat message in which the agent explained it can't build this kind of bot
+FAILED_MSG = ("متأسفانه این بار ساخت ربات به نتیجه نرسید. همان درخواست را دوباره بفرستید یا آن را ساده‌تر بنویسید؛ "
+              "اگر باز هم تکرار شد، از بخش «پشتیبانی» برای تیم بات‌یار بنویسید.")
+
+
+def _block_types() -> dict[str, str]:
+    from .llm_schema import LLMBotSpec
+    import typing
+    union = typing.get_args(LLMBotSpec.model_fields["blocks"].annotation)[0]
+    return {c.__name__: c.model_fields["type"].default for c in typing.get_args(union)}
+
+
+def spec_errors(e: ValidationError) -> list[str]:
+    """Validation errors as feedback for the next design attempt. A block is a union of types, so one wrong field in a
+    booking also reports errors for EVERY other block type (MessageBlock.text required, …): only the errors of the
+    type the block actually has are kept."""
+    types = _block_types()
+    out = []
+    for x in e.errors():
+        if x["type"] == "literal_error" and x["loc"] and x["loc"][-1] == "type":
+            continue
+        member = next((types[n] for seg in map(str, x["loc"]) for n in types if seg == n or seg.endswith(f", {n}]")), None)
+        given = x["input"].get("type") if isinstance(x.get("input"), dict) else None
+        if member and given and member != given:
+            continue  # an error of a block type this block is not
+        out.append(f"{'.'.join(map(str, x['loc']))}: {x['msg']}")
+    return out[:15] or [str(e)[:500]]
+
+
+DECLINE_MARK = "🚧 "  # starts a message that declines the request, or the line of a finished build listing what was left out
 
 
 class ClarifyResult(BaseModel):
@@ -69,8 +97,9 @@ class Builder:
         run.events = [*run.events, text]
         self.db.commit()
 
-    def ask(self, step, instructions, payload: str, schema, effort="low"):
-        return llm.call(self.db, bot_id=self.bot_id, run_id=self.run_id, step=step, instructions=instructions, input=payload, schema=schema, effort=effort)
+    def ask(self, step, instructions, payload: str, schema, effort="low", max_out: int = 8000):
+        return llm.call(self.db, bot_id=self.bot_id, run_id=self.run_id, step=step, instructions=instructions, input=payload, schema=schema,
+                        effort=effort, max_out=max_out)
 
     def cost(self) -> float:
         return float(self.db.scalar(select(func.coalesce(func.sum(LlmCall.cost_usd), 0.0)).where(LlmCall.run_id == self.run_id)))
@@ -95,7 +124,19 @@ class Builder:
                    f"CURRENT SPEC:\n{json.dumps(s['current'], ensure_ascii=False) if s.get('current') else 'none'}")
         if s.get("errors"):
             payload += f"\n\nYOUR PREVIOUS ATTEMPT WAS INVALID. Fix these validation errors:\n" + "\n".join(s["errors"])
-        r: LLMBotSpec = self.ask("design", prompts.DESIGN, payload, LLMBotSpec, effort="low")
+            if n == MAX_DESIGN:  # last chance: a working bot without one detail beats no bot at all
+                payload += ("\nTHIS IS THE LAST ATTEMPT. If a requested detail keeps causing these errors, leave that detail out "
+                            "completely and keep everything else; the owner is told about it separately.")
+        try:
+            # the reply is parsed into LLMBotSpec as it arrives: a reply that doesn't fit is a failed attempt like any other
+            r: LLMBotSpec = self.ask("design", prompts.DESIGN, payload, LLMBotSpec, effort="low")
+        except ValidationError as e:
+            log.warning("design attempt %s: reply did not fit LLMBotSpec: %s", n, spec_errors(e)[:5])
+            return {"spec": None, "errors": spec_errors(e), "design_attempts": n}
+        except RuntimeError as e:  # cut off before it was complete: another attempt, asked to be compact
+            log.warning("design attempt %s: %s", n, e)
+            return {"spec": None, "errors": ["your reply was cut off before it was complete: write a more compact spec (shorter texts, no unnecessary blocks)"],
+                    "design_attempts": n}
         try:
             spec = BotSpec.model_validate(r.model_dump())
             has_table = any(b.type == "catalog_order" and b.source == "table" for b in spec.blocks)
@@ -106,8 +147,7 @@ class Builder:
                     raise ValueError("sample_products: a catalog_order with source 'table' needs 6-10 realistic sample products")
             return {"spec": spec.model_dump(), "errors": [], "design_attempts": n, "fixture": fixture}
         except ValidationError as e:
-            errs = [f"{'.'.join(map(str, x['loc']))}: {x['msg']}" for x in e.errors()]
-            return {"spec": None, "errors": errs, "design_attempts": n}
+            return {"spec": None, "errors": spec_errors(e), "design_attempts": n}
         except ValueError as e:  # our own fixture rule (ValidationError is handled above)
             return {"spec": None, "errors": [str(e)], "design_attempts": n}
 
@@ -123,7 +163,12 @@ class Builder:
             payload += "\n\nFIXTURE PRODUCTS (ids are 1..N in this order):\n" + json.dumps([{"id": i, **p} for i, p in enumerate(s["fixture"], 1)], ensure_ascii=False)
         if s.get("current"):
             payload += "\n\n(This is a CHANGE request: write tests only for the new/changed behaviour.)"
-        plan: TestPlan = self.ask("tests", prompts.TESTS, payload, TestPlan, effort="none")
+        try:
+            plan: TestPlan = self.ask("tests", prompts.TESTS, payload, TestPlan, effort="none")
+        except RuntimeError as e:  # the reply was cut off (output limit): once more, with room and a reminder to be brief
+            log.warning("tests: %s; retrying", e)
+            plan = self.ask("tests", prompts.TESTS, payload + "\n\nKEEP IT SHORT: at most 3 scenarios of at most 8 steps each.", TestPlan,
+                            effort="none", max_out=16000)
         return {"scenarios": [x.model_dump() for x in plan.scenarios]}
 
     def run_tests(self, s: S) -> dict:
@@ -245,21 +290,28 @@ def run_builder(run_id: int, bot_id: int, request: str):
             msg = f"✅ نسخه {final['version']} آماده شد. {ok} از {len(res)} تست موفق بود."
             if ok < len(res):
                 msg = f"⚠️ نسخه {final['version']} ساخته شد ولی {len(res) - ok} تست هنوز ناموفق است؛ نتایج را در بخش تست‌ها ببینید."
-            if final.get("assumptions"):
-                msg += "\nفرض‌ها: " + "؛ ".join(final["assumptions"])
+            missing = [a for a in final.get("assumptions") or [] if "پشتیبانی نمی‌شود" in a]
+            others = [a for a in final.get("assumptions") or [] if a not in missing]
+            if others:
+                msg += "\nفرض‌ها:" + "".join(f"\n• {a.strip().rstrip('.؛')}" for a in others)
+            if missing:  # its own marked line: the workspace offers to send it to the team as a ticket
+                msg += "\n" + DECLINE_MARK + "؛ ".join(a.removeprefix("پشتیبانی نمی‌شود:").strip().rstrip(".؛") for a in missing)
             db.add(BuilderMessage(bot_id=bot_id, role="assistant", content=msg))
             run.status = "done"
             run.result = {"message": msg, "version": final["version"], "diff": spec_diff(last.spec if last else None, final["spec"]),
                           "tests": res, "cost_usd": b.cost()}
         else:
-            msg = "متأسفانه نتوانستم ساختار معتبری بسازم. لطفاً درخواست را کمی ساده‌تر یا دقیق‌تر بنویسید."
-            db.add(BuilderMessage(bot_id=bot_id, role="assistant", content=msg))
-            run.status, run.result = "failed", {"message": msg, "cost_usd": b.cost()}
+            db.add(BuilderMessage(bot_id=bot_id, role="assistant", content=FAILED_MSG))
+            run.status, run.result = "failed", {"message": FAILED_MSG, "cost_usd": b.cost()}
         db.commit()
-    except Exception as e:  # never leave a run hanging
+    except Exception as e:  # never leave a run hanging, and never leave the owner without an answer
+        log.exception("builder run %s (bot %s) failed", run_id, bot_id)
         db.rollback()
         run = db.get(BuilderRun, run_id)
-        run.status, run.result = "failed", {"message": "خطای داخلی؛ دوباره تلاش کنید.", "error": f"{type(e).__name__}: {str(e)[:300]}"}
+        run.events = [*run.events, "ساخت ربات ناموفق بود"]  # the timeline ends in red instead of looking finished
+        # the page reloads the chat from the messages, so the answer must be one of them
+        db.add(BuilderMessage(bot_id=bot_id, role="assistant", content=FAILED_MSG))
+        run.status, run.result = "failed", {"message": FAILED_MSG, "error": f"{type(e).__name__}: {str(e)[:2000]}"}
         db.commit()
     finally:
         db.close()

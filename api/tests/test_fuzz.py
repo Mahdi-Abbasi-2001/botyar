@@ -61,7 +61,7 @@ def run(spec, seed, catalog=None, steps=(5, 60), p_valid=0.7):
         offered[i] = buttons_of(actions)
         json.dumps(sessions[i], ensure_ascii=False)  # state must always be storable
         for a in actions:
-            assert a["type"] in ("send", "notify_admin", "notify_customer", "media", "location") and (a["type"] in ("media", "location") or isinstance(a["text"], str))
+            assert a["type"] in ("send", "notify_admin", "notify_customer", "notify_staff", "media", "location") and (a["type"] in ("media", "location") or isinstance(a["text"], str))
     # invariants
     for b in spec.blocks:
         if b.type == "booking" and b.schedule:

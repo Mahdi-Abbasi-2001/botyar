@@ -168,6 +168,7 @@ class Product(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     position: Mapped[int] = mapped_column(Integer, default=0)
     is_sample: Mapped[bool] = mapped_column(Boolean, default=False)  # agent-made demo rows, replaced on first import
+    has_photo: Mapped[bool] = mapped_column(Boolean, default=False)  # the photo itself is a BotFile with block_id "product:<id>"
 
 
 class VersionFixture(Base):
@@ -198,6 +199,7 @@ class Broadcast(Base):
     bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
     text: Mapped[str] = mapped_column(Text)
     audience: Mapped[int] = mapped_column(Integer, default=0)
+    segment_label: Mapped[str] = mapped_column(String(200), default="")  # who it went to, when not everyone
     sent: Mapped[int] = mapped_column(Integer, default=0)
     failed: Mapped[int] = mapped_column(Integer, default=0)
     done: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -231,6 +233,47 @@ class UpgradeRequest(Base):
     note: Mapped[str] = mapped_column(String(500), default="")
     status: Mapped[str] = mapped_column(String(10), default="pending")  # pending | approved | rejected
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class TimeOff(Base):
+    """Hours the owner closed on one date (afternoon off, a staff member's leave): no booking can fall inside them."""
+    __tablename__ = "time_off"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    block_id: Mapped[str] = mapped_column(String(64))
+    date: Mapped[str] = mapped_column(String(10))   # ISO (Gregorian)
+    start: Mapped[str] = mapped_column(String(5))   # "HH:MM"
+    end: Mapped[str] = mapped_column(String(5))
+    staff: Mapped[str] = mapped_column(String(40), default="")  # "" = everyone
+    note: Mapped[str] = mapped_column(String(100), default="")
+
+
+class SavedReply(Base):
+    """A reply the owner reuses in the inbox («سفارش شما فردا ارسال می‌شود»)."""
+    __tablename__ = "saved_replies"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    text: Mapped[str] = mapped_column(Text)
+
+
+class StaffLink(Base):
+    """A staff member of an appointment calendar who links their own chat («/staff CODE») to hear about their bookings."""
+    __tablename__ = "staff_links"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    name: Mapped[str] = mapped_column(String(40))  # as written in schedule.staff
+    code: Mapped[str] = mapped_column(String(16), unique=True, index=True)
+    messenger: Mapped[str] = mapped_column(String(8), default="")  # bale | tg, once linked
+    chat_id: Mapped[str] = mapped_column(String(32), default="")
+
+
+class OwnerDigest(Base):
+    """The owner's morning summary of a bot (sent at 8:00 Tehran to their linked chat): on by default."""
+    __tablename__ = "owner_digests"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), unique=True, index=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_sent: Mapped[str] = mapped_column(String(10), default="")  # ISO date of the last summary (one per day)
 
 
 class SupportTicket(Base):
@@ -306,6 +349,7 @@ class ReferralJoin(Base):
     bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
     referrer_key: Mapped[str] = mapped_column(String(64), index=True)
     invited_key: Mapped[str] = mapped_column(String(64))
+    confirmed: Mapped[bool] = mapped_column(Boolean, default=True)  # False until the friend's first order/booking (count_after="order")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
@@ -371,6 +415,7 @@ class AnonQueue(Base):
     bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
     block_id: Mapped[str] = mapped_column(String(64))
     key: Mapped[str] = mapped_column(String(64))
+    topic: Mapped[str] = mapped_column(String(40), default="")  # the topic room (empty = the block has no rooms)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 

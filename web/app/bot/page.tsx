@@ -228,7 +228,7 @@ function Workspace() {
   const spec = bot.spec;
   const passed = tests.filter((t) => t.passed).length;
   const hasCatalog = !!spec?.blocks?.some((b: any) => b.type === "catalog_order" && b.source === "table");
-  const hasMedia = !!spec?.blocks?.some((b: any) => b.type === "message" && b.media && b.media !== "none");
+  const hasMedia = !!spec?.blocks?.some((b: any) => (b.type === "message" && b.media && b.media !== "none") || (b.type === "faq" && b.entries?.some((e: any) => e.media === "image")) || (b.type === "quiz" && b.questions?.some((q: any) => q.media === "image")));
   const hasContact = !!spec?.blocks?.some((b: any) => b.type === "contact");
   const tabs: Tab[] = spec ? (["build", "spec", "tests", "versions", ...(hasCatalog ? ["catalog"] : []), "publish", ...(hasContact ? ["inbox"] : []), ...(hasMedia ? ["media"] : []), "announce", "customers", "channels", "records", "try"] as Tab[]) : ["build"];
   const phoneTabs = tab === "build" || tab === "spec";

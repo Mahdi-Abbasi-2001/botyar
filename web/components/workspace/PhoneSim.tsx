@@ -31,6 +31,7 @@ function prettyAdmin(text: string, labels: Record<string, string>): string {
 export function PhoneSim({ botId, version, labels, onActivity, className = "" }: { botId: string; version: number; labels: Record<string, string>; onActivity: () => void; className?: string }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [text, setText] = useState("");
+  const [attach, setAttach] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [session, setSession] = useState(rid);
@@ -46,12 +47,15 @@ export function PhoneSim({ botId, version, labels, onActivity, className = "" }:
       setMsgs((m) => {
         const mapped = r.actions.map((a): Msg => {
           if (a.type === "send") return { from: "bot", text: a.text, buttons: a.buttons };
+          if (a.type === "media" && a.block.startsWith("product:")) return { from: "bot", text: "🖼 عکس محصول" };
           if (a.type === "media") {
             const what = a.kind === "image" ? "عکس" : "فایل";
             return { from: "bot", text: a.uploaded ? `📎 ${what}: ${a.filename}` : `📎 ${what} (هنوز در بخش «فایل‌ها» بارگذاری نشده است)` };
           }
+          if (a.type === "contact") return { from: "bot", text: `👤 ${a.name}\n📞 ${a.phone}` };
           if (a.type === "location") return { from: "bot", text: `📍 موقعیت روی نقشه (${a.latitude}, ${a.longitude})` };
           if (a.type === "notify_customer") return { from: "note", text: "📨 پیام به مشتری دیگر در بله: " + a.text };
+          if (a.type === "notify_staff") return { from: "note", text: `👤 برای همکار «${a.staff}» (اگر چتش را وصل کرده باشد): ` + a.text };
           return { from: "admin", text: a.text };
         });
         const first = r.actions[0];
@@ -117,7 +121,7 @@ export function PhoneSim({ botId, version, labels, onActivity, className = "" }:
                 {m.buttons.map((b) => {
                   const full = /\(تکمیل\)$/.test(b.text);
                   return (
-                    <button key={b.data} disabled={busy} onClick={() => send(b.data, b.text)}
+                    <button key={b.data} disabled={busy} onClick={() => (b.data.startsWith("url:") ? window.open(b.data.slice(4), "_blank", "noopener") : send(b.data, b.text))}
                       className={`min-h-10 rounded-[10px] border px-2.5 py-1.5 text-[13px] disabled:opacity-50 ${full ? "border-line-2 text-dim" : "border-line-3 hover:border-saffron hover:text-saffron"}`}>
                       {fa(b.text)}
                     </button>
@@ -130,8 +134,17 @@ export function PhoneSim({ botId, version, labels, onActivity, className = "" }:
         {busy && <span className="self-start px-2 text-dim">…</span>}
       </div>
       {error && <p className="px-1 text-xs text-bad-fg">{error}</p>}
+      {attach && (
+        <div className="flex flex-col gap-1.5 rounded-xl border border-line-2 p-2 text-[13px]">
+          <span className="text-xs text-dim">در بله این‌ها را از 📎 می‌فرستید؛ اینجا نمونه‌ی آزمایشی فرستاده می‌شود:</span>
+          <button disabled={busy} onClick={() => { setAttach(false); send("loc:35.699700,51.338000", "📍 موقعیت مکانی"); }} className="min-h-9 rounded-lg border border-line-3 hover:border-saffron">📍 ارسال موقعیت مکانی</button>
+          <button disabled={busy} onClick={() => { setAttach(false); send("photo:sim", "🖼 عکس"); }} className="min-h-9 rounded-lg border border-line-3 hover:border-saffron">🖼 ارسال عکس</button>
+          <button disabled={busy} onClick={() => { setAttach(false); send("file:sim|52000|رزومه-نمونه.pdf", "📄 رزومه-نمونه.pdf"); }} className="min-h-9 rounded-lg border border-line-3 hover:border-saffron">📄 ارسال فایل (PDF نمونه)</button>
+        </div>
+      )}
       <form onSubmit={(e) => { e.preventDefault(); if (text.trim()) { send(text.trim()); setText(""); } }}
         className="flex items-center gap-2 rounded-full bg-ink py-1 pl-1 pr-3">
+        <button type="button" onClick={() => setAttach((v) => !v)} aria-label="پیوست" aria-expanded={attach} className="text-base text-mute hover:text-fg">📎</button>
         <label htmlFor="sim-in" className="sr-only">پیام به ربات</label>
         <input id="sim-in" value={text} onChange={(e) => setText(e.target.value)} placeholder="پیام خود را بنویسید…" className="min-w-0 flex-1 bg-transparent py-2 text-[13px] outline-none placeholder:text-dim" />
         <button disabled={busy} aria-label="ارسال" className="flex h-10 w-10 items-center justify-center rounded-full bg-saffron text-ink disabled:opacity-50">

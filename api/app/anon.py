@@ -41,13 +41,13 @@ def _partner(pair: AnonPair, key: str) -> str:
     return pair.b_key if pair.a_key == key else pair.a_key
 
 
-def _set_partner_step(db: Session, bot_id: int, key: str, block_id: str, step: str):
+def _set_partner_step(db: Session, bot_id: int, key: str, block_id: str, step: str, topic: str = ""):
     row = db.scalars(select(ChatSession).where(ChatSession.bot_id == bot_id, ChatSession.key == key)).first()
     if row is None:
         return
     st = copy.deepcopy(row.state)
     if step == "chat":
-        st.update(block=block_id, step="chat", data={})
+        st.update(block=block_id, step="chat", data={"_topic": topic} if topic else {})
     elif st.get("block") == block_id:
         st.update(step="idle")
     row.state = st
@@ -87,19 +87,20 @@ def run(db: Session, bot, spec, state: dict, key: str, actions: list[dict]) -> t
         if kind == "anon_find":
             others += _end(db, bot.id, key, block_id, notify=False)
             cutoff = _now() - timedelta(minutes=WAIT_MINUTES)
+            topic = a.get("topic") or ""
             waiting = [q for q in db.scalars(select(AnonQueue).where(AnonQueue.bot_id == bot.id, AnonQueue.block_id == block_id).order_by(AnonQueue.id)).all()
-                       if q.key != key and (q.created_at if q.created_at.tzinfo else q.created_at.replace(tzinfo=timezone.utc)) >= cutoff]
+                       if q.key != key and (q.topic or "") == topic and (q.created_at if q.created_at.tzinfo else q.created_at.replace(tzinfo=timezone.utc)) >= cutoff]
             if waiting:
                 partner = waiting[0]
                 db.delete(partner)
                 db.add(AnonPair(bot_id=bot.id, block_id=block_id, a_key=partner.key, b_key=key, log=[]))
-                _set_partner_step(db, bot.id, partner.key, block_id, "chat")
+                _set_partner_step(db, bot.id, partner.key, block_id, "chat", topic)
                 hello = "✅ شریک گفتگو پیدا شد! پیام خود را بنویسید؛ پیام‌ها ناشناس ارسال می‌شوند (لینک و شماره تلفن ارسال نمی‌شود)."
                 mine.append(engine.send(hello, engine._anon_buttons()))
                 others.append({"type": "notify_customer", "cust": partner.key, "text": hello, "buttons": engine._anon_buttons()})
                 state["step"] = "chat"
             else:
-                db.add(AnonQueue(bot_id=bot.id, block_id=block_id, key=key))
+                db.add(AnonQueue(bot_id=bot.id, block_id=block_id, key=key, topic=topic))
         elif kind == "anon_end":
             others += _end(db, bot.id, key, block_id)
         elif kind == "anon_report":
@@ -134,6 +135,20 @@ def run(db: Session, bot, spec, state: dict, key: str, actions: list[dict]) -> t
                 pair.log = ([*(pair.log or []), {"from": key, "text": text}])[-LOG_KEEP:]
                 others.append({"type": "notify_customer", "cust": _partner(pair, key), "text": "👤 " + text})
     return [*keep, *mine], others
+
+
+def expire_long_chats(db: Session, now: datetime, limit_for) -> list[tuple[int, dict]]:
+    """End chats older than their block's max_minutes (limit_for(bot_id, block_id) -> minutes, 0 = none); both sides are told."""
+    out = []
+    for pair in db.scalars(select(AnonPair).where(AnonPair.active.is_(True))).all():
+        minutes = limit_for(pair.bot_id, pair.block_id)
+        started = pair.created_at if pair.created_at.tzinfo else pair.created_at.replace(tzinfo=timezone.utc)
+        if minutes and now - started >= timedelta(minutes=minutes):
+            pair.active, pair.log = False, []
+            for k in (pair.a_key, pair.b_key):
+                _set_partner_step(db, pair.bot_id, k, pair.block_id, "idle")
+                out.append((pair.bot_id, {"type": "notify_customer", "cust": k, "text": f"⏱ زمان این گفت‌وگو ({minutes} دقیقه) تمام شد.", "buttons": _buttons_after_end()}))
+    return out
 
 
 def expire_waiting(db: Session, now: datetime) -> list[dict]:

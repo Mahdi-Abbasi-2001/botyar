@@ -13,7 +13,7 @@ from . import billing
 from .auth import current_user
 from .config import settings
 from .db import get_db
-from .models import Bot, BotListing, BotVersion, ChatLink, Product, Publication, User, VersionTests
+from .models import Bot, BotListing, BotVersion, ChatLink, Product, Publication, StaffLink, User, VersionTests
 from .spec import BotSpec
 
 router = APIRouter()
@@ -47,6 +47,11 @@ SAMPLE_MSG = ("محصولات این ربات هنوز نمونه‌اند و ب
               "ابتدا فهرست واقعی محصولات را در بخش «محصولات» وارد کنید.")
 
 
+def _digest_on(db: Session, bot_id: int) -> bool:
+    from .outreach import digest_enabled  # outreach imports this module's neighbours; import late
+    return digest_enabled(db, bot_id)
+
+
 def check_samples(bot_id: int, allow: bool, db: Session):
     if sample_catalog(bot_id, db) and not allow:
         raise HTTPException(409, SAMPLE_MSG)
@@ -63,12 +68,56 @@ def _status(bot_id: int, db: Session) -> dict:
         "webhooks_enabled": bool(settings.public_base_url),
         "listed": not bale._hidden(db, bot_id),
         "sample_products": sample_catalog(bot_id, db),
+        "daily_summary": _digest_on(db, bot_id),
     }
     if pub:
         out |= {"mode": pub.mode, "version": pub.version, "code": pub.code, "admin_code": pub.admin_code,
                 "bot_username": pub.bot_username or (bale.shared_username() if pub.mode == "shared" else ""),
                 "admin_linked": bool(pub.admin_chat_id), "up_to_date": bool(latest and pub.version == latest.version)}
     return out
+
+
+def _staff_names(bot_id: int, db: Session) -> list[str]:
+    latest = _latest(bot_id, db)
+    if latest is None:
+        return []
+    names: list[str] = []
+    for b in BotSpec.model_validate(latest.spec).blocks:
+        for n in (b.schedule.staff if b.type == "booking" and b.schedule else []):
+            if n not in names:
+                names.append(n)
+    return names
+
+
+@router.get("/api/bots/{bot_id}/staff")
+def staff_links(bot_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Each staff member of the bot's appointment calendars, with the code they send («/staff CODE») to get their bookings."""
+    _own(bot_id, user, db)
+    out = []
+    for name in _staff_names(bot_id, db):
+        link = db.scalars(select(StaffLink).where(StaffLink.bot_id == bot_id, StaffLink.name == name)).first()
+        if link is None:
+            link = StaffLink(bot_id=bot_id, name=name, code="S" + bale.new_code(7), messenger="", chat_id="")
+            db.add(link)
+            db.commit()
+        out.append({"name": name, "code": link.code, "linked": bool(link.chat_id), "messenger": link.messenger})
+    return out
+
+
+class StaffResetIn(BaseModel):
+    name: str
+
+
+@router.post("/api/bots/{bot_id}/staff/reset")
+def staff_reset(bot_id: int, body: StaffResetIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Unlink a staff member's chat (e.g. they left) and give them a fresh code."""
+    _own(bot_id, user, db)
+    link = db.scalars(select(StaffLink).where(StaffLink.bot_id == bot_id, StaffLink.name == body.name)).first()
+    if link is None:
+        raise HTTPException(404, "همکار یافت نشد")
+    link.code, link.messenger, link.chat_id = "S" + bale.new_code(7), "", ""
+    db.commit()
+    return staff_links(bot_id, user, db)
 
 
 class PublishIn(BaseModel):

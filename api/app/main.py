@@ -250,6 +250,7 @@ def records(bot_id: int, sandbox: bool = False, user: User = Depends(current_use
     bot = own_bot(bot_id, user, db)
     q = select(Record).where(Record.bot_id == bot.id, Record.sandbox == sandbox).order_by(Record.id.desc()).limit(500)
     return [{"id": r.id, "collection": r.collection, "data": {k: v for k, v in r.data.items() if not k.startswith("_")},
+             "files": {k: {"name": f.get("name", "")} for k, f in (r.data.get("_files") or {}).items()},  # names only; the ids stay internal
              "created_at": r.created_at.isoformat()} for r in db.scalars(q)]
 
 
@@ -404,6 +405,10 @@ app.include_router(telegram_router)
 from .support import router as support_router  # noqa: E402
 
 app.include_router(support_router)
+
+from .timeoff import router as timeoff_router  # noqa: E402
+
+app.include_router(timeoff_router)
 
 # ---------- static frontend (Next.js export copied to api/static at build time) ----------
 import os  # noqa: E402

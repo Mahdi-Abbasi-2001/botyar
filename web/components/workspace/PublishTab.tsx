@@ -11,6 +11,7 @@ import { ShareLink } from "@/components/workspace/ShareLink";
 type Pub = {
   published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string; webhooks_enabled: boolean; listed: boolean;
   sample_products: boolean;  // the product table still holds only the demo products made at build time
+  daily_summary: boolean;    // the owner's 8:00 summary in their linked chat
   mode?: "shared" | "own"; version?: number; code?: string; admin_code?: string; bot_username?: string; admin_linked?: boolean; up_to_date?: boolean;
 };
 type Live = { id: number; collection: string; data: Record<string, any>; created_at: string };
@@ -54,6 +55,15 @@ export function PublishTab({ botId, onImport }: { botId: string; onImport: () =>
       setError(e.message, e);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function setDigest(enabled: boolean) {
+    try {
+      const r = await api<{ daily_summary: boolean }>(`/bots/${botId}/digest`, { method: "PUT", body: { enabled } });
+      setPub((p) => (p ? { ...p, daily_summary: r.daily_summary } : p));
+    } catch (e: any) {
+      setError(e.message, e);
     }
   }
 
@@ -150,13 +160,21 @@ export function PublishTab({ botId, onImport }: { botId: string; onImport: () =>
           <div className={card}>
             <h3 className="mb-1 font-bold">اعلان ثبت‌های تازه</h3>
             {pub.admin_linked ? (
-              <p className="text-sm text-mint">✓ فعال است؛ ثبت‌های تازه در بله برای شما ارسال می‌شوند.</p>
+              <>
+                <p className="text-sm text-mint">✓ فعال است؛ ثبت‌های تازه در بله برای شما ارسال می‌شوند.</p>
+                <label className="mt-2 flex min-h-11 items-center gap-2 text-sm">
+                  <input type="checkbox" checked={pub.daily_summary} onChange={(e) => setDigest(e.target.checked)} />
+                  <span>خلاصه‌ی روزانه، هر روز ساعت ۸ صبح<span className="block text-xs text-mute">نوبت‌های امروز به ترتیب ساعت، سفارش‌های باز، و پیام‌ها و سؤال‌های بی‌پاسخ؛ اگر چیزی نباشد، پیامی ارسال نمی‌شود.</span></span>
+                </label>
+              </>
             ) : (
               <p className="text-sm leading-7 text-mute">برای دریافت اعلان، همین پیام را از حساب خودتان به {pub.mode === "own" ? "ربات" : `@${handle}`} بفرستید:
                 <span dir="ltr" className="mr-2 inline-block rounded-lg bg-ink px-3 py-1 font-mono text-fg">/admin {pub.admin_code}</span>
                 <button onClick={load} className="mr-2 text-saffron underline">بررسی دوباره</button></p>
             )}
           </div>
+
+          <StaffCard botId={botId} handle={pub.mode === "own" ? "ربات" : `@${handle}`} />
 
           <PaymentCard botId={botId} mode={pub.mode} />
 
@@ -194,6 +212,40 @@ function SampleProductsNote({ allow, setAllow, onImport }: { allow: boolean; set
           فقط برای آزمایش، با همین محصولات نمونه منتشر شود
         </label>
       </div>
+    </div>
+  );
+}
+
+type Staff = { name: string; code: string; linked: boolean; messenger: string };
+
+/** Staff of the appointment calendars link their own chat («/staff CODE») to hear about their own bookings. */
+function StaffCard({ botId, handle }: { botId: string; handle: string }) {
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const load = useCallback(() => { api<Staff[]>(`/bots/${botId}/staff`).then(setStaff).catch(() => {}); }, [botId]);
+  useEffect(load, [load]);
+  if (!staff.length) return null;
+  async function reset(name: string) {
+    if (!confirm(`اتصال «${name}» قطع و کد تازه ساخته شود؟`)) return;
+    setStaff(await api<Staff[]>(`/bots/${botId}/staff/reset`, { body: { name } }));
+  }
+  return (
+    <div className={card}>
+      <h3 className="mb-1 font-bold">اعلان برای همکاران</h3>
+      <p className="mb-3 text-sm leading-7 text-mute">هر همکار با فرستادن کد خودش به {handle} (در بله یا تلگرام)، نوبت‌های تازه و لغوشده‌ی خودش را همان‌جا دریافت می‌کند. شما همچنان همه‌ی اعلان‌ها را دریافت می‌کنید.</p>
+      <div className="flex flex-col gap-2 text-sm">
+        {staff.map((s) => (
+          <div key={s.name} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-raised px-3 py-2">
+            <span className="font-bold">{s.name}</span>
+            {s.linked ? (
+              <span className="flex items-center gap-3 text-mint">✓ متصل در {s.messenger === "tg" ? "تلگرام" : "بله"}
+                <button onClick={() => reset(s.name)} className="text-xs text-mute underline hover:text-bad">قطع اتصال</button></span>
+            ) : (
+              <span dir="ltr" className="rounded-lg bg-ink px-3 py-1 font-mono text-fg">/staff {s.code}</span>
+            )}
+          </div>
+        ))}
+      </div>
+      <button onClick={load} className="mt-2 text-sm text-saffron underline">بررسی دوباره</button>
     </div>
   );
 }

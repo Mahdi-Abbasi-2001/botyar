@@ -38,7 +38,7 @@ def world():
             rec = Record(bot_id=bot, collection="order", data={"status": "new", "items": [], "total": 1}, sandbox=False)
             db.add(rec)
             db.commit()
-            ids = {"bot_id": bot, "run_id": run.id, "pid": db.query(Product).first().id, "pub_id": 1, "secret": "x", "record_id": rec.id}
+            ids = {"tid": 1, "bot_id": bot, "run_id": run.id, "pid": db.query(Product).first().id, "pub_id": 1, "secret": "x", "record_id": rec.id}
         yield c, a, b, ids
 
 
@@ -95,7 +95,8 @@ def test_owner_is_not_locked_out_of_her_own_routes(world):
             continue
         r = call(c, method, fill(path, ids), a)
         assert r.status_code not in (401, 403, 404) or r.json().get("detail") in (
-            "محصولی برای خروجی گرفتن نیست", "ثبتی برای خروجی گرفتن نیست", "محصول یافت نشد", "اجرا یافت نشد", "این ربات بخش فروشگاهی با فهرست محصولات ندارد"), f"{method} {path} -> {r.status_code} {r.text[:80]}"
+            "محصولی برای خروجی گرفتن نیست", "ثبتی برای خروجی گرفتن نیست", "محصول یافت نشد", "اجرا یافت نشد", "این ربات بخش فروشگاهی با فهرست محصولات ندارد", "این بازه‌ی بسته یافت نشد",
+            "فایل یافت نشد", "سؤال بی‌پاسخی با این شماره یافت نشد", "این محصول عکس ندارد"), f"{method} {path} -> {r.status_code} {r.text[:80]}"
 
 
 def test_webhook_urls_reject_wrong_secrets(world):

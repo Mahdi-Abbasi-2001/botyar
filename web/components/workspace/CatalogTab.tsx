@@ -1,17 +1,66 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, apiUpload } from "@/lib/api";
+import { api, apiBlob, apiUpload } from "@/lib/api";
 import { fa } from "@/components/ui";
 import { ExportButtons } from "@/components/workspace/ExportButtons";
 
 type Opt = { name: string; choices: string[] };
-type Prod = { id: number; name: string; category: string; price: number; stock: number | null; options: Opt[]; description: string; is_sample: boolean };
+type Prod = { id: number; name: string; category: string; price: number; stock: number | null; options: Opt[]; description: string; is_sample: boolean; photo: boolean };
 type Cat = { blocks: { id: string; title: string }[]; block: string | null; total: number; products: Prod[]; categories: string[]; sample: boolean };
-type Preview = { kind: "table" | "vision"; total: number; products: Omit<Prod, "id" | "is_sample">[]; warnings: string[]; notes: string[]; cost_usd: number };
+type Preview = { kind: "table" | "vision"; total: number; products: Omit<Prod, "id" | "is_sample" | "photo">[]; warnings: string[]; notes: string[]; cost_usd: number };
 
 const card = "rounded-2xl border border-line-2 bg-panel p-4";
 const btn = "min-h-11 rounded-xl bg-saffron px-5 font-bold text-ink disabled:opacity-50";
 const money = (n: number) => fa(n.toLocaleString("en-US"));
+/** Phone photos are several MB: shrink to 1024px JPEG in the browser before upload. */
+async function shrink(file: File): Promise<Blob> {
+  const img = await createImageBitmap(file);
+  const k = Math.min(1, 1024 / Math.max(img.width, img.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.width * k);
+  c.height = Math.round(img.height * k);
+  c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+  return new Promise((ok, no) => c.toBlob((b) => (b ? ok(b) : no(new Error("خواندن عکس ممکن نشد."))), "image/jpeg", 0.85));
+}
+
+function PhotoCell({ botId, p, onChange, onError }: { botId: string; p: Prod; onChange: () => void; onError: (m: string) => void }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const pick = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!p.photo) { setSrc(null); return; }
+    let url = "";
+    apiBlob(`/bots/${botId}/catalog/products/${p.id}/photo`).then((b) => { if (b) { url = URL.createObjectURL(b); setSrc(url); } }).catch(() => {});
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [botId, p.id, p.photo]);
+  async function upload(f: File | undefined) {
+    if (!f) return;
+    setBusy(true);
+    try {
+      const form = new FormData();
+      form.append("file", await shrink(f), "photo.jpg");
+      await apiUpload(`/bots/${botId}/catalog/products/${p.id}/photo`, form, "PUT");
+      onChange();
+    } catch (e: any) { onError(e.message); } finally { setBusy(false); }
+  }
+  async function drop() {
+    try { await api(`/bots/${botId}/catalog/products/${p.id}/photo`, { method: "DELETE" }); onChange(); } catch (e: any) { onError(e.message); }
+  }
+  return (
+    <div className="flex items-center gap-1">
+      <input ref={pick} type="file" accept="image/*" className="hidden" onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ""; }} />
+      {src ? (
+        <>
+          <button onClick={() => pick.current?.click()} title="تغییر عکس"><img src={src} alt="" className="size-10 rounded-lg object-cover" /></button>
+          <button onClick={drop} className="text-xs text-mute hover:text-bad" aria-label="حذف عکس">✕</button>
+        </>
+      ) : (
+        <button onClick={() => pick.current?.click()} disabled={busy} className="size-10 rounded-lg border border-dashed border-line-2 text-xs text-mute hover:border-saffron disabled:opacity-50">{busy ? "…" : "+ عکس"}</button>
+      )}
+    </div>
+  );
+}
+
 const optSummary = (o: Opt[]) => o.map((g) => `${g.name}: ${g.choices.slice(0, 5).join("، ")}${g.choices.length > 5 ? "…" : ""}`).join(" · ");
 
 export function CatalogTab({ botId }: { botId: string }) {
@@ -141,10 +190,11 @@ export function CatalogTab({ botId }: { botId: string }) {
         {cat.products.length === 0 ? <p className="text-sm text-mute">هنوز محصولی ثبت نشده است.</p> : (
           <div className="overflow-auto">
             <table className="w-full text-sm">
-              <thead className="text-mute"><tr><th className="p-2 text-right">نام</th><th className="p-2 text-right">دسته</th><th className="p-2 text-right">قیمت</th><th className="p-2 text-right">موجودی</th><th /></tr></thead>
+              <thead className="text-mute"><tr><th className="p-2 text-right">عکس</th><th className="p-2 text-right">نام</th><th className="p-2 text-right">دسته</th><th className="p-2 text-right">قیمت</th><th className="p-2 text-right">موجودی</th><th /></tr></thead>
               <tbody>
                 {cat.products.map((p) => (
                   <tr key={p.id} className="border-t border-line-2">
+                    <td className="p-2"><PhotoCell botId={botId} p={p} onChange={load} onError={setError} /></td>
                     <td className="p-2">{p.name}{p.is_sample && <span className="mr-2 rounded bg-saffron/20 px-1.5 text-xs text-saffron">نمونه</span>}</td>
                     <td className="p-2 text-mute">{p.category || "—"}</td>
                     <td className="p-2"><input type="number" defaultValue={p.price} min={0} onBlur={(e) => +e.target.value !== p.price && patch(p, { price: +e.target.value })} className="w-28 rounded-lg border border-line-2 bg-ink px-2 py-1" /></td>

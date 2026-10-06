@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 from . import anon, billing, communities, outbox, dates, engine, faq_index, gate, media, referral
 from .config import settings
 from .db import SessionLocal
-from .models import Bot, BotListing, BotVersion, ChatLink, BannedCustomer, ChatSession, CustomerSeen, PaymentConfig, Publication, Record
+from .models import Bot, BotListing, BotVersion, ChatLink, BannedCustomer, ChatSession, CustomerSeen, PaymentConfig, Publication, Record, StaffLink
 from .spec import BotSpec
 from .store import SqlStore
 
@@ -172,6 +172,8 @@ def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_
                 if f is None:
                     continue  # the owner has not uploaded the file yet: the text above still went out
                 if ch.name != "bale":  # the Telegram relay carries JSON only
+                    if str(a["block"]).startswith("product:"):
+                        continue  # a product photo: the product's text follows anyway
                     ch.call(token, "sendMessage", {"chat_id": chat_id, "text": "📎 ارسال فایل فعلاً فقط در بله پشتیبانی می‌شود."})
                     continue
                 name, mime, data = f
@@ -179,6 +181,8 @@ def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_
                 api_upload(token, method, {"chat_id": chat_id}, field, name, data, mime)
             elif a["type"] == "location":
                 ch.call(token, "sendLocation", {"chat_id": chat_id, "latitude": a["latitude"], "longitude": a["longitude"]})
+            elif a["type"] == "contact":  # a contact card: one tap to call or save
+                ch.call(token, "sendContact", {"chat_id": chat_id, "phone_number": a["phone"], "first_name": a["name"]})
             elif a["type"] == "invoice":
                 if not wallet:
                     raise BaleError("no wallet token")
@@ -196,7 +200,16 @@ def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_
                 elif others is not None:
                     others.append(a)
             elif a["type"] == "notify_admin" and admin_chat_id:
+                if a.get("photo") or a.get("document"):  # the customer's receipt / file, by its file id on this same bot
+                    method, field = ("sendPhoto", "photo") if a.get("photo") else ("sendDocument", "document")
+                    try:
+                        ch.call(token, method, {"chat_id": admin_chat_id, field: a[field], "caption": ("🔔 " + a["text"])[:1024]})
+                        continue
+                    except Exception as e:  # noqa: BLE001
+                        log.warning("customer file not forwarded: %s", e)
                 outbox.send(ch, token, "sendMessage", {"chat_id": admin_chat_id, "text": ("🔔 " + a["text"])[:4096]}, bot_id, db)
+            elif a["type"] == "notify_staff" and bot_id is not None and db is not None:
+                send_staff(db, bot_id, a["staff"], a["text"])
         except Exception as e:  # noqa: BLE001
             log.warning("send failed: %s", e)
             if a["type"] == "invoice":
@@ -259,9 +272,12 @@ def _paid(db: Session, token: str, msg: dict):
             return
         block = spec.block(rec.collection)
         actions = engine.mark_paid(spec, store, dates.now_tehran(), block, row, str(pay.get("provider_payment_charge_id") or pay.get("telegram_payment_charge_id") or ""))
+        invite = referral.confirm_pending(db, rec.bot_id, f"bale:{chat_id}", spec, next((b for b in spec.blocks if b.type == "referral"), None))
         db.commit()
     if actions:
         deliver(token, chat_id, actions + [engine.menu_actions(spec)], {}, pub.admin_chat_id, bot_id=rec.bot_id, db=db)
+    if invite:
+        send_customer_actions(db, rec.bot_id, invite)
 
 
 def shared_username_for(ch: Channel) -> str:
@@ -283,6 +299,9 @@ def send_customer_actions(db: Session, bot_id: int, actions: list[dict]) -> int:
     """Deliver notify_customer messages outside a live chat turn (owner dashboard, reminders, or a customer on the
     other messenger), each on the messenger its customer key names. Returns how many were sent."""
     sent = 0
+    for a in actions:  # e.g. the owner cancelled a booking from the dashboard: its staff member hears about it too
+        if a["type"] == "notify_staff":
+            sent += send_staff(db, bot_id, a["staff"], a["text"])
     for ch in CHANNELS.values():
         mine = f"{ch.name}:"
         wanted = [a for a in actions if a["type"] == "notify_customer" and str(a.get("cust", "")).startswith(mine)]
@@ -305,6 +324,36 @@ def send_customer_actions(db: Session, bot_id: int, actions: list[dict]) -> int:
             except Exception as e:  # noqa: BLE001 - e.g. the customer blocked the bot
                 log.warning("customer message failed: %s", e)
     return sent
+
+
+def send_staff(db: Session, bot_id: int, staff: str, text: str) -> int:
+    """A message to every chat a staff member linked with /staff (on whichever messenger they used)."""
+    sent = 0
+    for link in db.scalars(select(StaffLink).where(StaffLink.bot_id == bot_id, StaffLink.name == staff, StaffLink.chat_id != "")):
+        ch = CHANNELS.get(link.messenger)
+        pub = db.scalars(select(ch.pub_model).where(ch.pub_model.bot_id == bot_id)).first() if ch else None
+        if pub is None:
+            continue
+        try:
+            outbox.send(ch, pub_token(ch, pub), "sendMessage", {"chat_id": link.chat_id, "text": text[:4096]}, bot_id, db)
+            sent += 1
+        except Exception as e:  # noqa: BLE001
+            log.warning("staff message failed: %s", e)
+    return sent
+
+
+def send_owner(db: Session, bot_id: int, text: str) -> bool:
+    """A message to the bot's owner in the chat they linked with /admin (Bale first when both messengers are linked)."""
+    for ch in CHANNELS.values():
+        pub = db.scalars(select(ch.pub_model).where(ch.pub_model.bot_id == bot_id)).first()
+        if pub is None or not pub.admin_chat_id:
+            continue
+        try:
+            outbox.send(ch, pub_token(ch, pub), "sendMessage", {"chat_id": pub.admin_chat_id, "text": text[:4096]}, bot_id, db)
+            return True
+        except Exception as e:  # noqa: BLE001
+            log.warning("owner message failed: %s", e)
+    return False
 
 
 # ---------- shared bot directory ----------
@@ -387,6 +436,14 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
         if (msg.get("chat") or {}).get("type", "private") != "private":
             return
         chat, text, cq_id = msg["chat"]["id"], msg.get("text"), None
+        if not text and msg.get("location"):  # a shared map location (address questions)
+            loc = msg["location"]
+            text = f"loc:{loc.get('latitude')},{loc.get('longitude')}"
+        elif not text and msg.get("photo"):  # a photo (e.g. a card-to-card receipt): its largest size's file id
+            text = "photo:" + str((msg["photo"][-1] or {}).get("file_id", ""))
+        elif not text and msg.get("document"):  # a file (e.g. a résumé for a form question)
+            doc = msg["document"]
+            text = f"file:{doc.get('file_id', '')}|{doc.get('file_size') or ''}|{(doc.get('file_name') or 'file').replace(chr(10), ' ')}"
     else:
         return
     if chat is None:
@@ -403,6 +460,18 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
         return
     t = engine.norm(text)
     Pub, Link = ch.pub_model, ch.link_model
+
+    # a staff member links their chat to hear about their own bookings
+    if t.startswith("/staff"):
+        code = t[6:].strip().upper()
+        link = db.scalars(select(StaffLink).where(StaffLink.code == code)).first() if code else None
+        if link is None or (own_pub is not None and link.bot_id != own_pub.bot_id):
+            say(token, chat_id, "کد همکار نامعتبر است. کد را از مدیر خود بگیرید: /staff CODE", ch)
+        else:
+            link.messenger, link.chat_id = ch.name, chat_id
+            db.commit()
+            say(token, chat_id, f"✅ انجام شد. از این پس نوبت‌های «{link.name}» همین‌جا برای شما ارسال می‌شوند.", ch)
+        return
 
     # owner links their chat to receive notifications
     if t.startswith("/admin"):
@@ -522,7 +591,7 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
             return
         ref_block = next((b for b in spec.blocks if b.type == "referral"), None)
         if refrow is not None and was_new and refrow.bot_id == pub.bot_id:
-            owed = referral.convert(db, pub.bot_id, refrow, skey, ref_block.goal if ref_block else None)
+            owed = referral.convert(db, pub.bot_id, refrow, skey, ref_block)
             if owed:
                 others_ref = list(owed)
                 db.flush()
@@ -541,6 +610,7 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
         anon_others: list[dict] = []
         if any(a["type"].startswith("anon_") for a in actions):
             actions, anon_others = anon.run(db, bot, spec, state, skey, actions)
+        others_ref += referral.confirm_pending(db, pub.bot_id, skey, spec, ref_block)  # an invited friend's first order/booking
         others: list[dict] = []  # e.g. a waitlisted customer on the other messenger who just got the freed place
         for rid in deliver(token, chat_id, actions, state, pub.admin_chat_id, clicked_message_id, wallet, ch, others,
                            files=lambda block_id: media.get_file(db, pub.bot_id, block_id), bot_id=pub.bot_id, db=db):
@@ -558,5 +628,5 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
             send_customer_actions(db, pub.bot_id, anon_others)
         if others_ref:
             send_customer_actions(db, pub.bot_id, others_ref)
-            if ref_block is not None and pub.admin_chat_id and any("به هدف رسیدید" in a["text"] for a in others_ref):
+            if ref_block is not None and pub.admin_chat_id and any("🎁" in a["text"] for a in others_ref):
                 say(token, pub.admin_chat_id, "🏆 یکی از مشتریان به هدف دعوت رسید؛ جزئیات را در بخش «مشتریان» در بات‌یار ببینید.", ch)

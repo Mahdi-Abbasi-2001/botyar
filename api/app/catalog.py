@@ -19,7 +19,7 @@ from . import engine, llm
 from .auth import current_user
 from .config import settings
 from .db import get_db
-from .models import Bot, BotVersion, LlmCall, Product, User
+from .models import Bot, BotFile, BotVersion, LlmCall, Product, User
 from .spec import ProductIn, ProductOption
 
 log = logging.getLogger("botyar.catalog")
@@ -55,7 +55,7 @@ def _block(bot_id: int, block: str | None, db: Session) -> str:
 
 def _prod_out(p: Product) -> dict:
     return {"id": p.id, "name": p.name, "category": p.category, "price": p.price, "stock": p.stock, "options": p.options or [],
-            "description": p.description, "is_sample": p.is_sample}
+            "description": p.description, "is_sample": p.is_sample, "photo": bool(p.has_photo)}
 
 
 # ---------- parsing ----------
@@ -376,6 +376,7 @@ def commit(bot_id: int, body: CommitIn, user: User = Depends(current_user), db: 
         raise HTTPException(400, "فهرستی برای ذخیره وجود ندارد")
     existing = list(db.scalars(select(Product).where(Product.bot_id == bot_id, Product.block_id == b)))
     if body.mode == "replace" or all(p.is_sample for p in existing):  # demo rows never survive a real import
+        _drop_photos(db, bot_id, [p.id for p in existing])
         db.execute(delete(Product).where(Product.bot_id == bot_id, Product.block_id == b))
         start = 0
     else:
@@ -422,6 +423,76 @@ def delete_product(bot_id: int, pid: int, user: User = Depends(current_user), db
     p = db.get(Product, pid)
     if not p or p.bot_id != bot_id:
         raise HTTPException(404, "محصول یافت نشد")
+    _drop_photos(db, bot_id, [p.id])
     db.delete(p)
     db.commit()
     return {"ok": True}
+
+
+# ---------- product photos (sent to the customer when they open the product) ----------
+PHOTO_MAX = 1_500_000  # the panel shrinks photos before upload; this only stops oversized files
+
+
+def _photo_key(pid: int) -> str:
+    return f"product:{pid}"
+
+
+def _drop_photos(db: Session, bot_id: int, pids: list[int]):
+    if pids:
+        db.execute(delete(BotFile).where(BotFile.bot_id == bot_id, BotFile.block_id.in_([_photo_key(i) for i in pids])))
+
+
+def _product(bot_id: int, pid: int, db: Session) -> Product:
+    p = db.get(Product, pid)
+    if not p or p.bot_id != bot_id:
+        raise HTTPException(404, "محصول یافت نشد")
+    return p
+
+
+@router.put("/api/bots/{bot_id}/catalog/products/{pid}/photo")
+async def upload_photo(bot_id: int, pid: int, file: UploadFile = File(...), user: User = Depends(current_user), db: Session = Depends(get_db)):
+    from .media import IMAGE_MAGIC, MAX_TOTAL
+    _own(bot_id, user, db)
+    p = _product(bot_id, pid, db)
+    data = await file.read(PHOTO_MAX + 1)
+    if not data:
+        raise HTTPException(422, "فایل خالی است")
+    if len(data) > PHOTO_MAX:
+        raise HTTPException(413, "حجم عکس بیشتر از ۱٫۵ مگابایت است")
+    mime = next((m for sig, m in IMAGE_MAGIC if data.startswith(sig) and (m != "image/webp" or data[8:12] == b"WEBP")), None)
+    if mime is None:
+        raise HTTPException(422, "فقط عکس JPG، PNG یا WEBP پذیرفته می‌شود")
+    key = _photo_key(pid)
+    existing = db.scalars(select(BotFile).where(BotFile.bot_id == bot_id, BotFile.block_id == key)).first()
+    photos = db.scalar(select(func.coalesce(func.sum(BotFile.size), 0)).where(BotFile.bot_id == bot_id, BotFile.block_id.like("product:%"))) or 0
+    if photos - (existing.size if existing else 0) + len(data) > 4 * MAX_TOTAL:  # their own allowance, apart from message files
+        raise HTTPException(413, "فضای عکس‌های این ربات پر شده است؛ عکس چند محصول را حذف کنید")
+    ext = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}[mime]
+    if existing is None:
+        db.add(BotFile(bot_id=bot_id, block_id=key, kind="image", filename=f"product-{pid}.{ext}", mime=mime, size=len(data), data=data))
+    else:
+        existing.filename, existing.mime, existing.size, existing.data = f"product-{pid}.{ext}", mime, len(data), data
+    p.has_photo = True
+    db.commit()
+    return _prod_out(p)
+
+
+@router.get("/api/bots/{bot_id}/catalog/products/{pid}/photo")
+def get_photo(bot_id: int, pid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    from fastapi import Response
+    _own(bot_id, user, db)
+    _product(bot_id, pid, db)
+    f = db.scalars(select(BotFile).where(BotFile.bot_id == bot_id, BotFile.block_id == _photo_key(pid))).first()
+    if f is None:
+        raise HTTPException(404, "این محصول عکس ندارد")
+    return Response(f.data, media_type=f.mime, headers={"Cache-Control": "private, max-age=60"})
+
+
+@router.delete("/api/bots/{bot_id}/catalog/products/{pid}/photo")
+def delete_photo(bot_id: int, pid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    _own(bot_id, user, db)
+    p = _product(bot_id, pid, db)
+    _drop_photos(db, bot_id, [pid])
+    p.has_photo = False
+    db.commit()
+    return _prod_out(p)

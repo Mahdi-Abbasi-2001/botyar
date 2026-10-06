@@ -39,5 +39,20 @@ def users_email_to_username(engine: Engine) -> bool:
     return True
 
 
+def add_column(engine: Engine, table: str, column: str, ddl: str) -> bool:
+    """Add one column to an existing table (create_all never alters tables). No-op when the table is new or has it."""
+    insp = inspect(engine)
+    if table not in insp.get_table_names() or column in {c["name"] for c in insp.get_columns(table)}:
+        return False
+    with engine.begin() as conn:
+        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
+    log.warning("migrated: added %s.%s", table, column)
+    return True
+
+
 def run_all(engine: Engine) -> None:
     users_email_to_username(engine)
+    add_column(engine, "broadcasts", "segment_label", "VARCHAR(200) DEFAULT ''")  # targeted announcements
+    add_column(engine, "products", "has_photo", "BOOLEAN DEFAULT FALSE")           # product photos
+    add_column(engine, "anon_queue", "topic", "VARCHAR(40) DEFAULT ''")            # anonymous chat topic rooms
+    add_column(engine, "referral_joins", "confirmed", "BOOLEAN DEFAULT TRUE")       # invites that count only after a first order

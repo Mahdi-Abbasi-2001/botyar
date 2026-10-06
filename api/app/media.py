@@ -33,8 +33,29 @@ def _spec(bot_id: int, db: Session) -> BotSpec | None:
 
 
 def _slots(bot_id: int, db: Session) -> dict:
+    """Everything that needs an uploaded file: message blocks with a photo/file, and FAQ answers with a photo."""
+    from types import SimpleNamespace
+
+    from .engine import album_key, faq_media_key, quiz_media_key
+
     spec = _spec(bot_id, db)
-    return {b.id: b for b in (spec.blocks if spec else []) if b.type == "message" and b.media != "none"}
+    out = {b.id: b for b in (spec.blocks if spec else []) if b.type == "message" and b.media not in ("none", "album")}
+    for b in (spec.blocks if spec else []):
+        if b.type == "message" and b.media == "album":
+            for k in range(b.album_size):
+                key = album_key(b.id, k)
+                out[key] = SimpleNamespace(id=key, text=f"آلبوم «{b.text[:40]}» · عکس {k + 1} از {b.album_size}", media="image")
+        if b.type == "quiz":
+            for i, q in enumerate(b.questions):
+                if q.media == "image":
+                    key = quiz_media_key(b.id, i)
+                    out[key] = SimpleNamespace(id=key, text=f"سؤال {i + 1} آزمون: {q.question[:40]}", media="image")
+        if b.type == "faq":
+            for i, e in enumerate(b.entries):
+                if e.media == "image":
+                    key = faq_media_key(b.id, i)
+                    out[key] = SimpleNamespace(id=key, text=f"پاسخ «{e.question}»", media="image")
+    return out
 
 
 def get_file(db: Session, bot_id: int, block_id: str) -> tuple[str, str, bytes] | None:
@@ -84,7 +105,7 @@ async def upload_media(bot_id: int, block_id: str, file: UploadFile = File(...),
             raise HTTPException(422, "این فایل PDF معتبر نیست")
         mime = file.content_type or "application/octet-stream"
     existing = db.scalars(select(BotFile).where(BotFile.bot_id == bot_id, BotFile.block_id == block_id)).first()
-    total = db.scalar(select(func.coalesce(func.sum(BotFile.size), 0)).where(BotFile.bot_id == bot_id)) or 0
+    total = db.scalar(select(func.coalesce(func.sum(BotFile.size), 0)).where(BotFile.bot_id == bot_id, ~BotFile.block_id.like("product:%"))) or 0  # product photos have their own allowance
     if total - (existing.size if existing else 0) + len(data) > MAX_TOTAL:
         raise HTTPException(413, "مجموع فایل‌های این ربات از ۲۵ مگابایت بیشتر می‌شود")
     if existing is None:
