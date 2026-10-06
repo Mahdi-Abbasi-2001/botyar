@@ -84,7 +84,7 @@ def test_link_token_links_a_channel_once_deletes_the_message_and_reports_back(cw
     calls.clear()
     channel_post(-100, t["command"], mid=55)
     assert methods(calls, "deleteMessage") == [{"chat_id": "-100", "message_id": 55}]               # the code does not stay visible
-    assert any("وصل شد" in p["text"] for p in methods(calls, "sendMessage"))
+    assert any("متصل شد" in p["text"] for p in methods(calls, "sendMessage"))
     chats = c.get(f"/api/bots/{bid}/chats", headers=H).json()["chats"]
     assert [(x["messenger"], x["kind"], x["title"]) for x in chats] == [("bale", "channel", "کانال -100")]
     calls.clear()
@@ -128,7 +128,7 @@ def test_a_chat_cannot_be_hijacked_by_another_owner(cw):
     code = c.post(f"/api/bots/{b2id}/link-token", headers=other).json()["code"]
     calls.clear()
     channel_post(-100, f"/link {code}")
-    assert any("قبلاً به ربات دیگری وصل" in p["text"] for p in methods(calls, "sendMessage"))
+    assert any("قبلاً به ربات دیگری متصل" in p["text"] for p in methods(calls, "sendMessage"))
     assert c.get(f"/api/bots/{b2id}/chats", headers=other).json()["chats"] == []
     assert c.get(f"/api/bots/{bid}/chats", headers=other).status_code == 404
     assert c.post(f"/api/bots/{bid}/link-token", headers=other).status_code == 404

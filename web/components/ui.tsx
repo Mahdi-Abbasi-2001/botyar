@@ -88,7 +88,7 @@ export function PlanLimitNote({ text, className = "" }: { text: string; classNam
     <div role="alert" className={`flex flex-wrap items-center gap-3 rounded-xl border border-amber-line bg-saffron/10 px-3.5 py-3 text-sm leading-7 text-amber-fg ${className}`}>
       <Icon name="lock" className="shrink-0 text-saffron" />
       <span className="min-w-0 flex-[1_1_240px]">{text}</span>
-      <Link href="/account/" className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-saffron px-4 font-bold text-ink hover:bg-saffron-hi">دیدن و ارتقای پلن</Link>
+      <Link href="/account/" className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-saffron px-4 font-bold text-ink hover:bg-saffron-hi">مشاهده و ارتقای پلن</Link>
     </div>
   );
 }

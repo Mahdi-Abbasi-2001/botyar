@@ -260,7 +260,7 @@ def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matc
         STALE_RESETS["count"] += 1
         log.warning("stale chat state reset (%s: %s)", type(e).__name__, e)
         _reset(session)
-        return [menu_actions(spec, "ربات همین الان به‌روزرسانی شد، برای همین باید از اول شروع کنیم. از منوی زیر ادامه دهید:")]
+        return [menu_actions(spec, "ربات به‌تازگی به‌روزرسانی شده است؛ لطفاً از منوی زیر دوباره شروع کنید:")]
     _reset(session)
     return [menu_actions(spec)]
 
@@ -286,7 +286,7 @@ def _from_menu(spec, session, text_n, store, now, rng=_RNG):
     else:
         item = next((i for i in spec.menu if i.label == text_n), None)
     if item is None:
-        return [menu_actions(spec, "متوجه نشدم. لطفاً از منو انتخاب کنید:")]
+        return [menu_actions(spec, "متوجه نشدم. لطفاً یکی از گزینه‌های منو را انتخاب کنید:")]
     return _start_block(spec, session, spec.block(item.block), store, now, rng)
 
 
@@ -915,7 +915,7 @@ def _order(spec, session, block: CatalogOrderBlock, text, store, now):
         breakdown = f"\nمبلغ کالاها: {subtotal:,} تومان"
         if price["discount"]:
             breakdown += f"\nتخفیف ({code.code}): {price['discount']:,} تومان"
-        breakdown += f"\nهزینه ارسال: {price['delivery_fee']:,} تومان" if price["delivery_fee"] else "\nهزینه ارسال: رایگان"
+        breakdown += f"\nهزینه‌ی ارسال: {price['delivery_fee']:,} تومان" if price["delivery_fee"] else "\nهزینه‌ی ارسال: رایگان"
     if dropped:
         breakdown += "\n⚠️ ظرفیت کد تخفیف در همین فاصله تمام شد و اعمال نشد."
     if online:  # the owner is notified when the money arrives, not when the cart is filled
@@ -928,7 +928,7 @@ def _order(spec, session, block: CatalogOrderBlock, text, store, now):
         actions.append(menu_actions(spec))
         return actions
     if block.payment == "online" and not session.get("pay_ok"):
-        breakdown += "\nپرداخت آنلاین هنوز برای این ربات فعال نشده؛ مدیر درباره‌ی پرداخت با شما هماهنگ می‌کند."
+        breakdown += "\nپرداخت آنلاین هنوز برای این ربات فعال نشده است؛ مدیر درباره‌ی پرداخت با شما هماهنگ می‌کند."
     actions = [send(f"{_fill(block.confirm_text, row)}\n{lines}{breakdown}\nجمع کل: {total:,} تومان")]
     _notify(spec, block.id, f"سفارش #{row['id']} - جمع {total:,} تومان" + (f" (کد {code.code})" if code else "") + f"\n{lines}", actions)
     _reset(session)
@@ -997,7 +997,7 @@ def _faq(spec, session, block: FaqBlock, text, store, now, matcher):
     if text_n == "fa":
         return [_faq_prompt(block)]
     if text_n == "fh1":
-        return [send("خوشحالم که کمک کرد 🌟", [_btn("سؤال دیگر", "fa")] + _faq_nav())]
+        return [send("خوشحالیم که پاسخ به کارتان آمد 🌟", [_btn("سؤال دیگر", "fa")] + _faq_nav())]
     if text_n in ("fh0", "fn"):  # the answer did not help / none of the suggestions was right
         q = d.get("_last_q")
         if not q:
@@ -1062,23 +1062,23 @@ def _anon(spec, session, block: AnonChatBlock, text, now):
     if step == "idle":
         if text_n == "ac:find":
             session["step"] = "waiting"
-            return [send("در حال جستجوی شریک گفتگو… هر وقت پیدا شد خبرتان می‌کنیم.", [_btn("لغو جستجو", "ac:end")]), {"type": "anon_find", "block": block.id}]
+            return [send("در حال جستجوی شریک گفتگو… به محض پیدا شدن، به شما خبر می‌دهیم.", [_btn("لغو جستجو", "ac:end")]), {"type": "anon_find", "block": block.id}]
         return [send(block.intro_text, [_btn("🔍 پیدا کردن شریک گفتگو", "ac:find"), _btn("بازگشت به منو", "/menu")])]
     if step == "waiting":
         if text_n == "ac:end":
             session["step"] = "idle"
             return [{"type": "anon_end", "block": block.id}, send("جستجو لغو شد.", [_btn("🔍 جستجوی دوباره", "ac:find"), _btn("بازگشت به منو", "/menu")])]
-        return [send("هنوز کسی پیدا نشده؛ منتظر بمانید یا لغو کنید.", [_btn("لغو جستجو", "ac:end")])]
+        return [send("هنوز کسی پیدا نشده است؛ منتظر بمانید یا جست‌وجو را لغو کنید.", [_btn("لغو جستجو", "ac:end")])]
     # step == "chat"
     if text_n == "ac:end":
         session["step"] = "idle"
-        return [{"type": "anon_end", "block": block.id}, send("گفتگو پایان یافت.", [_btn("🔍 جستجوی شریک جدید", "ac:find"), _btn("بازگشت به منو", "/menu")])]
+        return [{"type": "anon_end", "block": block.id}, send("گفت‌وگو پایان یافت.", [_btn("🔍 جستجوی شریک جدید", "ac:find"), _btn("بازگشت به منو", "/menu")])]
     if text_n == "ac:next":
         session["step"] = "waiting"
         return [{"type": "anon_end", "block": block.id}, send("در حال جستجوی شریک جدید…", [_btn("لغو جستجو", "ac:end")]), {"type": "anon_find", "block": block.id}]
     if text_n == "ac:report":
         session["step"] = "idle"
-        return [{"type": "anon_report", "block": block.id}, send("گزارش شما برای مدیر ثبت شد و گفتگو پایان یافت. ممنون.", [_btn("🔍 جستجوی شریک جدید", "ac:find"), _btn("بازگشت به منو", "/menu")])]
+        return [{"type": "anon_report", "block": block.id}, send("گزارش شما برای مدیر ثبت شد و گفت‌وگو پایان یافت. از همراهی شما متشکریم.", [_btn("🔍 جستجوی شریک جدید", "ac:find"), _btn("بازگشت به منو", "/menu")])]
     return [{"type": "anon_relay", "block": block.id, "text": text.strip()[:500]}]
 
 
@@ -1149,7 +1149,7 @@ def _feedback(spec, session, block: FeedbackBlock, text, store, now):
         recent = sum(1 for r in store.find(block.id, _cust=cust) if datetime.fromisoformat(r["_at"]) > day_ago)
         if recent >= FEEDBACK_PER_DAY:
             _reset(session)
-            return [send("امتیازهای امروز شما ثبت شده است؛ ممنون!"), menu_actions(spec)]
+            return [send("امتیاز امروز شما قبلاً ثبت شده است؛ متشکریم!"), menu_actions(spec)]
     row = store.add(block.id, {"rating": d["rating"], "comment": comment, "status": "new", **_ident(session, now)})
     actions = [send(block.thanks_text)]
     _notify(spec, block.id, f"{'⭐' * d['rating']}" + (f"\n{comment}" if comment else ""), actions, prefix=f"⭐ نظر جدید · {block.title}")
@@ -1330,12 +1330,12 @@ def _my_start(spec, session, store, now):
     found.sort(key=lambda t: t[2]["id"], reverse=True)
     session.update(block=MY_BLOCK, step="list", data={})
     buttons = [_btn("لغو: " + _short(_describe(b, r), 50), f"x:{bi}:{r['id']}") for bi, b, r in found[:8]]
-    head = "ثبت‌های فعال شما — برای لغو، روی مورد دلخواه بزنید:" + ("".join("\n" + p for p in progress))
+    head = "ثبت‌های فعال شما؛ برای لغو یا تغییر، مورد دلخواه را انتخاب کنید:" + ("".join("\n" + p for p in progress))
     return [send(head, buttons + [_btn("بازگشت به منو", "/menu")])]
 
 
 def _my_choices(b):
-    return [_btn("بله، لغو کن", "xy")] + ([_btn("🔄 تغییر زمان", "xr")] if b is not None and b.type == "booking" else []) + [_btn("نه، نگه دار", "xn")]
+    return [_btn("بله، لغو شود", "xy")] + ([_btn("🔄 تغییر زمان", "xr")] if b is not None and b.type == "booking" else []) + [_btn("خیر، بماند", "xn")]
 
 
 def _mine(spec, session, text, store, now):
@@ -1371,10 +1371,10 @@ def _mine(spec, session, text, store, now):
         return out
     if text_n == "xn":
         _reset(session)
-        return [send("باشه، ثبت شما سر جایش ماند."), menu_actions(spec)]
+        return [send("ثبت شما بدون تغییر باقی ماند."), menu_actions(spec)]
     if text_n != "xy":
         owned = _owned(spec, session, store, d["bi"], d["rid"])
-        return [send("لطفاً یکی از دکمه‌ها را بزنید."), send("چه کار کنیم؟", _my_choices(owned[0] if owned else None))]
+        return [send("لطفاً یکی از دکمه‌ها را بزنید."), send("چه کاری انجام شود؟", _my_choices(owned[0] if owned else None))]
     owned = _owned(spec, session, store, d["bi"], d["rid"])
     if owned is None or not _active(owned[0], owned[1], now):
         _reset(session)

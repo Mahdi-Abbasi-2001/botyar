@@ -413,7 +413,7 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
         else:
             target.admin_chat_id = chat_id
             db.commit()
-            say(token, chat_id, "✅ انجام شد. از این به بعد ثبت‌های جدید همین‌جا برای شما ارسال می‌شود.", ch)
+            say(token, chat_id, "✅ انجام شد. از این پس، ثبت‌های تازه همین‌جا برای شما ارسال می‌شوند.", ch)
         return
 
     pub = own_pub
@@ -477,7 +477,7 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
             state["muted"] = t == "/stop"
             row.state = state
             db.commit()
-            say(token, chat_id, "اطلاعیه‌های این ربات دیگر برایتان نمی‌آید (یادآوری نوبت‌ها همچنان ارسال می‌شود). برای فعال‌سازی دوباره: /resume" if t == "/stop" else "اطلاعیه‌ها دوباره فعال شد ✅", ch)
+            say(token, chat_id, "دریافت اطلاعیه‌های این ربات برای شما متوقف شد؛ یادآوری نوبت‌ها همچنان ارسال می‌شود. برای فعال‌سازی دوباره: /resume" if t == "/stop" else "اطلاعیه‌ها دوباره فعال شدند ✅", ch)
             return
         if welcome_now:
             muted = state.get("muted")
@@ -494,7 +494,7 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
             verdict = gate.verify(ch, token, spec, state, chat_id)
             if state.get("gate_error") and pub.admin_chat_id and _gate_notice.get(pub.bot_id) != dates.now_tehran().date():
                 _gate_notice[pub.bot_id] = dates.now_tehran().date()
-                say(token, pub.admin_chat_id, "⚠️ بررسی عضویت در کانال انجام نشد (ربات را در کانال ادمین کنید و نام کانال را بررسی کنید)؛ فعلاً مشتری‌ها بدون بررسی وارد می‌شوند.", ch)
+                say(token, pub.admin_chat_id, "⚠️ بررسی عضویت در کانال انجام نشد؛ ربات را مدیر کانال کنید و نام کانال را بررسی کنید. تا آن زمان، مشتریان بدون بررسی عضویت وارد می‌شوند.", ch)
             if verdict == "blocked":
                 row.state = state
                 db.commit()
@@ -518,7 +518,7 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
             today = dates.now_tehran().date()
             if pub.admin_chat_id and _cap_notice.get(pub.bot_id) != today:
                 _cap_notice[pub.bot_id] = today
-                say(token, pub.admin_chat_id, "⚠️ ظرفیت ماهانه‌ی مشتری‌های پلن شما پر شده و مشتری جدید پذیرفته نمی‌شود. برای ظرفیت بیشتر از بخش «پلن‌ها» در بات‌یار ارتقا دهید.", ch)
+                say(token, pub.admin_chat_id, "⚠️ ظرفیت ماهانه‌ی مشتریان در پلن شما تکمیل شده است و مشتری تازه‌ای پذیرفته نمی‌شود. برای افزایش ظرفیت، پلن خود را از بخش «پلن و مصرف» در بات‌یار ارتقا دهید.", ch)
             return
         ref_block = next((b for b in spec.blocks if b.type == "referral"), None)
         if refrow is not None and was_new and refrow.bot_id == pub.bot_id:
@@ -559,4 +559,4 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
         if others_ref:
             send_customer_actions(db, pub.bot_id, others_ref)
             if ref_block is not None and pub.admin_chat_id and any("به هدف رسیدید" in a["text"] for a in others_ref):
-                say(token, pub.admin_chat_id, "🏆 یکی از مشتری‌ها به هدف دعوت رسید؛ جایزه‌اش را از بخش مشتریان/دعوت‌ها ببینید.", ch)
+                say(token, pub.admin_chat_id, "🏆 یکی از مشتریان به هدف دعوت رسید؛ جزئیات را در بخش «مشتریان» در بات‌یار ببینید.", ch)

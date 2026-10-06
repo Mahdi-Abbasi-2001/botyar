@@ -37,7 +37,7 @@ export function InboxTab({ botId }: { botId: string }) {
     try {
       const r = await api<{ delivered: number; wanted: number; sandbox: boolean }>(`/bots/${botId}/inbox/${t.collection}/${t.thread}/reply?sandbox=${sandbox}`, { body: { text } });
       setDrafts({ ...drafts, [key]: "" });
-      setNote(r.sandbox ? "پاسخ ذخیره شد (گفتگوی آزمایشی به مشتری واقعی نمی‌رسد)." : r.delivered < r.wanted ? "پاسخ ذخیره شد ولی به چت مشتری نرسید (شاید ربات را مسدود کرده)." : "پاسخ برای مشتری ارسال شد ✓");
+      setNote(r.sandbox ? "پاسخ ذخیره شد. این گفت‌وگو آزمایشی است و پاسخ به مشتری واقعی نمی‌رسد." : r.delivered < r.wanted ? "پاسخ ذخیره شد، اما به مشتری نرسید؛ ممکن است ربات را مسدود کرده باشد." : "پاسخ برای مشتری ارسال شد ✓");
       await load();
     } catch (e: any) {
       setError(e.message);
@@ -49,14 +49,14 @@ export function InboxTab({ botId }: { botId: string }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="m-0 text-base">پیام‌های مشتری‌ها</h3>
+        <h3 className="m-0 text-base">پیام‌های مشتریان</h3>
         <label className="flex items-center gap-2 text-sm text-mute">
-          <input type="checkbox" checked={sandbox} onChange={(e) => setSandbox(e.target.checked)} /> فقط آزمایشی
+          <input type="checkbox" checked={sandbox} onChange={(e) => setSandbox(e.target.checked)} /> فقط گفت‌وگوهای آزمایشی
         </label>
       </div>
       {error && <p role="alert" className="m-0 text-sm text-red-400">{error}</p>}
       {note && <p className="m-0 text-sm text-mint">{note}</p>}
-      {threads && threads.length === 0 && <p className={`${card} m-0 text-sm text-mute`}>هنوز پیامی نیامده است.</p>}
+      {threads && threads.length === 0 && <p className={`${card} m-0 text-sm text-mute`}>هنوز پیامی دریافت نشده است.</p>}
       {threads?.map((t) => {
         const key = `${t.collection}/${t.thread}`;
         return (

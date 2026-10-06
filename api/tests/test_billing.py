@@ -104,7 +104,7 @@ def test_ai_request_limit(world):
             db.add(BuilderRun(bot_id=bid, status="done", events=[], result={}))
         db.commit()
     r = c.post(f"/api/bots/{bid}/builder", json={"text": "یه ربات بساز"}, headers=H)
-    assert r.status_code == 402 and "ایجنت" in r.json()["detail"]
+    assert r.status_code == 402 and "درخواست‌های ساخت و تغییر" in r.json()["detail"]
 
 
 def test_only_one_live_bot_on_free(world):

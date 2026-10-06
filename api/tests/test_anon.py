@@ -96,7 +96,7 @@ def test_ending_next_and_leaving_by_menu_release_both_sides(world):
         tap(a, "m:0"); tap(a, "ac:find")
     sent.clear()
     tap(801, "ac:end")
-    assert any("گفتگو را پایان داد" in t for t in texts(sent, 802))
+    assert any("گفت‌وگو را پایان داد" in t for t in texts(sent, 802))
     sent.clear()
     msg(802, "هنوز اینجایی؟")                                                                      # no active chat any more
     assert texts(sent, 801) == [] and any("با یک نفر ناشناس" in t for t in texts(sent, 802))          # back at the start, nothing relayed
@@ -107,7 +107,7 @@ def test_ending_next_and_leaving_by_menu_release_both_sides(world):
         tap(a, "m:0"); tap(a, "ac:find")
     sent.clear()
     msg(801, "/menu")
-    assert any("گفتگو را پایان داد" in t for t in texts(sent, 802))
+    assert any("گفت‌وگو را پایان داد" in t for t in texts(sent, 802))
     # "next partner" re-queues the caller; a third customer gets paired with them
     tap(802, "m:0"); tap(802, "ac:find"); tap(801, "m:0"); tap(801, "ac:find")
     sent.clear()
@@ -150,11 +150,11 @@ def test_waiting_too_long_expires_and_a_ban_ends_a_running_chat(world):
         assert outreach.expire_anon_waiting(db, datetime.now(timezone.utc)) == 0
         assert outreach.expire_anon_waiting(db, datetime.now(timezone.utc) + timedelta(minutes=anon.WAIT_MINUTES + 1)) == 1
         assert db.query(AnonQueue).count() == 0
-    assert any("کسی برای گفتگو پیدا نشد" in t for t in texts(sent, 801))
+    assert any("کسی برای گفت‌وگو پیدا نشد" in t for t in texts(sent, 801))
     for a in (801, 802):
         tap(a, "m:0"); tap(a, "ac:find")
     with SessionLocal() as db:
         cid = db.query(CustomerSeen).filter(CustomerSeen.key == "bale:801").one().id
     sent.clear()
     assert c.post(f"/api/bots/{bid}/customers/{cid}/ban", headers=H).status_code == 200
-    assert any("گفتگو را پایان داد" in t for t in texts(sent, 802))
+    assert any("گفت‌وگو را پایان داد" in t for t in texts(sent, 802))

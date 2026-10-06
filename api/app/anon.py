@@ -69,7 +69,7 @@ def _end(db: Session, bot_id: int, key: str, block_id: str, notify: bool = True)
         pair.active, pair.log = False, []
         _set_partner_step(db, bot_id, other, block_id, "idle")
         if notify:
-            out.append({"type": "notify_customer", "cust": other, "text": "شریک گفتگو، گفتگو را پایان داد.", "buttons": _buttons_after_end()})
+            out.append({"type": "notify_customer", "cust": other, "text": "طرف مقابل گفت‌وگو را پایان داد.", "buttons": _buttons_after_end()})
     return out
 
 
@@ -94,7 +94,7 @@ def run(db: Session, bot, spec, state: dict, key: str, actions: list[dict]) -> t
                 db.delete(partner)
                 db.add(AnonPair(bot_id=bot.id, block_id=block_id, a_key=partner.key, b_key=key, log=[]))
                 _set_partner_step(db, bot.id, partner.key, block_id, "chat")
-                hello = "✅ شریک گفتگو پیدا شد! بنویسید؛ پیام‌ها ناشناس ارسال می‌شود (لینک و شماره تلفن ارسال نمی‌شود)."
+                hello = "✅ شریک گفتگو پیدا شد! پیام خود را بنویسید؛ پیام‌ها ناشناس ارسال می‌شوند (لینک و شماره تلفن ارسال نمی‌شود)."
                 mine.append(engine.send(hello, engine._anon_buttons()))
                 others.append({"type": "notify_customer", "cust": partner.key, "text": hello, "buttons": engine._anon_buttons()})
                 state["step"] = "chat"
@@ -110,14 +110,14 @@ def run(db: Session, bot, spec, state: dict, key: str, actions: list[dict]) -> t
                 lines = [{"from": "گزارش‌دهنده" if l["from"] == key else "طرف مقابل", "text": l["text"]} for l in (pair.log or [])]
                 SqlStore(db, bot.id, sandbox=False).add(block_id, {"status": "reported", "who": "گزارش گفتگوی ناشناس", "log": lines,
                                                                    "reported_id": seen.id if seen else None, "reported_name": (seen.name if seen else "") or "—"})
-                mine.append({"type": "notify_admin", "text": "🚨 یک گفتگوی ناشناس گزارش شد؛ جزئیات در بخش «ثبت‌ها» است."})
+                mine.append({"type": "notify_admin", "text": "🚨 یک گفت‌وگوی ناشناس گزارش شد؛ جزئیات را در بخش «ثبت‌ها» در بات‌یار ببینید."})
             others += _end(db, bot.id, key, block_id)
         elif kind == "anon_relay":
             pair = _active_pair(db, bot.id, key)
             text = a["text"]
             if pair is None:
                 state["step"] = "idle"
-                mine.append(engine.send("شما الان در گفتگو نیستید.", [{"text": "🔍 پیدا کردن شریک گفتگو", "data": "ac:find"}, {"text": "بازگشت به منو", "data": "/menu"}]))
+                mine.append(engine.send("در حال حاضر در گفت‌وگویی نیستید.", [{"text": "🔍 پیدا کردن شریک گفتگو", "data": "ac:find"}, {"text": "بازگشت به منو", "data": "/menu"}]))
             elif not text:
                 continue
             elif LINKISH.search(text):
@@ -128,7 +128,7 @@ def run(db: Session, bot, spec, state: dict, key: str, actions: list[dict]) -> t
                 while q and now - q[0] > 60:
                     q.popleft()
                 if len(q) >= RATE:
-                    mine.append(engine.send("خیلی سریع پیام می‌فرستید؛ کمی صبر کنید."))
+                    mine.append(engine.send("پیام‌ها را خیلی سریع می‌فرستید؛ لطفاً کمی صبر کنید."))
                     continue
                 q.append(now)
                 pair.log = ([*(pair.log or []), {"from": key, "text": text}])[-LOG_KEEP:]
@@ -144,6 +144,6 @@ def expire_waiting(db: Session, now: datetime) -> list[dict]:
         created = q.created_at if q.created_at.tzinfo else q.created_at.replace(tzinfo=timezone.utc)
         if created < cutoff:
             _set_partner_step(db, q.bot_id, q.key, q.block_id, "idle")
-            out.append((q.bot_id, {"type": "notify_customer", "cust": q.key, "text": "فعلاً کسی برای گفتگو پیدا نشد. بعداً دوباره امتحان کنید.", "buttons": _buttons_after_end()}))
+            out.append((q.bot_id, {"type": "notify_customer", "cust": q.key, "text": "فعلاً کسی برای گفت‌وگو پیدا نشد. لطفاً بعداً دوباره امتحان کنید.", "buttons": _buttons_after_end()}))
             db.delete(q)
     return out

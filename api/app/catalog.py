@@ -167,7 +167,7 @@ def map_columns(db: Session, bot_id: int, rows: list[list[str]]) -> ColumnMappin
     width = max(len(r) for r in rows)
     for name in ("name_col", "price_col"):
         if not 0 <= getattr(m, name) < width:
-            raise HTTPException(422, "ستون‌های فایل تشخیص داده نشد؛ مطمئن شوید ستون «نام» و «قیمت» دارد")
+            raise HTTPException(422, "ستون‌های فایل تشخیص داده نشدند؛ مطمئن شوید فایل ستون‌های «نام» و «قیمت» را دارد")
     return m
 
 
@@ -250,10 +250,10 @@ def checked_image(data: bytes) -> tuple[bytes, str]:
             fmt = (im.format or "").lower()
             im.verify()
     except Exception:  # noqa: BLE001
-        raise HTTPException(422, "تصویر خوانده نشد؛ عکس یا اسکرین‌شات واضح‌تری بدهید")
+        raise HTTPException(422, "تصویر خوانده نشد؛ عکس یا تصویر صفحه‌ی واضح‌تری بارگذاری کنید")
     mime = {"png": "image/png", "jpeg": "image/jpeg", "webp": "image/webp", "gif": "image/gif"}.get(fmt)
     if mime is None:
-        raise HTTPException(422, "فرمت تصویر پشتیبانی نمی‌شود؛ PNG یا JPG بدهید")
+        raise HTTPException(422, "این قالب تصویر پشتیبانی نمی‌شود؛ تصویر PNG یا JPG بارگذاری کنید")
     return data, mime
 
 
@@ -296,7 +296,7 @@ async def preview(bot_id: int, files: list[UploadFile] = File(default=[]), text:
     if (db.scalar(select(func.count()).select_from(LlmCall).where(LlmCall.step.in_(["catalog_map", "catalog_vision"]), LlmCall.created_at >= since)) or 0) >= settings.global_daily_imports:
         raise HTTPException(503, "ظرفیت امروز واردسازی تکمیل شده است؛ فردا دوباره تلاش کنید")
     if not files and not text.strip():
-        raise HTTPException(400, "یک فایل انتخاب کنید یا جدول را پیست کنید")
+        raise HTTPException(400, "یک فایل انتخاب کنید یا جدول را جای‌گذاری کنید")
     from_vision = bool(files) and any((f.content_type or "").startswith("image/") or (f.filename or "").lower().endswith((".pdf", ".png", ".jpg", ".jpeg", ".webp")) for f in files)
     before = float(db.scalar(select(func.coalesce(func.sum(LlmCall.cost_usd), 0.0)).where(LlmCall.bot_id == bot_id)))
     notes: list[str] = []
@@ -373,7 +373,7 @@ def commit(bot_id: int, body: CommitIn, user: User = Depends(current_user), db: 
     _own(bot_id, user, db)
     b = _block(bot_id, body.block, db)
     if not body.products:
-        raise HTTPException(400, "فهرستی برای ذخیره نیست")
+        raise HTTPException(400, "فهرستی برای ذخیره وجود ندارد")
     existing = list(db.scalars(select(Product).where(Product.bot_id == bot_id, Product.block_id == b)))
     if body.mode == "replace" or all(p.is_sample for p in existing):  # demo rows never survive a real import
         db.execute(delete(Product).where(Product.bot_id == bot_id, Product.block_id == b))

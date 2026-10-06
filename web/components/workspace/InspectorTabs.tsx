@@ -23,12 +23,12 @@ export function StructureTab({ spec, records, onEdit }: { spec: Spec; records: R
         </>
       ),
     },
-    ...(spec.gate ? [{ title: `عضویت اجباری در کانال · ${spec.gate.channel}`, body: <span className="text-sm leading-7 text-fg-2">مشتری تا عضو این کانال نشود به ربات دسترسی ندارد. ربات باید در کانال «ادمین» باشد؛ وضعیتش را در تب «کانال و گروه» ببینید.</span>, tone: "amber" as const }] : []),
+    ...(spec.gate ? [{ title: `عضویت اجباری در کانال · ${spec.gate.channel}`, body: <span className="text-sm leading-7 text-fg-2">مشتری تا عضو این کانال نشود به ربات دسترسی ندارد. ربات باید مدیر (ادمین) کانال باشد؛ وضعیت آن را در بخش «کانال و گروه» ببینید.</span>, tone: "amber" as const }] : []),
     ...spec.blocks.map((b) => ({ title: `${BLOCK_KIND[b.type]} · ${blockTitle(b)}`, body: <BlockBody b={b} spec={spec} records={records} />, tone: tone(b) })),
   ];
   return (
     <div className="flex flex-col">
-      <span className="pb-3.5 text-sm text-mute">ربات‌ت قدم‌به‌قدم، همان‌طور که مشتری می‌بیند</span>
+      <span className="pb-3.5 text-sm text-mute">ربات شما، قدم‌به‌قدم و همان‌طور که مشتری می‌بیند</span>
       {steps.map((s, i) => (
         <div key={i} className="flex gap-3.5">
           <div className="flex flex-col items-center">
@@ -38,7 +38,7 @@ export function StructureTab({ spec, records, onEdit }: { spec: Spec; records: R
           <div className={`mb-3.5 flex min-w-0 flex-1 flex-col gap-2.5 rounded-2xl border p-4 ${s.tone === "hot" ? "border-saffron bg-panel" : s.tone === "amber" ? "border-amber-line bg-amber-bg" : "border-line bg-panel"}`}>
             <div className="flex items-center justify-between gap-2">
               <span className="font-extrabold">{s.title}</span>
-              <button onClick={() => onEdit(i === 0 ? "پیام خوش‌آمد و منو" : blockTitle(spec.blocks[i - 1]))} className="min-h-11 shrink-0 px-1 text-[13px] text-saffron hover:text-saffron-hi">تغییرش بده</button>
+              <button onClick={() => onEdit(i === 0 ? "پیام خوش‌آمد و منو" : blockTitle(spec.blocks[i - 1]))} className="min-h-11 shrink-0 px-1 text-[13px] text-saffron hover:text-saffron-hi">تغییر</button>
             </div>
             {s.body}
           </div>
@@ -67,7 +67,7 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
   if (b.type === "message" && b.variants?.length)
     return (
       <>
-        <span className="text-xs text-mute">هر بار یکی از {fa(b.variants.length)} متن زیر به‌صورت تصادفی نشان داده می‌شود (هیچ‌وقت دو بار پشت‌سرهم تکراری نیست):</span>
+        <span className="text-xs text-mute">هر بار یکی از {fa(b.variants.length)} متن زیر به‌طور تصادفی نمایش داده می‌شود و یک متن دو بار پشت سر هم تکرار نمی‌شود:</span>
         <div className="flex flex-col gap-1.5 text-sm">
           {b.variants.map((v, i) => <span key={i} className="rounded-[10px] bg-raised px-3 py-2">{v}</span>)}
         </div>
@@ -77,19 +77,19 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
     return (
       <>
         <p className="m-0 whitespace-pre-line text-sm leading-7 text-fg-2">{b.text}</p>
-        {b.media && b.media !== "none" && <span className="text-xs text-mute">📎 {b.media === "image" ? "عکس" : "فایل"} ضمیمه می‌شود؛ از تب «فایل‌ها» بارگذاری کنید.</span>}
+        {b.media && b.media !== "none" && <span className="text-xs text-mute">📎 {b.media === "image" ? "عکس" : "فایل"} پیوست می‌شود؛ آن را از بخش «فایل‌ها» بارگذاری کنید.</span>}
         {b.location && <span className="text-xs text-mute">📍 موقعیت روی نقشه ({b.location.latitude}, {b.location.longitude})</span>}
       </>
     );
   if (b.type === "form") return <Fields fields={b.fields} />;
   if (b.type === "admin_notify") {
     const on = spec.blocks.find((x) => x.id === b.on);
-    return <span className="text-sm leading-7 text-amber-fg">بعد از هر ثبت در «{on ? blockTitle(on) : b.on}»: «{b.text}»</span>;
+    return <span className="text-sm leading-7 text-amber-fg">پس از هر ثبت در «{on ? blockTitle(on) : b.on}»: «{b.text}»</span>;
   }
   if (b.type === "referral")
-    return <span className="text-sm leading-7 text-fg-2">هر مشتری یک لینک اختصاصی می‌گیرد؛ هر مشتری جدیدی که با لینکش بیاید یک دعوت حساب می‌شود (هدف: {fa(b.goal)} دعوت). جایزه را خودتان تحویل می‌دهید؛ جدول برترین‌ها در تب «مشتریان» است.</span>;
+    return <span className="text-sm leading-7 text-fg-2">هر مشتری یک لینک اختصاصی می‌گیرد و هر کاربر تازه‌ای که با آن لینک وارد شود، یک دعوت حساب می‌شود (هدف: {fa(b.goal)} دعوت). جایزه را خودتان تحویل می‌دهید؛ جدول برترین‌ها در بخش «مشتریان» است.</span>;
   if (b.type === "anon_chat")
-    return <span className="text-sm leading-7 text-fg-2">دو مشتری هم‌زمان بدون دیدن هویت هم گفتگو می‌کنند (فقط متن؛ لینک و شماره تلفن ارسال نمی‌شود). تخلف گزارش می‌شود و در «ثبت‌ها» می‌بینید؛ مشتری متخلف را از «مشتریان» مسدود کنید. فقط در بله و تلگرام کار می‌کند.</span>;
+    return <span className="text-sm leading-7 text-fg-2">دو کاربر بدون دیدن هویت یکدیگر گفت‌وگو می‌کنند (فقط متن؛ لینک و شماره تلفن ارسال نمی‌شود). گزارش‌های تخلف در بخش «ثبت‌ها» نمایش داده می‌شوند و می‌توانید کاربر متخلف را از بخش «مشتریان» مسدود کنید. این امکان فقط در بله و تلگرام کار می‌کند.</span>;
   if (b.type === "menu")
     return (
       <div className="flex flex-col gap-1.5 text-sm">
@@ -117,7 +117,7 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
             </div>
           ))}
         </div>
-        <span className="text-xs text-mute">{rs.length ? `${fa(rs.length)} نفر شرکت کرده‌اند؛ میانگین نمره ${fa(Math.round(avg))}٪.` : "هنوز کسی شرکت نکرده است."}</span>
+        <span className="text-xs text-mute">{rs.length ? `${fa(rs.length)} نفر شرکت کرده‌اند و میانگین نمره ${fa(Math.round(avg))}٪ است.` : "هنوز کسی شرکت نکرده است."}</span>
       </>
     );
   }
@@ -126,13 +126,13 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
     const avg = rs.length ? rs.reduce((a, r) => a + (r.data.rating as number), 0) / rs.length : 0;
     return (
       <span className="text-sm leading-7 text-fg-2">
-        مشتری با ۱ تا ۵ ستاره امتیاز می‌دهد و در صورت تمایل نظر می‌نویسد.{" "}
-        {rs.length ? `میانگین تا الان: ${fa(avg.toFixed(1))} از ۵ (${fa(rs.length)} نظر).` : "هنوز نظری ثبت نشده است."}
+        مشتری از ۱ تا ۵ ستاره امتیاز می‌دهد و در صورت تمایل نظرش را می‌نویسد.{" "}
+        {rs.length ? `میانگین تا این لحظه: ${fa(avg.toFixed(1))} از ۵ (${fa(rs.length)} نظر).` : "هنوز نظری ثبت نشده است."}
       </span>
     );
   }
   if (b.type === "contact")
-    return <span className="text-sm leading-7 text-fg-2">مشتری پیامش را می‌نویسد و برای شما می‌آید؛ پاسخ را از بخش «پیام‌ها» می‌نویسید و در همان گفتگوی مشتری می‌رسد. ربات خودش جواب نمی‌دهد.</span>;
+    return <span className="text-sm leading-7 text-fg-2">پیام مشتری برای شما ارسال می‌شود. پاسخ را در بخش «پیام‌ها» می‌نویسید و در همان گفت‌وگوی مشتری به دستش می‌رسد. ربات خودش به این پیام‌ها پاسخ نمی‌دهد.</span>;
   if (b.type === "faq") {
     const open = records.filter((r) => r.collection === b.id && r.data.status === "unanswered").length;
     return (
@@ -145,7 +145,7 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
             </div>
           ))}
         </div>
-        <span className="text-xs text-mute">مشتری سؤالش را با کلمات خودش می‌نویسد و همین پاسخ‌های شما را می‌بیند؛ چیزی ساخته نمی‌شود. {open ? `${fa(open)} سؤال بدون پاسخ در انتظار شماست.` : "سؤال‌های بدون پاسخ برای شما ثبت می‌شود."}</span>
+        <span className="text-xs text-mute">مشتری سؤالش را با کلمات خودش می‌نویسد و یکی از همین پاسخ‌های شما را دریافت می‌کند؛ ربات پاسخی از خودش نمی‌سازد. {open ? `${fa(open)} سؤال بی‌پاسخ در انتظار شماست.` : "سؤال‌هایی که پاسخی برایشان نباشد، برای شما ثبت می‌شوند."}</span>
       </>
     );
   }
@@ -162,24 +162,24 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
         </div>
         {(b.payment === "online" || !!b.delivery_fee || !!b.discount_codes?.length) && (
           <div className="flex flex-col gap-1 text-sm text-fg-2">
-            {b.payment === "online" && <span>پرداخت آنلاین داخل بله (با کیف پول خود شما)</span>}
-            {!!b.delivery_fee && <span>هزینه ارسال: {toman(b.delivery_fee)}{b.free_delivery_over ? ` · رایگان از ${toman(b.free_delivery_over)}` : ""}</span>}
+            {b.payment === "online" && <span>پرداخت آنلاین داخل بله، مستقیم به کیف پول شما</span>}
+            {!!b.delivery_fee && <span>هزینه‌ی ارسال: {toman(b.delivery_fee)}{b.free_delivery_over ? ` · رایگان برای سفارش‌های بالای ${toman(b.free_delivery_over)}` : ""}</span>}
             {b.discount_codes?.map((c) => (
-              <span key={c.code}>کد <b dir="ltr">{c.code}</b>: {c.percent ? `${fa(c.percent)}٪` : toman(c.amount)} تخفیف{c.min_total ? ` · حداقل ${toman(c.min_total)}` : ""}{c.max_uses ? ` · ${fa(c.max_uses)} بار` : ""}</span>
+              <span key={c.code}>کد <b dir="ltr">{c.code}</b>: {c.percent ? `${fa(c.percent)}٪` : toman(c.amount)} تخفیف{c.min_total ? ` · برای سفارش‌های دست‌کم ${toman(c.min_total)}` : ""}{c.max_uses ? ` · ${fa(c.max_uses)} بار` : ""}</span>
             ))}
           </div>
         )}
-        <span className="text-xs text-mute">حداکثر {fa(b.max_items)} آیتم{b.min_total ? ` · حداقل سفارش ${toman(b.min_total)}` : ""}</span>
+        <span className="text-xs text-mute">حداکثر {fa(b.max_items)} قلم در هر سفارش{b.min_total ? ` · حداقل مبلغ سفارش ${toman(b.min_total)}` : ""}</span>
         <Fields fields={b.fields} />
       </>
     );
   const mine = records.filter((r) => r.collection === b.id);
   return (
     <>
-      <p className="mb-2 text-xs text-mute">{b.allow_cancel ? `مشتری می‌تواند لغو کند${b.cancel_deadline_hours ? ` · تا ${fa(b.cancel_deadline_hours)} ساعت پیش از شروع` : ""}` : "لغو توسط مشتری غیرفعال است"}{b.reminder_hours ? ` · یادآوری ${fa(b.reminder_hours)} ساعت قبل` : ""}</p>
+      <p className="mb-2 text-xs text-mute">{b.allow_cancel ? `مشتری می‌تواند نوبتش را لغو کند${b.cancel_deadline_hours ? ` · تا ${fa(b.cancel_deadline_hours)} ساعت پیش از شروع` : ""}` : "امکان لغو توسط مشتری غیرفعال است"}{b.reminder_hours ? ` · یادآوری ${fa(b.reminder_hours)} ساعت پیش از نوبت` : ""}</p>
       {b.schedule && (
         <div className="flex flex-col gap-1 rounded-xl bg-raised p-3 text-sm">
-          <span className="text-xs text-mint-fg">نوبت‌دهی با ساعت کاری · زمان‌ها خودکار ساخته می‌شوند</span>
+          <span className="text-xs text-mint-fg">نوبت‌دهی بر اساس ساعت کاری؛ وقت‌های خالی خودکار ساخته می‌شوند</span>
           {scheduleLines(b.schedule).map((l, i) => <span key={i} className={i === 0 ? "" : "text-mute"}>{l}</span>)}
         </div>
       )}
@@ -189,24 +189,24 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
           if (weekly) {  // a weekly slot is counted per date, so a lifetime "used" bar would be misleading
             return (
               <div key={s.id} className="flex flex-col gap-1.5 rounded-xl bg-raised p-3">
-                <div className="flex justify-between gap-2 text-sm"><span>{s.label}</span><span className="text-saffron">{fa(s.capacity)} جا</span></div>
+                <div className="flex justify-between gap-2 text-sm"><span>{s.label}</span><span className="text-saffron">ظرفیت {fa(s.capacity)} نفر</span></div>
                 <span className="text-xs text-mint-fg">{weekly}</span>
-                <span className="text-xs text-mute">ظرفیت هر جلسه {fa(s.capacity)} · برای هر تاریخ جداگانه شمرده می‌شود</span>
+                <span className="text-xs text-mute">ظرفیت هر جلسه {fa(s.capacity)} نفر، که برای هر تاریخ جداگانه حساب می‌شود</span>
               </div>
             );
           }
           const used = mine.filter((r) => r.data.slot === s.id && r.data.status === "confirmed").length;
           return (
             <div key={s.id} className="flex flex-col gap-1.5 rounded-xl bg-raised p-3">
-              <div className="flex justify-between gap-2 text-sm"><span>{s.label}</span><span className={used >= s.capacity ? "text-bad-soft" : "text-saffron"}>{used >= s.capacity ? "پر" : `${fa(s.capacity - used)} جا`}</span></div>
+              <div className="flex justify-between gap-2 text-sm"><span>{s.label}</span><span className={used >= s.capacity ? "text-bad-soft" : "text-saffron"}>{used >= s.capacity ? "تکمیل" : `${fa(s.capacity - used)} جای خالی`}</span></div>
               <CapacityBar used={used} capacity={s.capacity} />
-              <span className="text-xs text-mute">ظرفیت {fa(s.capacity)} · {fa(used)} رزرو در پیش‌نمایش</span>
+              <span className="text-xs text-mute">ظرفیت {fa(s.capacity)} نفر · {fa(used)} رزرو در پیش‌نمایش</span>
             </div>
           );
         })}
       </div>
       <div className={`flex items-center justify-between rounded-[10px] px-3 py-2 text-sm ${b.waitlist ? "bg-mint-bg" : "bg-raised"}`}>
-        <span className={b.waitlist ? "text-mint-fg" : "text-mute"}>لیست انتظار وقتی زمان پر است</span>
+        <span className={b.waitlist ? "text-mint-fg" : "text-mute"}>لیست انتظار برای زمان‌های تکمیل‌شده</span>
         <span className={`rounded-md px-2.5 font-extrabold ${b.waitlist ? "bg-mint text-ink" : "border border-line-3 text-mute"}`}>{b.waitlist ? "فعال" : "غیرفعال"}</span>
       </div>
       <Fields fields={b.fields} />
@@ -216,18 +216,18 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
 
 // ---------------- Tests ----------------
 export function TestsTab({ tests, spec, version }: { tests: TestRes[]; spec: Spec | null; version: number }) {
-  if (!tests.length) return <Empty>هنوز تستی اجرا نشده. ربات را با ایجنت بساز تا سناریوها نوشته و اجرا شوند.</Empty>;
+  if (!tests.length) return <Empty>هنوز تستی برای این نسخه اجرا نشده است. با اولین درخواست در «گفت‌وگوی ساخت»، سناریوهای تست نوشته و اجرا می‌شوند.</Empty>;
   const passed = tests.filter((t) => t.passed).length;
   const all = passed === tests.length;
   return (
     <div className="relative flex flex-col gap-7">
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div className="flex flex-[1_1_480px] flex-col gap-2.5">
-          <span className="text-[13px] text-mute">تست‌ها · نسخه {fa(version)}</span>
+          <span className="text-[13px] text-mute">تست‌ها · نسخه‌ی {fa(version)}</span>
           <h2 className="m-0 text-3xl font-black leading-snug sm:text-[44px]">
-            {fa(passed)} از {fa(tests.length)} سناریو <span className={all ? "text-mint" : "text-bad-soft"}>قبول شد</span>
+            {fa(passed)} از {fa(tests.length)} سناریو <span className={all ? "text-mint" : "text-bad-soft"}>موفق بود</span>
           </h2>
-          <p className="m-0 max-w-[620px] leading-8 text-fg-2">ایجنت هر سناریو را مثل یک مشتری واقعی روی ربات اجرا کرد. هر کارت، همان گفت‌وگویی است که اتفاق افتاد.</p>
+          <p className="m-0 max-w-[620px] leading-8 text-fg-2">بات‌یار هر سناریو را مثل یک مشتری واقعی با ربات اجرا کرده است. هر کارت، متن کامل همان گفت‌وگوست.</p>
         </div>
         <div className="w-[320px] max-w-full"><TestBar passed={passed} total={tests.length} h={40} /></div>
       </div>
@@ -247,7 +247,7 @@ function TestCard({ t, spec }: { t: TestRes; spec: Spec | null }) {
     <article className={`flex flex-col overflow-hidden rounded-[18px] border bg-panel ${t.passed ? "border-line" : "border-bad-line"}`}>
       <div className="flex items-center justify-between gap-3 border-b border-line px-[18px] py-4">
         <span className="font-extrabold leading-7">{t.name}</span>
-        <span className={`-rotate-[4deg] shrink-0 rounded-md border-2 px-2.5 text-[13px] font-black ${t.passed ? "border-mint text-mint" : "border-bad text-bad-soft"}`}>{t.passed ? "قبول" : "رد"}</span>
+        <span className={`-rotate-[4deg] shrink-0 rounded-md border-2 px-2.5 text-[13px] font-black ${t.passed ? "border-mint text-mint" : "border-bad text-bad-soft"}`}>{t.passed ? "قبول" : "ناموفق"}</span>
       </div>
       <ol className="m-0 flex list-none flex-col gap-2 px-[18px] py-3.5 text-[13px] leading-7">
         {shown.map(([who, text], i) => (
@@ -258,7 +258,7 @@ function TestCard({ t, spec }: { t: TestRes; spec: Spec | null }) {
         ))}
       </ol>
       {lines.length > 6 && (
-        <button onClick={() => setOpen(!open)} className="min-h-11 border-t border-line text-[13px] text-mute hover:text-fg">{open ? "کوتاه‌تر" : `دیدن کل گفت‌وگو (${fa(lines.length)} پیام)`}</button>
+        <button onClick={() => setOpen(!open)} className="min-h-11 border-t border-line text-[13px] text-mute hover:text-fg">{open ? "نمایش خلاصه" : `نمایش کامل گفت‌وگو (${fa(lines.length)} پیام)`}</button>
       )}
       {t.failures.length > 0 && (
         <div className="mt-auto flex flex-col gap-1.5 border-t border-dashed border-bad-line bg-bad-bg px-[18px] py-3 text-[13px] leading-7 text-bad-fg">
@@ -271,7 +271,7 @@ function TestCard({ t, spec }: { t: TestRes; spec: Spec | null }) {
 
 // ---------------- Versions ----------------
 export function VersionsTab({ versions, spec }: { versions: Ver[]; spec: Spec | null }) {
-  if (!versions.length) return <Empty>هنوز نسخه‌ای ساخته نشده.</Empty>;
+  if (!versions.length) return <Empty>هنوز نسخه‌ای ساخته نشده است.</Empty>;
   return (
     <div className="flex flex-col gap-5">
       {versions.map((v, idx) => {
@@ -281,7 +281,7 @@ export function VersionsTab({ versions, spec }: { versions: Ver[]; spec: Spec | 
           <article key={v.version} className={`flex flex-col gap-4 rounded-[20px] border bg-panel p-5 ${idx === 0 ? "border-mint-line" : "border-line"}`}>
             <div className="flex flex-wrap items-center gap-3">
               <span className={`flex h-6 w-6 items-center justify-center rounded-full ${idx === 0 ? "bg-mint shadow-[0_0_0_6px_rgba(79,209,181,.18)]" : "border-2 border-dim"}`} />
-              <span className="text-lg font-black">نسخه {fa(v.version)}</span>
+              <span className="text-lg font-black">نسخه‌ی {fa(v.version)}</span>
               {idx === 0 && <span className="rounded-full bg-mint-bg px-2.5 py-0.5 text-xs text-mint-fg">فعلی</span>}
               <span className="mr-auto text-[13px] text-mute">{ago(v.created_at)}</span>
             </div>
@@ -290,10 +290,10 @@ export function VersionsTab({ versions, spec }: { versions: Ver[]; spec: Spec | 
             {changes === null ? (
               <span className="text-sm text-mute">ساخت اولیه‌ی ربات</span>
             ) : changes.length === 0 ? (
-              <span className="text-sm text-mute">بدون تغییر در ساختار</span>
+              <span className="text-sm text-mute">بدون تغییر در ساختار ربات</span>
             ) : (
               <div className="flex flex-col gap-2">
-                <span className="text-[13px] text-mute">چه چیزی عوض شد</span>
+                <span className="text-[13px] text-mute">تغییرات این نسخه</span>
                 {changes.slice(0, 10).map((c, i) => (
                   <div key={i} className="flex flex-col gap-1.5 rounded-xl border border-line bg-ink-2 px-3.5 py-2.5 text-sm">
                     <span className="font-bold">{c.where ? `${c.where} · ` : ""}{c.field}</span>
@@ -322,7 +322,7 @@ export function VersionsTab({ versions, spec }: { versions: Ver[]; spec: Spec | 
             {v.tests_total > 0 && (
               <div className={`flex flex-col gap-2.5 rounded-2xl border p-4 ${ok ? "border-mint-line bg-mint-bg" : "border-bad-line bg-bad-bg"}`}>
                 <div className={`flex justify-between text-sm font-extrabold ${ok ? "text-mint-fg" : "text-bad-fg"}`}>
-                  <span>{changes === null ? "تست‌های این نسخه" : "همه‌ی تست‌ها دوباره اجرا شد"}</span>
+                  <span>{changes === null ? "تست‌های این نسخه" : "همه‌ی تست‌ها دوباره اجرا شدند"}</span>
                   <span>{fa(v.tests_passed)}/{fa(v.tests_total)}</span>
                 </div>
                 <TestBar passed={v.tests_passed} total={v.tests_total} h={8} />
@@ -356,12 +356,12 @@ export function RecordsTab({ records, spec, botId, onChanged }: { records: Rec[]
   const bookings = spec.blocks.filter((b): b is Extract<Block, { type: "booking" }> => b.type === "booking");
   const rows = records.filter((r) => filter === "all" || (filter === "waitlisted" ? r.data.status === "waitlisted" : r.collection === filter));
 
-  if (!records.length) return <Empty>هنوز ثبتی انجام نشده. در «امتحانش کن» یک نوبت یا سفارش ثبت کن تا اینجا بیاید.</Empty>;
+  if (!records.length) return <Empty>هنوز ثبتی انجام نشده است. در بخش «امتحان ربات» یک نوبت یا سفارش ثبت کنید تا اینجا نمایش داده شود.</Empty>;
 
   const detail = (r: Rec) => {
     const d = r.data;
     if (d.question) return `سؤال: ${d.question}${d.note ? ` (${d.note})` : ""}`;
-    if (d.status === "reported" && Array.isArray(d.log)) return `گزارش گفتگوی ناشناس: ${d.log.map((l: any) => `${l.from}: ${l.text}`).join(" ⏎ ")}`;
+    if (d.status === "reported" && Array.isArray(d.log)) return `گزارش گفت‌وگوی ناشناس: ${d.log.map((l: any) => `${l.from}: ${l.text}`).join(" ⏎ ")}`;
     if (typeof d.score === "number") return `${d.who ?? ""}: ${d.score} از ${d.total}`;
     if (typeof d.rating === "number") return `${"⭐".repeat(d.rating)}${d.comment ? ` · ${d.comment}` : ""}`;
     if (d.slot_label) return d.slot_label;
@@ -386,7 +386,7 @@ export function RecordsTab({ records, spec, botId, onChanged }: { records: Rec[]
               <span className="text-[13px] text-mute">{title}</span>
               <span className="text-[28px] font-black">{fa(used)} از {fa(s.capacity)}</span>
               <CapacityBar used={used} capacity={s.capacity} />
-              <span className={`text-[13px] ${wait ? "text-mint-fg" : "text-mute"}`}>{wait ? `+ ${fa(wait)} در لیست انتظار` : `${fa(Math.max(0, s.capacity - used))} جای خالی`}{gone ? ` · ${fa(gone)} لغو شده` : ""}</span>
+              <span className={`text-[13px] ${wait ? "text-mint-fg" : "text-mute"}`}>{wait ? `+ ${fa(wait)} نفر در لیست انتظار` : `${fa(Math.max(0, s.capacity - used))} جای خالی`}{gone ? ` · ${fa(gone)} لغو شده` : ""}</span>
             </div>
           );
           });
@@ -394,7 +394,7 @@ export function RecordsTab({ records, spec, botId, onChanged }: { records: Rec[]
         <div className="flex flex-col gap-2 rounded-2xl border border-line bg-panel p-[18px]">
           <span className="text-[13px] text-mute">همه‌ی ثبت‌ها در پیش‌نمایش</span>
           <span className="text-[28px] font-black">{fa(records.length)}</span>
-          <span className="text-[13px] text-mute">برای هر ثبت، یک اعلان به مدیر</span>
+          <span className="text-[13px] text-mute">برای هر ثبت، یک پیام به مدیر</span>
         </div>
       </div>
 
@@ -430,7 +430,7 @@ export function RecordsTab({ records, spec, botId, onChanged }: { records: Rec[]
           </tbody>
         </table>
       </div>
-      <span className="flex items-center gap-2 text-xs text-dim"><Icon name="shield" size={14} /> این‌ها ثبت‌های پیش‌نمایش هستند؛ «شروع دوباره» در شبیه‌ساز پاکشان می‌کند.</span>
+      <span className="flex items-center gap-2 text-xs text-dim"><Icon name="shield" size={14} /> این‌ها ثبت‌های پیش‌نمایش‌اند و با «شروع دوباره» در شبیه‌ساز پاک می‌شوند.</span>
     </div>
   );
 }

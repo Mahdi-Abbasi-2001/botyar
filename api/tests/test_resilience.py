@@ -297,7 +297,7 @@ def test_an_outage_while_publishing_is_never_reported_as_a_wrong_token(db_world,
 
     monkeypatch.setattr(bale, "api_call", down)
     r = c.post(f"/api/bots/{bid}/publish", json={"mode": "own", "token": "123:abc"}, headers=H)
-    assert r.status_code == 503 and "در دسترس نیست" in r.json()["detail"] and "توکن معتبر نیست" not in r.json()["detail"]
+    assert r.status_code == 503 and "اتصال به بله برقرار نشد" in r.json()["detail"] and "توکن معتبر نیست" not in r.json()["detail"]
 
     def bad_token(token, method, payload=None, timeout=15):
         raise resilience.BaleError("Unauthorized")

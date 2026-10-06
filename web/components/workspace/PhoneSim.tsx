@@ -48,10 +48,10 @@ export function PhoneSim({ botId, version, labels, onActivity, className = "" }:
           if (a.type === "send") return { from: "bot", text: a.text, buttons: a.buttons };
           if (a.type === "media") {
             const what = a.kind === "image" ? "عکس" : "فایل";
-            return { from: "bot", text: a.uploaded ? `📎 ${what}: ${a.filename}` : `📎 ${what} (هنوز در تب «فایل‌ها» بارگذاری نشده)` };
+            return { from: "bot", text: a.uploaded ? `📎 ${what}: ${a.filename}` : `📎 ${what} (هنوز در بخش «فایل‌ها» بارگذاری نشده است)` };
           }
           if (a.type === "location") return { from: "bot", text: `📍 موقعیت روی نقشه (${a.latitude}, ${a.longitude})` };
-          if (a.type === "notify_customer") return { from: "note", text: "📨 پیام به مشتریِ دیگر در بله: " + a.text };
+          if (a.type === "notify_customer") return { from: "note", text: "📨 پیام به مشتری دیگر در بله: " + a.text };
           return { from: "admin", text: a.text };
         });
         const first = r.actions[0];
@@ -96,7 +96,7 @@ export function PhoneSim({ botId, version, labels, onActivity, className = "" }:
   return (
     <section aria-label="پیش‌نمایش ربات" className={`flex h-[640px] w-[320px] max-w-full flex-col gap-2.5 rounded-[40px] border-8 border-line bg-panel px-3 py-4 ${className}`}>
       <div className="flex items-center justify-between border-b border-line px-1.5 pb-2.5 text-[13px]">
-        <span className="font-bold">امتحانش کن <span className="font-normal text-mint">· نسخه {version.toLocaleString("fa-IR")}</span></span>
+        <span className="font-bold">امتحان ربات <span className="font-normal text-mint">· نسخه‌ی {version.toLocaleString("fa-IR")}</span></span>
         <button onClick={restart} className="flex min-h-8 items-center gap-1 rounded-lg border border-line-2 px-2.5 text-xs text-mute hover:text-fg">
           <Icon name="refresh" size={13} /> شروع دوباره
         </button>
@@ -109,7 +109,7 @@ export function PhoneSim({ botId, version, labels, onActivity, className = "" }:
               : m.from === "admin" ? "rounded-xl border border-amber-line bg-amber-bg text-amber-fg"
               : m.from === "note" ? "rounded-xl border border-dashed border-line-3 text-xs text-dim"
               : "rounded-[14px_14px_14px_4px] bg-raised"}`}>
-              {m.from === "admin" && <div className="mb-0.5 flex items-center gap-1.5 text-xs font-bold"><Icon name="bell" size={14} /> اعلان به مدیر</div>}
+              {m.from === "admin" && <div className="mb-0.5 flex items-center gap-1.5 text-xs font-bold"><Icon name="bell" size={14} /> پیام به مدیر</div>}
               {m.from === "admin" ? prettyAdmin(m.text, labels) : m.from === "bot" ? fa(m.text) : m.text}
             </div>
             {m.buttons && m.buttons.length > 0 && (
@@ -133,7 +133,7 @@ export function PhoneSim({ botId, version, labels, onActivity, className = "" }:
       <form onSubmit={(e) => { e.preventDefault(); if (text.trim()) { send(text.trim()); setText(""); } }}
         className="flex items-center gap-2 rounded-full bg-ink py-1 pl-1 pr-3">
         <label htmlFor="sim-in" className="sr-only">پیام به ربات</label>
-        <input id="sim-in" value={text} onChange={(e) => setText(e.target.value)} placeholder="پیام…" className="min-w-0 flex-1 bg-transparent py-2 text-[13px] outline-none placeholder:text-dim" />
+        <input id="sim-in" value={text} onChange={(e) => setText(e.target.value)} placeholder="پیام خود را بنویسید…" className="min-w-0 flex-1 bg-transparent py-2 text-[13px] outline-none placeholder:text-dim" />
         <button disabled={busy} aria-label="ارسال" className="flex h-10 w-10 items-center justify-center rounded-full bg-saffron text-ink disabled:opacity-50">
           <Icon name="send" size={16} strokeWidth={2.4} />
         </button>

@@ -49,7 +49,7 @@ def act_on_record(bot_id: int, record_id: int, body: RecordAction, user: User = 
         promoted = None
         try:
             if body.action == "cancel" and block.type == "faq":
-                raise ValueError("سؤال را لغو نمی‌کنند؛ پاسخ را در ربات اضافه کنید یا «رسیدگی شد» بزنید.")
+                raise ValueError("سؤال‌ها لغو نمی‌شوند؛ پاسخ را به پرسش‌های متداول ربات اضافه کنید یا «رسیدگی شد» را بزنید.")
             if body.action == "cancel":
                 if status_now in ("cancelled", "done"):
                     raise ValueError("این ثبت قبلاً بسته یا لغو شده است.")
@@ -123,7 +123,7 @@ def inbox_reply(bot_id: int, collection: str, thread: str, body: InboxReply, san
     with bale._locks[bot_id]:
         t = _threads(db, bot_id, sandbox, only=f"{collection}:{thread}").get(f"{collection}:{thread}")
         if t is None:
-            raise HTTPException(404, "گفتگو یافت نشد")
+            raise HTTPException(404, "گفت‌وگو یافت نشد")
         store = SqlStore(db, bot_id, sandbox=sandbox)
         row = store.add(collection, {"text": text, "from": "owner", "thread": thread, "who": t["who"], "_cust": t["cust"], "_at": now_tehran().isoformat()})
         db.commit()

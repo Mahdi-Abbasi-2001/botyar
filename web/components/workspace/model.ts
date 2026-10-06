@@ -33,13 +33,13 @@ export type RunResult = { message: string; version?: number; tests?: TestRes[]; 
 export type RunStatus = "running" | "needs_input" | "done" | "failed" | "declined";
 
 export const BLOCK_KIND: Record<Block["type"], string> = {
-  message: "پیام", form: "فرم", booking: "نوبت‌دهی", catalog_order: "سفارش", admin_notify: "اعلان به مدیر", faq: "پرسش‌های متداول", contact: "پیام به مدیر", feedback: "نظرسنجی", menu: "زیرمنو", quiz: "آزمون", referral: "دعوت دوستان", anon_chat: "چت ناشناس",
+  message: "پیام", form: "فرم", booking: "نوبت‌دهی", catalog_order: "سفارش", admin_notify: "اطلاع به مدیر", faq: "پرسش‌های متداول", contact: "پیام به مدیر", feedback: "نظرسنجی", menu: "زیرمنو", quiz: "آزمون", referral: "دعوت دوستان", anon_chat: "چت ناشناس",
 };
-export const FIELD_KIND: Record<Field["kind"], string> = { text: "متن", phone: "موبایل · بررسی قالب", number: "عدد", choice: "انتخابی" };
+export const FIELD_KIND: Record<Field["kind"], string> = { text: "متن", phone: "شماره‌ی موبایل (با بررسی قالب)", number: "عدد", choice: "انتخابی" };
 
 export function blockTitle(b: Block): string {
   if (b.type === "message") return b.text.length > 36 ? b.text.slice(0, 36) + "…" : b.text;
-  if (b.type === "admin_notify") return b.text?.trim() || "اعلان به مدیر";
+  if (b.type === "admin_notify") return b.text?.trim() || "اطلاع به مدیر";
   return b.title;
 }
 
@@ -77,7 +77,7 @@ export function scheduleLines(sc: Schedule): string[] {
   }
   const lines = groups.map((g) => `${g.from === g.to ? WEEKDAYS[g.from] : `${WEEKDAYS[g.from]} تا ${WEEKDAYS[g.to]}`} · ${g.start} تا ${g.end}`);
   lines.push(`هر نوبت ${sc.duration_minutes} دقیقه · ظرفیت هر ساعت ${sc.capacity}${sc.break_start ? ` · استراحت ${sc.break_start} تا ${sc.break_end}` : ""} · رزرو تا ${sc.days_ahead} روز آینده`);
-  if (sc.staff.length) lines.push(`تقویم جدا برای: ${sc.staff.join("، ")}`);
+  if (sc.staff.length) lines.push(`تقویم جداگانه برای: ${sc.staff.join("، ")}`);
   return lines;
 }
 
@@ -127,7 +127,7 @@ export function toSteps(events: string[]): Step[] {
 }
 
 const PHASES: [RegExp, number][] = [
-  [/ذخیره شد/, 1], [/همه تست‌ها موفق/, 0.92], [/رفع خطا/, 0.78], [/ناموفق/, 0.7], [/اجرای .* تست/, 0.62],
+  [/ذخیره شد/, 1], [/همه(‌ی)? تست‌ها موفق/, 0.92], [/رفع خطا/, 0.78], [/ناموفق/, 0.7], [/اجرای .* تست/, 0.62],
   [/سناریوهای تست/, 0.48], [/ساختار/, 0.3], [/بررسی/, 0.1],
 ];
 export function progressOf(events: string[]): number {
@@ -147,7 +147,7 @@ const FIELD_NAME: Record<string, string> = {
   name: "نام ربات", welcome: "پیام خوش‌آمد", menu: "منو", waitlist: "لیست انتظار", capacity: "ظرفیت", allow_cancel: "لغو توسط مشتری", cancel_deadline_hours: "مهلت لغو (ساعت)", cancel_window_minutes: "مهلت لغو سفارش (دقیقه)", weekday: "روز هفته", time: "ساعت", occurrences: "تعداد تاریخ‌های پیشنهادی", label: "عنوان",
   text: "متن", title: "عنوان", confirm_text: "پیام تأیید", full_text: "پیام تکمیل ظرفیت", waitlist_text: "پیام لیست انتظار",
   done_text: "پیام پایان فرم", price: "قیمت", min_total: "حداقل مبلغ سفارش", max_items: "حداکثر تعداد آیتم", fields: "سؤال‌های فرم",
-  slots: "زمان‌ها", items: "آیتم‌ها", on: "زمان ارسال اعلان", kind: "نوع", required: "اجباری", choices: "گزینه‌ها", options: "گزینه‌ها",
+  slots: "زمان‌ها", items: "آیتم‌ها", on: "زمان ارسال پیام به مدیر", kind: "نوع", required: "اجباری", choices: "گزینه‌ها", options: "گزینه‌ها",
   block: "مقصد", blocks: "بخش‌ها", type: "نوع",
 };
 

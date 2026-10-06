@@ -83,16 +83,16 @@ export function CatalogTab({ botId }: { botId: string }) {
   }
 
   if (!cat) return <p className="text-mute">{error || "در حال بارگذاری…"}</p>;
-  if (!cat.block) return <p className={card + " text-mute"}>این ربات فهرست محصولات ندارد. از ایجنت بخواهید «فروشگاه با فهرست محصولات» بسازد.</p>;
+  if (!cat.block) return <p className={card + " text-mute"}>این ربات فهرست محصولات ندارد. اگر لازم دارید، در «گفت‌وگوی ساخت» بنویسید که یک فروشگاه با فهرست محصولات اضافه شود.</p>;
 
   return (
     <div className="flex flex-col gap-4">
       {error && <p className="rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-bad">{error}</p>}
-      {cat.sample && <p className="rounded-xl border border-saffron/50 bg-saffron/10 p-3 text-sm leading-7">این‌ها محصولات <b>نمونه</b> هستند تا ربات همین الان قابل امتحان باشد. فهرست واقعی فروشگاهتان را وارد کنید؛ نمونه‌ها جایگزین می‌شوند.</p>}
+      {cat.sample && <p className="rounded-xl border border-saffron/50 bg-saffron/10 p-3 text-sm leading-7">این‌ها محصولات <b>نمونه</b>‌اند تا بتوانید ربات را از همین حالا امتحان کنید. با وارد کردن فهرست واقعی فروشگاه، نمونه‌ها جایگزین می‌شوند.</p>}
 
       <div className={card}>
         <h3 className="mb-1 text-lg font-extrabold">وارد کردن محصولات</h3>
-        <p className="mb-3 text-sm leading-7 text-mute">فایل اکسل یا CSV، یک جدول کپی‌شده، یا عکس/PDF لیست قیمت را بدهید. ایجنت ستون‌ها را تشخیص می‌دهد و پیش از ذخیره نتیجه را نشانتان می‌دهد.</p>
+        <p className="mb-3 text-sm leading-7 text-mute">فایل اکسل یا CSV، یک جدول کپی‌شده، یا عکس یا PDF فهرست قیمت را بارگذاری کنید. بات‌یار ستون‌ها را تشخیص می‌دهد و پیش از ذخیره، نتیجه را به شما نشان می‌دهد.</p>
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <input ref={input} type="file" multiple accept=".csv,.xlsx,.xlsm,.png,.jpg,.jpeg,.webp,.pdf,image/*,application/pdf" className="hidden"
             onChange={(e) => { setFiles(Array.from(e.target.files ?? []).slice(0, 4)); setPv(null); }} />
@@ -100,15 +100,15 @@ export function CatalogTab({ botId }: { botId: string }) {
           {files.length > 0 && <span className="text-sm text-mute">{files.map((f) => f.name).join("، ")}</span>}
         </div>
         {!files.length && (
-          <textarea value={text} onChange={(e) => { setText(e.target.value); setPv(null); }} rows={4} placeholder="یا جدول را اینجا پیست کنید (ردیف اول عنوان ستون‌ها)…"
+          <textarea value={text} onChange={(e) => { setText(e.target.value); setPv(null); }} rows={4} placeholder="یا جدول را اینجا جای‌گذاری کنید (ردیف اول، عنوان ستون‌ها)…"
             className="mb-3 w-full rounded-xl border border-line-2 bg-ink p-3 text-sm outline-none focus:border-saffron" />
         )}
-        <button className={btn} disabled={busy || (!files.length && text.trim().length < 5)} onClick={check}>{busy && !pv ? "ایجنت در حال خواندن…" : "بررسی"}</button>
+        <button className={btn} disabled={busy || (!files.length && text.trim().length < 5)} onClick={check}>{busy && !pv ? "در حال خواندن…" : "بررسی"}</button>
       </div>
 
       {pv && (
         <div className={card + " border-saffron/60"}>
-          <h3 className="mb-2 font-extrabold">{fa(pv.total)} محصول پیدا شد {pv.kind === "vision" && <span className="text-sm font-normal text-mute">(از روی تصویر؛ لطفاً با دقت بررسی کنید)</span>}</h3>
+          <h3 className="mb-2 font-extrabold">{fa(pv.total)} محصول پیدا شد {pv.kind === "vision" && <span className="text-sm font-normal text-mute">(خوانده‌شده از تصویر؛ لطفاً با دقت بررسی کنید)</span>}</h3>
           {pv.notes.map((n, i) => <p key={i} className="mb-1 text-sm text-mute">ℹ️ {n}</p>)}
           {pv.warnings.map((n, i) => <p key={i} className="mb-1 text-sm text-saffron">⚠️ {n}</p>)}
           <div className="my-3 max-h-80 overflow-auto rounded-xl border border-line-2">
@@ -123,7 +123,7 @@ export function CatalogTab({ botId }: { botId: string }) {
           </div>
           {pv.total > 15 && <p className="mb-2 text-xs text-mute">… و {fa(pv.total - 15)} محصول دیگر</p>}
           <div className="mb-3 flex flex-wrap gap-4 text-sm">
-            <label className="flex items-center gap-2"><input type="radio" checked={mode === "replace"} onChange={() => setMode("replace")} />جایگزین فهرست فعلی</label>
+            <label className="flex items-center gap-2"><input type="radio" checked={mode === "replace"} onChange={() => setMode("replace")} />جایگزینی فهرست فعلی</label>
             <label className="flex items-center gap-2"><input type="radio" checked={mode === "append"} onChange={() => setMode("append")} />افزودن به فهرست فعلی</label>
           </div>
           <div className="flex gap-3">
@@ -135,7 +135,7 @@ export function CatalogTab({ botId }: { botId: string }) {
 
       <div className={card}>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-bold">محصولات ({fa(cat.total)}){cat.total > cat.products.length && <span className="text-sm font-normal text-mute"> — {fa(cat.products.length)} مورد اول در این جدول</span>}</h3>
+          <h3 className="font-bold">محصولات ({fa(cat.total)}){cat.total > cat.products.length && <span className="text-sm font-normal text-mute"> · {fa(cat.products.length)} مورد اول در این جدول</span>}</h3>
           {cat.total > 0 && <ExportButtons path={`/bots/${botId}/export/products`} name="products" onError={setError} />}
         </div>
         {cat.products.length === 0 ? <p className="text-sm text-mute">هنوز محصولی ثبت نشده است.</p> : (

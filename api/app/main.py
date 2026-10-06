@@ -79,7 +79,7 @@ def health():
 
 # ---------- auth ----------
 USERNAME_RE = re.compile(r"[a-z][a-z0-9_.]{2,31}")
-USERNAME_RULE = "نام کاربری باید ۳ تا ۳۲ حرف باشد: حروف کوچک انگلیسی، عدد، _ یا نقطه، و با یک حرف انگلیسی شروع شود."
+USERNAME_RULE = "نام کاربری باید ۳ تا ۳۲ حرف باشد، فقط شامل حروف انگلیسی، عدد، خط زیر (_) یا نقطه، و با یک حرف انگلیسی شروع شود."
 
 
 class Credentials(BaseModel):
@@ -105,13 +105,13 @@ def register(body: Credentials, request: Request, db: Session = Depends(get_db))
     ip, now_ = client_ip(request), time.time()
     hits = [t for t in _reg_hits.get(ip, []) if now_ - t < 3600]
     if len(hits) >= settings.register_per_ip_hour:
-        raise HTTPException(429, "تعداد ثبت‌نام از این شبکه زیاد بوده؛ کمی بعد دوباره تلاش کنید")
+        raise HTTPException(429, "تعداد ثبت‌نام‌ها از این شبکه زیاد بوده است؛ کمی بعد دوباره تلاش کنید")
     _reg_hits[ip] = hits + [now_]
     login_id = body.login_id()
     if not USERNAME_RE.fullmatch(login_id):
         raise HTTPException(422, USERNAME_RULE)
     if db.scalar(select(User).where(User.username == login_id)):
-        raise HTTPException(409, "این نام کاربری قبلاً گرفته شده است")
+        raise HTTPException(409, "این نام کاربری قبلاً انتخاب شده است")
     user = User(username=login_id, password_hash=hash_password(body.password))
     db.add(user)
     db.commit()
@@ -283,14 +283,14 @@ def builder_send(bot_id: int, body: BuilderIn, tasks: BackgroundTasks, user: Use
     _fail_interrupted_runs(RUN_TIMEOUT_MIN)
     running = db.scalar(select(BuilderRun).where(BuilderRun.bot_id == bot.id, BuilderRun.status == "running"))
     if running:
-        raise HTTPException(409, "ایجنت هنوز در حال کار روی درخواست قبلی است")
+        raise HTTPException(409, "بات‌یار هنوز در حال انجام درخواست قبلی است؛ لطفاً تا پایان آن صبر کنید")
     billing.check_ai_request(db, user)
     since = datetime.now(timezone.utc) - timedelta(hours=24)
     used = db.scalar(select(func.count()).select_from(BuilderRun).join(Bot, Bot.id == BuilderRun.bot_id).where(Bot.user_id == user.id, BuilderRun.created_at >= since))
     if used >= DAILY_RUN_LIMIT:
         raise HTTPException(429, "سقف درخواست‌های روزانه پر شده است؛ فردا دوباره تلاش کنید")
     if db.scalar(select(func.count()).select_from(BuilderRun).where(BuilderRun.created_at >= since)) >= settings.global_daily_runs:
-        raise HTTPException(503, "ظرفیت امروز ایجنت تکمیل شده است؛ فردا دوباره تلاش کنید")
+        raise HTTPException(503, "ظرفیت امروز ساخت ربات تکمیل شده است؛ لطفاً فردا دوباره تلاش کنید")
     run = BuilderRun(bot_id=bot.id, status="running", events=[], result={})
     db.add(run)
     db.commit()

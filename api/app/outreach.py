@@ -193,10 +193,10 @@ def launch_broadcast(db: Session, bot_id: int, text: str) -> Broadcast:
     last = db.scalars(select(Broadcast).where(Broadcast.bot_id == bot_id).order_by(Broadcast.id.desc()).limit(BROADCASTS_PER_DAY)).all()
     recent = sum(1 for b in last if (b.created_at if b.created_at.tzinfo else b.created_at.replace(tzinfo=timezone.utc)) > day_ago)
     if recent >= BROADCASTS_PER_DAY:
-        raise ValueError(f"در هر شبانه‌روز حداکثر {BROADCASTS_PER_DAY} اطلاعیه (دستی و زمان‌بندی‌شده روی هم) فرستاده می‌شود تا مشتری‌ها ناراحت نشوند.")
+        raise ValueError(f"در هر شبانه‌روز حداکثر {BROADCASTS_PER_DAY} اطلاعیه (دستی و زمان‌بندی‌شده با هم) ارسال می‌شود تا مشتریان آزرده نشوند.")
     custs = audience(db, bot_id)
     if not custs:
-        raise ValueError("هنوز مشتری‌ای با ربات شما گفتگو نکرده است.")
+        raise ValueError("هنوز هیچ مشتری‌ای با ربات شما گفت‌وگو نکرده است.")
     row = Broadcast(bot_id=bot_id, text=text, audience=len(custs))
     db.add(row)
     db.commit()

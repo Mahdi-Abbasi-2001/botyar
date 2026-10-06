@@ -28,11 +28,11 @@ export function DeliveryBanner({ botId }: { botId: string }) {
     <div role="status" className="flex flex-col gap-1 rounded-2xl border border-amber-line bg-saffron/10 p-3 text-sm leading-7 text-amber-fg">
       {bad.map((m) => (
         <span key={m.messenger}>
-          ⚠ {NAME[m.messenger] ?? m.messenger} {m.status === "down" ? "الان در دسترس نیست" : "ناپایدار است"}؛ پیام‌ها در صف می‌مانند و پس از وصل شدن خودکار ارسال می‌شوند. اگر مشتری پیامی نگرفت، خطای شما نیست.
+          ⚠ {NAME[m.messenger] ?? m.messenger} {m.status === "down" ? "در حال حاضر در دسترس نیست" : "ناپایدار است"}؛ پیام‌ها در صف می‌مانند و پس از برقراری ارتباط، خودکار ارسال می‌شوند. اگر پیامی به مشتری نرسید، مشکل از ربات شما نیست.
         </span>
       ))}
       {pending > 0 && <span>{fa(pending)} پیام در صف ارسال مجدد است.</span>}
-      {failed_24h > 0 && <span>{fa(failed_24h)} پیام در ۲۴ ساعت گذشته بعد از چند بار تلاش ارسال نشد (مثلاً مشتری ربات را مسدود کرده یا پیام‌رسان زیاد قطع بوده).</span>}
+      {failed_24h > 0 && <span>{fa(failed_24h)} پیام در ۲۴ ساعت گذشته پس از چند بار تلاش ارسال نشد؛ برای مثال چون مشتری ربات را مسدود کرده یا پیام‌رسان مدت زیادی قطع بوده است.</span>}
     </div>
   );
 }

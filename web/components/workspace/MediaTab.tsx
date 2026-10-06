@@ -58,10 +58,10 @@ export function MediaTab({ botId }: { botId: string }) {
   return (
     <div className="flex flex-col gap-3">
       <h3 className="m-0 text-base">عکس و فایل‌های ربات</h3>
-      <p className="m-0 text-sm leading-7 text-mute">برای هر پیامی که ایجنت «ارسال عکس/فایل» برایش گذاشته، فایل واقعی را اینجا بارگذاری کنید (عکس JPG/PNG/WEBP یا PDF، Word، Excel، PowerPoint، متن، CSV، ZIP؛ تا ۵ مگابایت). فعلاً فقط در بله ارسال می‌شود.</p>
+      <p className="m-0 text-sm leading-7 text-mute">برای هر پیامی که در ربات «ارسال عکس یا فایل» دارد، فایل اصلی را اینجا بارگذاری کنید: عکس JPG، PNG یا WEBP، یا فایل PDF، Word، Excel، PowerPoint، متنی، CSV و ZIP، حداکثر ۵ مگابایت. فعلاً فایل‌ها فقط در بله ارسال می‌شوند.</p>
       {error && <p role="alert" className="m-0 text-sm text-red-400">{error}</p>}
       <input ref={input} type="file" className="hidden" onChange={onPick} accept={target.current?.kind === "image" ? "image/jpeg,image/png,image/webp" : undefined} />
-      {slots && slots.length === 0 && <p className={`${card} m-0 text-sm text-mute`}>هنوز هیچ پیامی فایل نمی‌خواهد. به ایجنت بگویید: «در بخش کاتالوگ، فایل PDF کاتالوگ را بفرست».</p>}
+      {slots && slots.length === 0 && <p className={`${card} m-0 text-sm text-mute`}>هنوز هیچ پیامی در ربات به فایل نیاز ندارد. اگر می‌خواهید، در «گفت‌وگوی ساخت» بنویسید: «در بخش کاتالوگ، فایل PDF کاتالوگ هم ارسال شود».</p>}
       {slots?.map((s) => (
         <section key={s.block} className={`${card} flex flex-wrap items-center justify-between gap-3`}>
           <div className="flex flex-col gap-1">
@@ -69,7 +69,7 @@ export function MediaTab({ botId }: { botId: string }) {
             <span className="text-xs text-mute">{s.kind === "image" ? "یک عکس" : "یک فایل"} · {s.uploaded ? `${s.filename} (${kb(s.size)})` : "هنوز بارگذاری نشده"}</span>
           </div>
           <div className="flex gap-2">
-            <button disabled={busy === s.block} onClick={() => { target.current = s; input.current?.click(); }} className="min-h-11 rounded-xl bg-saffron px-4 font-bold text-ink disabled:opacity-50">{s.uploaded ? "جایگزین کن" : "بارگذاری"}</button>
+            <button disabled={busy === s.block} onClick={() => { target.current = s; input.current?.click(); }} className="min-h-11 rounded-xl bg-saffron px-4 font-bold text-ink disabled:opacity-50">{s.uploaded ? "جایگزینی" : "بارگذاری"}</button>
             {s.uploaded && <button disabled={busy === s.block} onClick={() => remove(s)} className="min-h-11 rounded-xl border border-line-2 px-4 disabled:opacity-50">حذف</button>}
           </div>
         </section>

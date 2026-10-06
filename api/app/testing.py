@@ -98,7 +98,7 @@ def run_scenario(spec: BotSpec, sc: TestScenario, catalog: list[dict] | None = N
             n = sum(all(str(r.get(kv.key)) == kv.value for kv in rc.where) for r in store.rows.get(rc.collection, []))
             if n != rc.count:
                 where = ", ".join(f"{kv.key}={kv.value}" for kv in rc.where)
-                failures.append(f"ثبت‌ها: در «{rc.collection}» با شرط ({where}) تعداد {rc.count} انتظار می‌رفت ولی {n} بود")
+                failures.append(f"ثبت‌ها: در «{rc.collection}» با شرط ({where}) تعداد {rc.count} انتظار می‌رفت، اما {n} بود")
     except Exception as e:  # engine crash is a failed test, not a server error
         failures.append(f"خطای اجرا: {type(e).__name__}: {e}")
     return {"name": sc.name, "passed": not failures, "failures": failures, "transcript": transcript}

@@ -42,7 +42,7 @@ export function ShareLink({ url, fileName, hint }: { url: string; fileName: stri
         <a href={url} target="_blank" rel="noreferrer" dir="ltr" className="break-all text-left font-bold text-saffron underline">{url.replace(/^https:\/\//, "")}</a>
         <div className="flex flex-wrap gap-2">
           <button onClick={copy} className="min-h-11 rounded-xl bg-saffron px-4 text-sm font-bold text-ink">{copied ? "کپی شد ✓" : "کپی لینک"}</button>
-          <button onClick={download} className="min-h-11 rounded-xl border border-line-2 px-4 text-sm hover:border-saffron">دانلود QR برای چاپ</button>
+          <button onClick={download} className="min-h-11 rounded-xl border border-line-2 px-4 text-sm hover:border-saffron">دریافت کد QR برای چاپ</button>
         </div>
       </div>
     </div>

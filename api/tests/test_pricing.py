@@ -45,7 +45,7 @@ def place(spec, store, cust, code=None, items=("i:latte",)):
 def test_delivery_fee_is_added_and_shown():
     spec, store = make(), MemoryStore()
     out, _ = place(spec, store, "a")
-    assert "هزینه ارسال: 30,000" in text(out) and "جمع کل: 130,000" in text(out)
+    assert "هزینه‌ی ارسال: 30,000" in text(out) and "جمع کل: 130,000" in text(out)
     assert store.find("o")[0]["total"] == 130000 and store.find("o")[0]["delivery_fee"] == 30000
 
 
@@ -110,7 +110,7 @@ def test_last_use_taken_while_filling_the_form_is_dropped_honestly():
 def test_min_total_uses_goods_not_delivery_and_no_features_means_old_behaviour():
     spec, store = make(fee=0), MemoryStore()
     out, _ = order(spec, store, "a", "i:latte", "n:1", "checkout", "سارا")
-    assert "هزینه ارسال" not in text(out) and store.find("o")[0]["total"] == 100000 and "discount" not in store.find("o")[0]
+    assert "هزینه‌ی ارسال" not in text(out) and store.find("o")[0]["total"] == 100000 and "discount" not in store.find("o")[0]
 
 
 def test_spec_validation():

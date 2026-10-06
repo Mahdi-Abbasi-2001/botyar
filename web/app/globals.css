@@ -93,3 +93,6 @@ body {
   .anim-stamp, .anim-live, .anim-rise, .anim-shake, .anim-caret, .anim-ring { animation: none; }
   * { transition: none !important; }
 }
+
+/* in-page anchors land below the sticky landing header */
+[id] { scroll-margin-top: 88px; }

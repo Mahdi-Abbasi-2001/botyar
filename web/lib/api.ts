@@ -12,7 +12,27 @@ export type Action =
 export const PENDING_KEY = (id: number | string) => `botyar:pending:${id}`;
 
 export const getToken =() => (typeof window === "undefined" ? null : localStorage.getItem("token"));
-export const setToken = (t: string | null) => (t ? localStorage.setItem("token", t) : localStorage.removeItem("token"));
+export const getUsername = () => (typeof window === "undefined" ? null : localStorage.getItem("username"));
+/** Signing in stores the token and the username (shown in the header); signing out clears both. */
+export const setToken = (t: string | null, username?: string) => {
+  if (!t) { localStorage.removeItem("token"); localStorage.removeItem("username"); return; }
+  localStorage.setItem("token", t);
+  if (username) localStorage.setItem("username", username);
+};
+
+/** Who is signed in, without the sign-in redirect of api(): an expired session just reads as signed out. */
+export async function whoAmI(): Promise<string | null | undefined> {
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const res = await fetch(BASE + "/api/me", { headers: { Authorization: `Bearer ${token}` } });
+    if (res.status === 401) { setToken(null); return null; }
+    if (!res.ok) return undefined;
+    const { username } = await res.json();
+    localStorage.setItem("username", username);
+    return username;
+  } catch { return undefined; }  // offline: keep what we have
+}
 
 export async function api<T = any>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
   const token = getToken();
@@ -35,12 +55,12 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
   if (res.status === 401 && token && !path.startsWith("/auth")) {
     setToken(null);
     window.location.href = "/login/";
-    throw new Error("نیاز به ورود");
+    throw new Error("لطفاً دوباره وارد شوید.");
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const d = data.detail;
-    const err = new Error(typeof d === "string" ? d : "خطایی رخ داد");
+    const err = new Error(typeof d === "string" ? d : "خطایی رخ داد. لطفاً دوباره تلاش کنید.");
     if (res.status === 402) (err as PlanLimitError).planLimit = true;
     throw err;
   }
@@ -67,10 +87,10 @@ export async function apiUpload<T = any>(path: string, form: FormData, method: "
   if (res.status === 401) {
     setToken(null);
     window.location.href = "/login/";
-    throw new Error("نیاز به ورود");
+    throw new Error("لطفاً دوباره وارد شوید.");
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "خطایی رخ داد");
+  if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "خطایی رخ داد. لطفاً دوباره تلاش کنید.");
   return data as T;
 }
 
@@ -80,7 +100,7 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
   const res = await fetch(BASE + "/api" + path, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(typeof d.detail === "string" ? d.detail : "دریافت فایل ممکن نشد");
+    throw new Error(typeof d.detail === "string" ? d.detail : "دریافت فایل انجام نشد.");
   }
   const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? fallbackName;
   const url = URL.createObjectURL(await res.blob());

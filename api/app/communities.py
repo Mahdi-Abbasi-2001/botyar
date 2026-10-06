@@ -141,9 +141,9 @@ def add_forward(bot_id: int, body: ForwardIn, user: User = Depends(current_user)
     if src.id == dst.id:
         raise HTTPException(422, "مبدأ و مقصد یکی است")
     if db.scalars(select(ForwardRule).where(ForwardRule.source_id == src.id, ForwardRule.dest_id == dst.id)).first():
-        raise HTTPException(409, "این انتقال قبلاً تعریف شده است")
+        raise HTTPException(409, "این بازنشر قبلاً تعریف شده است")
     if _reaches(db, bot_id, dst.id, src.id):
-        raise HTTPException(422, "این انتقال یک حلقه می‌سازد (پست‌ها برای همیشه بین کانال‌ها می‌چرخند)")
+        raise HTTPException(422, "این بازنشر یک چرخه می‌سازد و پست‌ها بی‌پایان میان کانال‌ها تکرار می‌شوند")
     r = ForwardRule(bot_id=bot_id, source_id=src.id, dest_id=dst.id)
     db.add(r)
     db.commit()
@@ -244,15 +244,15 @@ def _link(db, ch, own_pub, token, msg, chat, chat_id, kind, text):
     row = db.scalars(select(LinkToken).where(LinkToken.code == (parts[1].upper() if len(parts) > 1 else "-"))).first() if len(parts) > 1 else None
     exp = row.expires_at if row and row.expires_at.tzinfo else (row.expires_at.replace(tzinfo=timezone.utc) if row else None)
     if row is None or row.used or exp < datetime.now(timezone.utc) or (own_pub is not None and own_pub.bot_id != row.bot_id):
-        _say(ch, token, chat_id, "❌ کد اتصال نامعتبر یا منقضی است. در بات‌یار کد جدید بگیرید.")
+        _say(ch, token, chat_id, "❌ کد اتصال نامعتبر است یا اعتبارش تمام شده؛ از پنل بات‌یار کد تازه بگیرید.")
         return
     sender = msg.get("from") or {}
     if kind == "group" and sender.get("id") is not None and not _is_admin(ch, token, chat_id, sender["id"]):
-        _say(ch, token, chat_id, "❌ فقط مدیر گروه می‌تواند گروه را وصل کند.")
+        _say(ch, token, chat_id, "❌ فقط مدیر گروه می‌تواند گروه را متصل کند.")
         return
     b = db.scalars(select(ChatBinding).where(ChatBinding.ch == ch.name, ChatBinding.chat_id == chat_id)).first()
     if b is not None and b.bot_id != row.bot_id:
-        _say(ch, token, chat_id, "❌ این گفتگو قبلاً به ربات دیگری وصل شده است.")
+        _say(ch, token, chat_id, "❌ این گفت‌وگو قبلاً به ربات دیگری متصل شده است.")
         return
     if b is None:
         b = ChatBinding(bot_id=row.bot_id, ch=ch.name, chat_id=chat_id, kind=kind, title=(chat.get("title") or "")[:120])
@@ -266,7 +266,7 @@ def _link(db, ch, own_pub, token, msg, chat, chat_id, kind, text):
         ch.call(token, "deleteMessage", {"chat_id": chat_id, "message_id": msg.get("message_id")})
     except Exception:  # noqa: BLE001
         pass
-    _say(ch, token, chat_id, "✅ این " + ("کانال" if kind == "channel" else "گروه") + " به ربات شما در بات‌یار وصل شد؛ تنظیمات را از پنل بات‌یار ببینید.")
+    _say(ch, token, chat_id, "✅ این " + ("کانال" if kind == "channel" else "گروه") + " به ربات شما در بات‌یار متصل شد؛ تنظیمات آن را در پنل بات‌یار ببینید.")
 
 
 def _forward(db, ch, token, src: ChatBinding, msg):
@@ -280,7 +280,7 @@ def _forward(db, ch, token, src: ChatBinding, msg):
             else:  # between Bale and Telegram only the text can travel (the media would have to be downloaded and re-uploaded)
                 text = (msg.get("text") or msg.get("caption") or "").strip()
                 if not text:
-                    r.last_error = "پست بدون متن بین بله و تلگرام منتقل نمی‌شود"
+                    r.last_error = "پست بدون متن میان بله و تلگرام بازنشر نمی‌شود"
                     continue
                 other = bale.CHANNELS[dst.ch]
                 tok = _token_for(db, other, r.bot_id)
@@ -316,7 +316,7 @@ def _moderate(db, ch, token, b: ChatBinding, msg, text: str):
     target = (reply.get("from") or {}).get("id")
     if cmd in ("/ban", "/unban", "/warns") and _is_admin(ch, token, chat_id, uid):
         if target is None:
-            _say(ch, token, chat_id, "این دستور را روی پیام فرد مورد نظر «ریپلای» کنید.")
+            _say(ch, token, chat_id, "این فرمان را در پاسخ (ریپلای) به پیام کاربر مورد نظر بفرستید.")
             return
         if cmd == "/ban":
             _ban(ch, token, chat_id, target)
@@ -328,9 +328,9 @@ def _moderate(db, ch, token, b: ChatBinding, msg, text: str):
                 w = db.scalars(select(GroupWarning).where(GroupWarning.binding_id == b.id, GroupWarning.user_id == str(target))).first()
                 if w:
                     w.count = 0
-                _say(ch, token, chat_id, "✅ کاربر آزاد شد.")
+                _say(ch, token, chat_id, "✅ مسدودیت کاربر برداشته شد.")
             except Exception as e:  # noqa: BLE001
-                _say(ch, token, chat_id, f"آزاد کردن ممکن نشد: {str(e)[:80]}")
+                _say(ch, token, chat_id, f"برداشتن مسدودیت ممکن نشد: {str(e)[:80]}")
         else:
             w = db.scalars(select(GroupWarning).where(GroupWarning.binding_id == b.id, GroupWarning.user_id == str(target))).first()
             _say(ch, token, chat_id, f"اخطارهای این کاربر: {w.count if w else 0}")

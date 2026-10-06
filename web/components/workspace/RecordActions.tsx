@@ -47,13 +47,13 @@ export function RecordActions({ botId, rec, onChanged }: { botId: string | numbe
       const r = await api<Reply>(`/bots/${botId}/records/${rec.id}`, { method: "PATCH", body });
       const m = r.customer_messages;
       const parts: string[] = [];
-      if (r.refund_needed) parts.push("⚠️ این سفارش پرداخت شده بود؛ بازگشت وجه را خودتان از کیف پول انجام دهید");
+      if (r.refund_needed) parts.push("⚠️ هزینه‌ی این سفارش پرداخت شده بود؛ بازگرداندن وجه را خودتان از کیف پول انجام دهید");
       if (r.promoted) parts.push(`${r.promoted.name ?? "نفر بعدی"} از لیست انتظار تأیید شد`);
       if (isFaq) { /* closing a question messages nobody */ }
       else if (m.sandbox) parts.push("در شبیه‌ساز پیامی به مشتری ارسال نمی‌شود");
-      else if (m.wanted && m.sent === m.wanted) parts.push(`به ${fa(m.sent)} مشتری پیام داده شد ✓`);
-      else if (m.wanted) parts.push("پیام به مشتری ارسال نشد (شاید ربات را مسدود کرده است)");
-      else parts.push("این ثبت مشتری قابل پیام‌دادن ندارد");
+      else if (m.wanted && m.sent === m.wanted) parts.push(`برای ${fa(m.sent)} مشتری پیام ارسال شد ✓`);
+      else if (m.wanted) parts.push("پیام به مشتری نرسید؛ ممکن است ربات را مسدود کرده باشد");
+      else parts.push("برای این ثبت، امکان ارسال پیام به مشتری وجود ندارد");
       setNote(parts.join(" · "));
       setAsking(false);
       onChanged();

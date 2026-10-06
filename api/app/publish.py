@@ -73,7 +73,7 @@ def publish(bot_id: int, body: PublishIn, user: User = Depends(current_user), db
     if latest is None:
         raise HTTPException(409, "ربات هنوز ساخته نشده است")
     if not _tests_ok(bot_id, latest.version, db):
-        raise HTTPException(409, "نسخه‌ی فعلی هنوز همه‌ی تست‌ها را نگذرانده؛ ابتدا با ایجنت اصلاحش کنید")
+        raise HTTPException(409, "همه‌ی تست‌های نسخه‌ی فعلی هنوز موفق نشده‌اند؛ ابتدا ربات را در «گفت‌وگوی ساخت» اصلاح کنید")
     if body.mode not in ("shared", "own"):
         raise HTTPException(400, "حالت انتشار نامعتبر است")
     if not settings.public_base_url:
@@ -94,9 +94,9 @@ def publish(bot_id: int, body: PublishIn, user: User = Depends(current_user), db
         try:
             username = bale.api_call(token, "getMe").get("username", "")
         except (bale.TransientError, bale.UncertainError):  # an outage must never be reported as «your token is wrong»
-            raise HTTPException(503, "اتصال به بله برقرار نشد (بله یا اینترنت در دسترس نیست). چند دقیقه بعد دوباره امتحان کنید.")
+            raise HTTPException(503, "اتصال به بله برقرار نشد؛ ممکن است بله یا اینترنت در دسترس نباشد. چند دقیقه بعد دوباره تلاش کنید.")
         except bale.BaleError:
-            raise HTTPException(400, "توکن معتبر نیست؛ دوباره از @botfather بله کپی کنید")
+            raise HTTPException(400, "توکن معتبر نیست؛ آن را دوباره از @botfather در بله کپی کنید")
         token_enc = bale.encrypt(token)
     elif not settings.bale_shared_bot_token:
         raise HTTPException(503, "ربات اشتراکی بات‌یار تنظیم نشده است")
@@ -120,10 +120,10 @@ def publish(bot_id: int, body: PublishIn, user: User = Depends(current_user), db
             bale.api_call(bale.decrypt(token_enc), "setWebhook", {"url": url})
         except bale.TransientError:
             db.rollback()
-            raise HTTPException(503, "اتصال به بله برقرار نشد (بله یا اینترنت در دسترس نیست). چند دقیقه بعد دوباره امتحان کنید.")
+            raise HTTPException(503, "اتصال به بله برقرار نشد؛ ممکن است بله یا اینترنت در دسترس نباشد. چند دقیقه بعد دوباره تلاش کنید.")
         except bale.BaleError as e:
             db.rollback()
-            raise HTTPException(502, f"ثبت وبهوک در بله ناموفق بود: {e}")
+            raise HTTPException(502, f"اتصال ربات به بله ناموفق بود: {e}")
     db.commit()
     return _status(bot_id, db)
 

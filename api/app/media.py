@@ -65,7 +65,7 @@ async def upload_media(bot_id: int, block_id: str, file: UploadFile = File(...),
     _bot(bot_id, user, db)
     block = _slots(bot_id, db).get(block_id)
     if block is None:
-        raise HTTPException(404, "این بخش فایلی نمی‌خواهد؛ از ایجنت بخواهید برای آن «ارسال عکس» یا «ارسال فایل» بگذارد.")
+        raise HTTPException(404, "این بخش به فایل نیاز ندارد؛ اگر لازم است، در «گفت‌وگوی ساخت» بخواهید که «ارسال عکس» یا «ارسال فایل» به آن اضافه شود.")
     data = await file.read(MAX_BYTES + 1)
     if not data:
         raise HTTPException(422, "فایل خالی است")

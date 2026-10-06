@@ -95,7 +95,7 @@ def test_feedback_buttons():
     st = MemoryStore()
     c = Chat(spec_with(), st)
     c.say("/start", "m:0", "ساعت کاری کلینیک چیست؟")
-    assert "خوشحالم" in text(c.say("fh1")) and "faq" not in st.rows
+    assert "خوشحالیم" in text(c.say("fh1")) and "faq" not in st.rows
     c.say("ساعت کاری کلینیک چیست؟")
     c.say("fh0")
     assert st.rows["faq"][0]["note"] == "پاسخ پیشنهادی کمک نکرد" and st.rows["faq"][0]["question"] == "ساعت کاری کلینیک چیست؟"

@@ -5,8 +5,8 @@ import "./globals.css";
 const vazir = localFont({ src: "./fonts/Vazirmatn.woff2", variable: "--font-vazir", weight: "100 900", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "بات‌یار | ساخت ربات بله با گفتگو",
-  description: "ربات خود را به زبان فارسی توضیح دهید؛ ایجنت آن را می‌سازد، تست می‌کند و منتشر می‌کند.",
+  title: "بات‌یار | ساخت ربات بله و تلگرام بدون کدنویسی",
+  description: "کار ربات را به فارسی توضیح دهید؛ بات‌یار آن را می‌سازد، تست می‌کند و در بله و تلگرام منتشر می‌کند.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -66,7 +66,7 @@ export function PublishTab({ botId }: { botId: string }) {
   }
 
   async function unpublish() {
-    if (!confirm("انتشار ربات لغو شود؟ کاربران دیگر پاسخی نمی‌گیرند.")) return;
+    if (!confirm("انتشار ربات متوقف شود؟ کاربران دیگر پاسخی دریافت نمی‌کنند.")) return;
     setBusy(true);
     try {
       setPub(await api<Pub>(`/bots/${botId}/unpublish`, { method: "POST", body: {} }));
@@ -87,11 +87,11 @@ export function PublishTab({ botId }: { botId: string }) {
       {!pub.published ? (
         <>
         <div className={card}>
-          <h3 className="mb-1 text-lg font-extrabold">انتشار روی پیام‌رسان بله</h3>
-          <p className="mb-4 text-sm leading-7 text-mute">ربات شما همین‌جا آزمایش شده است. با انتشار، مشتری‌هایتان می‌توانند در بله با آن گفتگو کنند و ثبت‌ها به‌صورت واقعی ذخیره می‌شود.</p>
-          {!pub.tests_ok && <p className="mb-3 rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-bad">نسخه‌ی فعلی هنوز همه‌ی تست‌ها را نگذرانده؛ ابتدا با ایجنت اصلاحش کنید.</p>}
+          <h3 className="mb-1 text-lg font-extrabold">انتشار در بله</h3>
+          <p className="mb-4 text-sm leading-7 text-mute">ربات شما همین‌جا آزمایش شده است. پس از انتشار، مشتریان می‌توانند در بله با آن گفت‌وگو کنند و ثبت‌ها به‌صورت واقعی ذخیره می‌شوند.</p>
+          {!pub.tests_ok && <p className="mb-3 rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-bad">همه‌ی تست‌های نسخه‌ی فعلی هنوز موفق نشده‌اند. ابتدا در «گفت‌وگوی ساخت» ربات را اصلاح کنید.</p>}
           <div className="mb-4 grid gap-3 sm:grid-cols-2">
-            {([["shared", "ربات بات‌یار", "سریع‌ترین راه، بدون ساختن ربات. یک لینک و QR می‌گیرید که مشتری را مستقیم به ربات شما در @" + (pub.shared_bot_username || "botyar") + " می‌برد."], ["own", "ربات اختصاصی شما (پیشنهادی)", "با نام و عکس خودتان. توکن را از @botfather بله می‌گیرید."]] as const).map(([m, t, d]) => (
+            {([["shared", "ربات بات‌یار", "سریع‌ترین راه، بدون نیاز به ساخت ربات جداگانه. یک لینک و کد QR دریافت می‌کنید که مشتری را مستقیم به ربات شما در \u2066@" + (pub.shared_bot_username || "botyar") + "\u2069 می‌برد."], ["own", "ربات اختصاصی شما (پیشنهادی)", "با نام و تصویر خودتان. توکن را از \u2066@botfather\u2069 در بله دریافت می‌کنید."]] as const).map(([m, t, d]) => (
               <button key={m} onClick={() => setMode(m)} aria-pressed={mode === m}
                 className={`rounded-xl border p-4 text-right ${mode === m ? "border-saffron bg-saffron/10" : "border-line-2 hover:border-mute"}`}>
                 <div className="font-bold">{t}</div>
@@ -101,14 +101,14 @@ export function PublishTab({ botId }: { botId: string }) {
           </div>
           {mode === "own" && (
             <label className="mb-4 block text-sm">
-              <span className="mb-1 block text-mute">توکن ربات (محرمانه است و رمزنگاری ذخیره می‌شود)</span>
+              <span className="mb-1 block text-mute">توکن ربات (محرمانه است و به‌صورت رمزنگاری‌شده ذخیره می‌شود)</span>
               <input dir="ltr" value={token} onChange={(e) => setToken(e.target.value)} placeholder="123456789:ABC…" autoComplete="off"
                 className="min-h-11 w-full rounded-xl border border-line-2 bg-ink px-3 text-left outline-none focus:border-saffron" />
             </label>
           )}
-          {!pub.webhooks_enabled && <p className="mb-3 text-sm text-mute">انتشار فقط روی نسخه‌ی آنلاین کار می‌کند.</p>}
+          {!pub.webhooks_enabled && <p className="mb-3 text-sm text-mute">انتشار فقط در نسخه‌ی آنلاین بات‌یار کار می‌کند.</p>}
           <button className={btn} disabled={busy || !pub.tests_ok || !pub.webhooks_enabled || (mode === "own" && token.trim().length < 10)} onClick={() => publish(mode)}>
-            {busy ? "در حال انتشار…" : "انتشار روی بله"}
+            {busy ? "در حال انتشار…" : "انتشار در بله"}
           </button>
         </div>
         <TelegramCard botId={botId} />
@@ -117,35 +117,35 @@ export function PublishTab({ botId }: { botId: string }) {
         <>
           <div className={card}>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-lg font-extrabold"><span className="ml-2 inline-block h-2.5 w-2.5 rounded-full bg-mint" />منتشر شده روی بله · نسخه {fa(pub.version ?? 0)}</h3>
-              <button onClick={unpublish} disabled={busy} className="text-sm text-mute hover:text-bad">لغو انتشار</button>
+              <h3 className="text-lg font-extrabold"><span className="ml-2 inline-block h-2.5 w-2.5 rounded-full bg-mint" />منتشرشده در بله · نسخه‌ی {fa(pub.version ?? 0)}</h3>
+              <button onClick={unpublish} disabled={busy} className="text-sm text-mute hover:text-bad">توقف انتشار</button>
             </div>
             {!pub.up_to_date && (
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-saffron/50 bg-saffron/10 p-3 text-sm">
-                <span>نسخه‌ی {fa(pub.latest_version)} آماده است ولی هنوز منتشر نشده.</span>
+                <span>نسخه‌ی {fa(pub.latest_version)} آماده است، اما هنوز منتشر نشده است.</span>
                 <button className={btn + " !min-h-9 !px-4 text-sm"} disabled={busy || !pub.tests_ok} onClick={() => publish(pub.mode!)}>انتشار نسخه‌ی {fa(pub.latest_version)}</button>
               </div>
             )}
             {pub.mode === "shared" ? (
               <div className="flex flex-col gap-4">
                 <ShareLink url={`https://ble.ir/${handle}?start=${pub.code}`} fileName={`bale-${pub.code}`}
-                  hint="این لینک را در اینستاگرام، واتس‌اپ یا روی پیشخوان بگذارید؛ مشتری با یک لمس مستقیم وارد ربات شما می‌شود." />
+                  hint="این لینک را در اینستاگرام، واتس‌اپ یا کنار صندوق قرار دهید؛ مشتری با باز کردن آن مستقیم وارد ربات شما می‌شود." />
                 <label className="flex items-start gap-3 rounded-xl border border-line-2 p-3 text-sm leading-7">
                   <input type="checkbox" checked={pub.listed} onChange={(e) => setListed(e.target.checked)} disabled={busy} className="mt-1.5 h-5 w-5 accent-[var(--color-saffron)]" />
-                  <span>نمایش در فهرست <span dir="ltr">@{handle}</span><span className="block text-mute">مشتری‌ای که بدون لینک وارد ربات بات‌یار شود، ربات شما را در فهرست کسب‌وکارها می‌بیند. لینک شما در هر حال کار می‌کند.</span></span>
+                  <span>نمایش در فهرست <span dir="ltr">@{handle}</span><span className="block text-mute">مشتریانی که بدون لینک وارد ربات بات‌یار شوند، ربات شما را در فهرست کسب‌وکارها می‌بینند. لینک اختصاصی شما در هر صورت کار می‌کند.</span></span>
                 </label>
               </div>
             ) : (
-              <ShareLink url={`https://ble.ir/${handle}`} fileName={`bale-${handle}`} hint="ربات اختصاصی شما فعال است. این لینک را به مشتری‌ها بدهید." />
+              <ShareLink url={`https://ble.ir/${handle}`} fileName={`bale-${handle}`} hint="ربات اختصاصی شما فعال است. این لینک را در اختیار مشتریان قرار دهید." />
             )}
           </div>
 
           <TelegramCard botId={botId} />
 
           <div className={card}>
-            <h3 className="mb-1 font-bold">اعلان ثبت‌های جدید</h3>
+            <h3 className="mb-1 font-bold">اعلان ثبت‌های تازه</h3>
             {pub.admin_linked ? (
-              <p className="text-sm text-mint">✓ فعال است؛ ثبت‌های جدید در بله برای شما ارسال می‌شود.</p>
+              <p className="text-sm text-mint">✓ فعال است؛ ثبت‌های تازه در بله برای شما ارسال می‌شوند.</p>
             ) : (
               <p className="text-sm leading-7 text-mute">برای دریافت اعلان، همین پیام را از حساب خودتان به {pub.mode === "own" ? "ربات" : `@${handle}`} بفرستید:
                 <span dir="ltr" className="mr-2 inline-block rounded-lg bg-ink px-3 py-1 font-mono text-fg">/admin {pub.admin_code}</span>
@@ -157,7 +157,7 @@ export function PublishTab({ botId }: { botId: string }) {
 
           <div className={card}>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold">ثبت‌های واقعی ({fa(live.length)})</h3>
-              <span className="flex items-center gap-3"><button onClick={load} className="text-sm text-saffron">تازه‌سازی</button>
+              <span className="flex items-center gap-3"><button onClick={load} className="text-sm text-saffron">به‌روزرسانی</button>
                 {live.length > 0 && <ExportButtons path={`/bots/${botId}/export/records`} name="records" onError={setError} />}</span></div>
             {live.length === 0 ? <p className="text-sm text-mute">هنوز مشتری واقعی ثبتی انجام نداده است.</p> : (
               <ul className="space-y-2">

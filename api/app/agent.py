@@ -87,7 +87,7 @@ class Builder:
 
     def design(self, s: S) -> dict:
         n = s.get("design_attempts", 0) + 1
-        self.emit("در حال طراحی ساختار ربات…" if n == 1 else f"اصلاح ساختار ربات (تلاش {n})…")
+        self.emit("در حال طراحی ساختار ربات…" if n == 1 else f"در حال اصلاح ساختار ربات (تلاش {n})…")
         payload = (f"OWNER REQUEST / CONVERSATION:\n{s['history']}\n{s['request']}\n\nASSUMPTIONS:\n{json.dumps(s.get('assumptions', []), ensure_ascii=False)}\n\n"
                    f"CURRENT SPEC:\n{json.dumps(s['current'], ensure_ascii=False) if s.get('current') else 'none'}")
         if s.get("errors"):
@@ -125,10 +125,10 @@ class Builder:
 
     def run_tests(self, s: S) -> dict:
         all_sc = [TestScenario.model_validate(x) for x in (s.get("old_scenarios", []) + s["scenarios"])]
-        self.emit(f"اجرای {len(all_sc)} تست روی ربات…")
+        self.emit(f"در حال اجرای {len(all_sc)} تست روی ربات…")
         results = run_plan(BotSpec.model_validate(s["spec"]), all_sc, s.get("fixture"))
         failed = sum(not r["passed"] for r in results)
-        self.emit("همه تست‌ها موفق بود ✅" if not failed else f"{failed} تست ناموفق بود")
+        self.emit("همه‌ی تست‌ها موفق بودند ✅" if not failed else f"{failed} تست ناموفق بود")
         for r in results:
             if not r["passed"]:
                 self.emit(f"✗ {r['name']}: {r['failures'][0]}")
@@ -141,7 +141,7 @@ class Builder:
 
     def repair(self, s: S) -> dict:
         n = s.get("repair_attempts", 0) + 1
-        self.emit(f"ایجنت در حال رفع خطاهای تست (دور {n})…")
+        self.emit(f"در حال رفع خطاهای تست (دور {n})…")
         failing = [r for r in s["results"] if not r["passed"]]
         payload = (f"OWNER REQUEST SUMMARY: {s['summary']}\n\nCURRENT SPEC:\n{json.dumps(s['spec'], ensure_ascii=False)}\n\n"
                    f"{'FIXTURE PRODUCTS (ids 1..N, fixed): ' + json.dumps([{'id': i, **p} for i, p in enumerate(s['fixture'], 1)], ensure_ascii=False) + chr(10) + chr(10) if s.get('fixture') else ''}"
@@ -173,17 +173,17 @@ class Builder:
         bot.name = s["spec"]["name"]
         self.db.commit()
         if any(b["type"] == "faq" for b in s["spec"]["blocks"]):
-            self.emit("در حال ساخت فهرست جست‌وجوی سؤال‌ها…")
+            self.emit("در حال آماده‌سازی جست‌وجو در پرسش‌های متداول…")
             try:  # best effort: without an index the bot still works (word matching) and publishing retries it
                 faq_index.ensure(self.db, self.bot_id, BotSpec.model_validate(s["spec"]), self.run_id)
             except Exception:  # noqa: BLE001
                 self.db.rollback()
                 log.exception("faq indexing failed")
-        self.emit(f"نسخه {v} ذخیره شد ({passed}/{len(s['results'])} تست موفق)")
+        self.emit(f"نسخه‌ی {v} ذخیره شد ({passed} از {len(s['results'])} تست موفق)")
         return {"version": v, "outcome": "done"}
 
     def fail(self, s: S) -> dict:
-        self.emit("طراحی معتبر ممکن نشد")
+        self.emit("ساخت طرح معتبر ممکن نشد")
         return {"outcome": "failed"}
 
     # ---- graph ----

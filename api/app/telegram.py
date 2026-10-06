@@ -143,7 +143,7 @@ def tg_publish(bot_id: int, body: TgPublishIn, user: User = Depends(current_user
     if latest is None:
         raise HTTPException(409, "ربات هنوز ساخته نشده است")
     if not _tests_ok(bot_id, latest.version, db):
-        raise HTTPException(409, "نسخه‌ی فعلی هنوز همه‌ی تست‌ها را نگذرانده؛ ابتدا با ایجنت اصلاحش کنید")
+        raise HTTPException(409, "همه‌ی تست‌های نسخه‌ی فعلی هنوز موفق نشده‌اند؛ ابتدا ربات را در «گفت‌وگوی ساخت» اصلاح کنید")
     if body.mode not in ("shared", "own"):
         raise HTTPException(400, "حالت انتشار نامعتبر است")
     pub = db.scalars(select(TgPublication).where(TgPublication.bot_id == bot_id)).first()
@@ -162,11 +162,11 @@ def tg_publish(bot_id: int, body: TgPublishIn, user: User = Depends(current_user
         try:
             username = api_call(token, "getMe").get("username", "")
         except (bale.TransientError, bale.UncertainError):
-            raise HTTPException(503, "اتصال به تلگرام برقرار نشد (تلگرام یا رِله در دسترس نیست)؛ چند دقیقه بعد دوباره تلاش کنید")
+            raise HTTPException(503, "اتصال به تلگرام برقرار نشد؛ چند دقیقه بعد دوباره تلاش کنید")
         except bale.BaleError as e:
             if "relay" in str(e):
                 raise HTTPException(502, "اتصال به تلگرام برقرار نشد؛ چند دقیقه بعد دوباره تلاش کنید")
-            raise HTTPException(400, "توکن معتبر نیست؛ دوباره از @BotFather تلگرام کپی کنید")
+            raise HTTPException(400, "توکن معتبر نیست؛ آن را دوباره از @BotFather در تلگرام کپی کنید")
         token_enc = bale.encrypt(token)
     elif not settings.telegram_shared_bot_token:
         raise HTTPException(503, "ربات اشتراکی تلگرام بات‌یار تنظیم نشده است")
@@ -189,10 +189,10 @@ def tg_publish(bot_id: int, body: TgPublishIn, user: User = Depends(current_user
                      {"url": hook_url(f"own/{pub.id}/{pub.hook_secret}"), "allowed_updates": ALLOWED_UPDATES})
         except (bale.TransientError, bale.UncertainError):
             db.rollback()
-            raise HTTPException(503, "اتصال به تلگرام برقرار نشد (تلگرام یا رِله در دسترس نیست)؛ چند دقیقه بعد دوباره تلاش کنید")
+            raise HTTPException(503, "اتصال به تلگرام برقرار نشد؛ چند دقیقه بعد دوباره تلاش کنید")
         except bale.BaleError as e:
             db.rollback()
-            raise HTTPException(502, f"ثبت وبهوک در تلگرام ناموفق بود: {e}")
+            raise HTTPException(502, f"اتصال ربات به تلگرام ناموفق بود: {e}")
     db.commit()
     return _status(bot_id, db)
 

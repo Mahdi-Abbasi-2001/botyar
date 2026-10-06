@@ -169,7 +169,7 @@ class BookingBlock(BaseModel):
     fields: list[FormField] = Field(default_factory=lambda: [f.model_copy() for f in DEFAULT_CONTACT])
     confirm_text: str = "ثبت‌نام شما با موفقیت انجام شد."
     full_text: str = "متأسفانه ظرفیت این زمان تکمیل است."
-    waitlist_text: str = "ظرفیت تکمیل است؛ شما در لیست انتظار قرار گرفتید و در صورت خالی شدن جا خبر می‌دهیم."
+    waitlist_text: str = "ظرفیت تکمیل است؛ شما در لیست انتظار قرار گرفتید و اگر جایی خالی شود، به شما خبر می‌دهیم."
 
     @model_validator(mode="after")
     def _one_kind(self):

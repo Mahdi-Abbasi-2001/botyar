@@ -18,7 +18,7 @@ import { PhoneSim } from "@/components/workspace/PhoneSim";
 import { progressOf, type Bot, type ChatMsg, type Rec, type RunResult, type RunStatus, type TestRes, type Ver } from "@/components/workspace/model";
 
 type Tab = "build" | "spec" | "tests" | "versions" | "publish" | "catalog" | "inbox" | "announce" | "customers" | "media" | "channels" | "records" | "try";
-const TAB_LABEL: Record<Tab, string> = { build: "ساخت با ایجنت", spec: "ساختار", tests: "تست‌ها", versions: "نسخه‌ها", publish: "انتشار", catalog: "محصولات", inbox: "پیام‌ها", announce: "اطلاعیه", customers: "مشتریان", media: "فایل‌ها", channels: "کانال و گروه", records: "ثبت‌ها", try: "امتحانش کن" };
+const TAB_LABEL: Record<Tab, string> = { build: "گفت‌وگوی ساخت", spec: "ساختار", tests: "تست‌ها", versions: "نسخه‌ها", publish: "انتشار", catalog: "محصولات", inbox: "پیام‌ها", announce: "اطلاعیه", customers: "مشتریان", media: "فایل‌ها", channels: "کانال و گروه", records: "ثبت‌ها", try: "امتحان ربات" };
 
 // The workspace in three jobs: make the bot, put it in front of customers, run it day to day.
 type Group = "make" | "share" | "manage";
@@ -31,12 +31,12 @@ const groupOf = (t: Tab): Group | null => GROUPS.find((g) => g.tabs.includes(t))
 
 // Tabs that only fill up once real customers can reach the bot, and what each will show then.
 const AFTER_PUBLISH: Partial<Record<Tab, { icon: React.ComponentProps<typeof Icon>["name"]; title: string; text: string }>> = {
-  customers: { icon: "star", title: "مشتری‌ها بعد از انتشار اینجا می‌آیند",
-    text: "هر کسی که در بله یا تلگرام با ربات‌ت گفت‌وگو کند اینجا دیده می‌شود: نام، آخرین پیام و تعداد دوستانی که دعوت کرده. می‌توانی جست‌وجو کنی، خروجی اکسل بگیری یا کسی را مسدود کنی." },
-  announce: { icon: "bell", title: "اطلاعیه برای مشتری‌های ربات منتشرشده",
-    text: "بعد از انتشار، برای همه‌ی کسانی که با ربات گفت‌وگو کرده‌اند پیام بفرست یا آن را برای بعد زمان‌بندی کن. روزی حداکثر ۳ اطلاعیه، و هر کس با /stop می‌تواند دیگر دریافت نکند." },
-  channels: { icon: "chat", title: "کانال و گروه، بعد از انتشار",
-    text: "ربات منتشرشده را به کانال یا گروهت اضافه کن تا عضویت اجباری در کانال، شمارش دعوت‌ها، بازنشر خودکار پست‌ها و مدیریت گروه (حذف لینک و فحش، اخطار و اخراج) کار کند." },
+  customers: { icon: "star", title: "مشتریان پس از انتشار اینجا نمایش داده می‌شوند",
+    text: "هر کسی که در بله یا تلگرام با ربات شما گفت‌وگو کند، اینجا دیده می‌شود: نام، آخرین پیام و تعداد دوستانی که دعوت کرده است. می‌توانید جست‌وجو کنید، خروجی اکسل بگیرید یا کاربری را مسدود کنید." },
+  announce: { icon: "bell", title: "اطلاعیه برای مشتریان ربات منتشرشده",
+    text: "پس از انتشار، می‌توانید برای همه‌ی کسانی که با ربات گفت‌وگو کرده‌اند پیام بفرستید یا ارسال را برای زمان دیگری تنظیم کنید. در هر روز حداکثر ۳ اطلاعیه ممکن است و هر مشتری با فرمان /stop می‌تواند دریافت اطلاعیه را لغو کند." },
+  channels: { icon: "chat", title: "کانال و گروه، پس از انتشار",
+    text: "ربات منتشرشده را به کانال یا گروه خود اضافه کنید تا عضویت اجباری، شمارش دعوت‌ها، بازنشر خودکار پست‌ها و مدیریت گروه (حذف لینک و ناسزا، اخطار و اخراج) فعال شود." },
 };
 
 function AfterPublish({ tab, onPublish, testsOk }: { tab: Tab; onPublish: () => void; testsOk: boolean }) {
@@ -49,12 +49,12 @@ function AfterPublish({ tab, onPublish, testsOk }: { tab: Tab; onPublish: () => 
       <ol className="m-0 flex list-none flex-wrap gap-2 p-0 text-sm text-mute">
         {testsOk
           ? <li className="rounded-full border border-mint-line bg-mint-bg px-3 py-1 text-mint-fg">۱. ساخته و تست شد ✓</li>
-          : <li className="rounded-full border border-bad-line bg-bad-bg px-3 py-1 text-bad-fg">۱. اول تست‌ها باید قبول شوند</li>}
-        <li className="rounded-full border border-amber-line bg-saffron/10 px-3 py-1 text-saffron">۲. انتشار روی بله یا تلگرام</li>
-        <li className="rounded-full border border-line-2 px-3 py-1">۳. اینجا پر می‌شود</li>
+          : <li className="rounded-full border border-bad-line bg-bad-bg px-3 py-1 text-bad-fg">۱. ابتدا همه‌ی تست‌ها باید موفق شوند</li>}
+        <li className="rounded-full border border-amber-line bg-saffron/10 px-3 py-1 text-saffron">۲. انتشار در بله یا تلگرام</li>
+        <li className="rounded-full border border-line-2 px-3 py-1">۳. این بخش فعال می‌شود</li>
       </ol>
       <button onClick={onPublish} className="flex min-h-12 items-center gap-2 rounded-xl bg-saffron px-5 font-extrabold text-ink hover:bg-saffron-hi">
-        <Icon name="live" size={18} /> رفتن به انتشار
+        <Icon name="live" size={18} /> رفتن به بخش انتشار
       </button>
     </div>
   );
@@ -118,7 +118,7 @@ function Workspace() {
         } catch (e: any) {
           // the agent keeps working on the server; tolerate a few failed status checks
           if (++misses >= 5) {
-            setError("ارتباط قطع شد، اما ایجنت روی سرور به کار ادامه می‌دهد. چند لحظه بعد صفحه را تازه کنید.");
+            setError("ارتباط قطع شد، اما ساخت ربات روی سرور ادامه دارد. چند لحظه بعد صفحه را دوباره بارگذاری کنید.");
             break;
           }
           continue;
@@ -242,14 +242,14 @@ function Workspace() {
         <div className="flex min-w-0 flex-1 basis-0 flex-col">
           <span className="truncate text-[17px] font-extrabold">{bot.name}</span>
           <span className="text-xs text-mute">
-            {running ? (spec ? `نسخه ${fa(bot.version)} · در حال ساخت نسخه‌ی بعد` : "در حال ساخت اولین نسخه") : spec ? `نسخه ${fa(bot.version)}${tests.length ? ` · ${fa(passed)}/${fa(tests.length)} تست موفق` : ""}` : "پیش‌نویس"}
+            {running ? (spec ? `نسخه‌ی ${fa(bot.version)} · در حال ساخت نسخه‌ی بعدی` : "در حال ساخت اولین نسخه") : spec ? `نسخه‌ی ${fa(bot.version)}${tests.length ? ` · ${fa(passed)} از ${fa(tests.length)} تست موفق` : ""}` : "پیش‌نویس"}
           </span>
         </div>
-        {cost !== null && cost > 0 && <span className="hidden rounded-lg border border-line px-2.5 py-1.5 text-xs text-mute xl:inline" dir="ltr" title="هزینه‌ی هوش مصنوعی این ربات تا الان">هزینه‌ی AI: <span dir="ltr">${cost.toFixed(4)}</span></span>}
+        {cost !== null && cost > 0 && <span className="hidden rounded-lg border border-line px-2.5 py-1.5 text-xs text-mute xl:inline" dir="ltr" title="هزینه‌ی هوش مصنوعی این ربات تا این لحظه">هزینه‌ی هوش مصنوعی: <span dir="ltr">${cost.toFixed(4)}</span></span>}
         {/* where the bot stands with customers, and the one-click way forward */}
         {spec && live === "live" && (
           <button onClick={goPublish} className="hidden min-h-11 items-center gap-2 rounded-xl bg-mint-bg px-3.5 text-sm text-mint-fg hover:bg-mint-bg/70 sm:flex">
-            <span className="anim-live h-2 w-2 rounded-full bg-mint" /> زنده روی {liveOn.join(" و ")}
+            <span className="anim-live h-2 w-2 rounded-full bg-mint" /> فعال در {liveOn.join(" و ")}
           </button>
         )}
         {spec && live === "stale" && (
@@ -261,7 +261,7 @@ function Workspace() {
           <>
             <span className="hidden text-sm text-mute md:inline">هنوز منتشر نشده</span>
             <button onClick={goPublish} disabled={running} className="hidden min-h-11 items-center gap-2 rounded-xl bg-saffron px-4 text-sm font-extrabold text-ink hover:bg-saffron-hi disabled:opacity-50 sm:flex">
-              <Icon name="live" size={16} /> انتشار برای مشتری‌ها
+              <Icon name="live" size={16} /> انتشار برای مشتریان
             </button>
           </>
         )}
@@ -291,8 +291,8 @@ function Workspace() {
                   <Icon name={g.icon} size={16} className={on ? "text-saffron" : "text-mute"} />
                   {g.label}
                   {g.key === "make" && tests.length > 0 && <span className={`text-xs ${passed === tests.length ? "text-mint" : "text-bad-soft"}`}>{fa(passed)}/{fa(tests.length)}</span>}
-                  {g.key === "share" && live === "live" && <span className="h-2 w-2 rounded-full bg-mint" title={`زنده روی ${liveOn.join(" و ")}`} />}
-                  {g.key === "share" && live === "stale" && <span className="h-2 w-2 rounded-full bg-saffron" title="نسخه‌ی جدید منتشر نشده" />}
+                  {g.key === "share" && live === "live" && <span className="h-2 w-2 rounded-full bg-mint" title={`فعال در ${liveOn.join(" و ")}`} />}
+                  {g.key === "share" && live === "stale" && <span className="h-2 w-2 rounded-full bg-saffron" title="نسخه‌ی تازه منتشر نشده" />}
                   {g.key === "manage" && records.length > 0 && <span className="rounded-full bg-raised px-1.5 text-xs text-fg-2">{fa(records.length)}</span>}
                 </button>
               );
@@ -345,7 +345,7 @@ function Workspace() {
           <aside className="hidden flex-[0_0_320px] lg:flex">
             <div className="flex h-[640px] w-[320px] flex-col items-center justify-center gap-3 rounded-[40px] border-8 border-line bg-panel p-8 text-center text-[13px] leading-7 text-dim">
               <Icon name="phone" size={40} strokeWidth={1.6} className="text-line-3" />
-              ربات بعد از قبولی تست‌ها اینجا روشن می‌شود و می‌توانی امتحانش کنی.
+              پس از موفقیت تست‌ها، ربات اینجا فعال می‌شود و می‌توانید امتحانش کنید.
             </div>
           </aside>
         )}

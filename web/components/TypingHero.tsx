@@ -72,7 +72,7 @@ export function BlueprintPreview({ n }: { n: number }) {
   const cap = n >= ENDS[7];
   return (
     <div className="relative flex flex-col gap-3">
-      <span className="text-[13px] text-mute">نقشه‌ی ربات، همین الان</span>
+      <span className="text-[13px] text-mute">نقشه‌ی ربات، هم‌زمان با نوشتن شما</span>
       <Node on={n >= ENDS[0]} className="flex items-center gap-3 rounded-2xl border border-line-2 bg-panel px-4 py-3.5">
         <Num n="۱" />
         <div className="flex flex-col"><span className="text-xs text-mute">پیام خوش‌آمد</span><span className="text-[15px]">سلام! به کلینیک دندانپزشکی خوش آمدید.</span></div>
@@ -92,15 +92,15 @@ export function BlueprintPreview({ n }: { n: number }) {
       <div className="grid grid-cols-2 gap-3">
         <Node on={n >= ENDS[9]} className="flex items-center gap-3 rounded-2xl border border-line-2 bg-panel px-4 py-3.5">
           <Num n="۳" />
-          <div className="flex flex-col"><span className="text-xs text-mute">فرم بیمار</span><span className="text-sm">نام · موبایل</span></div>
+          <div className="flex flex-col"><span className="text-xs text-mute">اطلاعات بیمار</span><span className="text-sm">نام · شماره‌ی موبایل</span></div>
         </Node>
         <Node on={n >= ENDS[11]} className="flex items-center gap-3 rounded-2xl border border-amber-line bg-amber-bg px-4 py-3.5">
           <Num n="۴" />
-          <div className="flex flex-col"><span className="text-xs text-amber-fg/80">اعلان به مدیر</span><span className="text-sm">بعد از هر نوبت</span></div>
+          <div className="flex flex-col"><span className="text-xs text-amber-fg/80">اطلاع به مدیر</span><span className="text-sm">پس از ثبت هر نوبت</span></div>
         </Node>
       </div>
       <Node on={n >= LEN + 15} className="flex items-center gap-3.5 rounded-2xl border border-mint-line bg-mint-bg px-4 py-3.5 text-mint-fg">
-        <span className="flex-1 text-[15px] font-extrabold">ایجنت ۵ سناریو نوشت و اجرا کرد</span>
+        <span className="flex-1 text-[15px] font-extrabold">۵ سناریوی تست نوشته و اجرا شد</span>
         <span>۵/۵</span>
       </Node>
       {n >= LEN + 32 && <Stamp sub="۵ از ۵" size={146} className="absolute bottom-16 left-2.5" />}
