@@ -3,6 +3,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, setToken } from "@/lib/api";
 import { ErrorNote, Logo, Stamp } from "@/components/ui";
+import { PageTransition } from "@/components/PageTransition";
 
 type Mode = "login" | "register";
 
@@ -83,24 +84,26 @@ function LoginForm() {
 
 export default function Login() {
   return (
-    <main className="flex min-h-screen flex-wrap">
-      <div className="flex flex-[1_1_480px] flex-col justify-center px-4 py-12 sm:px-6">
-        <Suspense>
-          <LoginForm />
-        </Suspense>
-      </div>
-      <div className="bp hidden flex-[1_1_520px] items-center justify-center border-r border-line bg-ink-2 px-6 py-12 md:flex">
-        <div className="relative flex w-[460px] max-w-full flex-col gap-3.5">
-          <span className="text-[30px] font-black leading-[1.5]">ربات بله و تلگرام،<br /><span className="text-saffron">بدون یک خط کد.</span></span>
-          <div className="rounded-2xl border border-line-2 bg-panel px-4 py-3.5 text-sm">سلام! به کلینیک دندانپزشکی خوش آمدید.</div>
-          <div className="flex flex-col gap-1.5 rounded-2xl border border-saffron bg-panel px-4 py-3.5 text-sm">
-            <div className="flex justify-between"><span>شنبه ساعت ۹ صبح</span><span className="text-saffron">ظرفیت ۸ نفر</span></div>
-            <div className="flex justify-between"><span>دوشنبه ساعت ۵ عصر</span><span className="text-saffron">ظرفیت ۸ نفر</span></div>
-          </div>
-          <div className="rounded-2xl border border-mint-line bg-mint-bg px-4 py-3.5 text-sm font-bold text-mint-fg">هر ۶ تست موفق بود</div>
-          <Stamp size={130} className="absolute -bottom-8 -left-2.5" />
+    <PageTransition>
+      <main className="flex min-h-screen flex-wrap">
+        <div className="flex flex-[1_1_480px] flex-col justify-center px-4 py-12 sm:px-6">
+          <Suspense>
+            <LoginForm />
+          </Suspense>
         </div>
-      </div>
-    </main>
+        <div className="bp hidden flex-[1_1_520px] items-center justify-center border-r border-line bg-ink-2 px-6 py-12 md:flex">
+          <div className="relative flex w-[460px] max-w-full flex-col gap-3.5">
+            <span className="text-[30px] font-black leading-[1.5]">ربات بله و تلگرام،<br /><span className="text-saffron">بدون یک خط کد.</span></span>
+            <div className="rounded-2xl border border-line-2 bg-panel px-4 py-3.5 text-sm">سلام! به کلینیک دندانپزشکی خوش آمدید.</div>
+            <div className="flex flex-col gap-1.5 rounded-2xl border border-saffron bg-panel px-4 py-3.5 text-sm">
+              <div className="flex justify-between"><span>شنبه ساعت ۹ صبح</span><span className="text-saffron">ظرفیت ۸ نفر</span></div>
+              <div className="flex justify-between"><span>دوشنبه ساعت ۵ عصر</span><span className="text-saffron">ظرفیت ۸ نفر</span></div>
+            </div>
+            <div className="rounded-2xl border border-mint-line bg-mint-bg px-4 py-3.5 text-sm font-bold text-mint-fg">هر ۶ تست موفق بود</div>
+            <Stamp size={130} className="absolute -bottom-8 -left-2.5" />
+          </div>
+        </div>
+      </main>
+    </PageTransition>
   );
 }

@@ -36,6 +36,29 @@
 
 html {
   color-scheme: dark;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);   /* fast start, soft landing: used by every motion below */
+}
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+/* Every interactive element eases its hover/press changes instead of snapping.
+   In @layer base so any Tailwind transition-* utility on an element still wins. */
+@layer base {
+  a, button, input, textarea, select, summary, label, [role="tab"] {
+    transition-property: color, background-color, border-color, outline-color, box-shadow, opacity, translate, scale, transform;
+    transition-duration: 200ms;
+    transition-timing-function: var(--ease-out);
+  }
+}
+/* a filled button gives under the finger */
+:is(button, a)[class*="bg-saffron"]:not(:disabled):active,
+:is(button, a)[class*="bg-fg"]:not(:disabled):active,
+:is(button, a)[class*="bg-mint"]:not(:disabled):active { scale: 0.97; transition-duration: 80ms; }
+/* cards that open something rise a little toward the pointer */
+.lift { transition: translate 260ms var(--ease-out), box-shadow 260ms var(--ease-out), border-color 200ms var(--ease-out); }
+@media (hover: hover) {
+  .lift:hover { translate: 0 -3px; box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(242, 169, 59, 0.08); }
 }
 
 body {
@@ -88,7 +111,30 @@ body {
 .anim-caret { animation: blink 0.9s steps(1) infinite; }
 .anim-ring { animation: ring 2.4s ease-out infinite; }
 
+/* switching a workspace tab: the new page fades up instead of popping in */
+@keyframes fade-up {
+  from { opacity: 0; translate: 0 6px; }
+  to { opacity: 1; translate: 0 0; }
+}
+.anim-tab { animation: fade-up 280ms var(--ease-out) both; }
+
+/* landing sections rise in as they scroll into view (armed by JS, so they stay visible without it) */
+.reveal-armed { opacity: 0; translate: 0 24px; transition: opacity 700ms var(--ease-out), translate 700ms var(--ease-out); }
+.reveal-armed.is-in { opacity: 1; translate: 0 0; }
+
+/* page-to-page navigation (React <ViewTransition>, see components/PageTransition.tsx) */
+::view-transition { pointer-events: none; }
+::view-transition-old(.page-out) { animation: 140ms ease-in both vt-fade reverse, 140ms ease-in both vt-rise reverse; }
+::view-transition-new(.page-in) { animation: 260ms var(--ease-out) 90ms both vt-fade, 380ms var(--ease-out) both vt-rise; }
+@keyframes vt-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes vt-rise { from { translate: 0 12px; } to { translate: 0 0; } }
+/* the logo is the one thing that stays put (it morphs between its large and small size) */
+::view-transition-group(site-logo) { animation-duration: 380ms; animation-timing-function: var(--ease-out); z-index: 100; }
+
 @media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*), ::view-transition-new(*), ::view-transition-group(*) { animation-duration: 0s !important; animation-delay: 0s !important; }
+  .reveal-armed { opacity: 1; translate: none; }
+  .anim-tab { animation: none; }
   .anim-stamp-settle { animation: none; opacity: 0.18; }
   .anim-stamp, .anim-live, .anim-rise, .anim-shake, .anim-caret, .anim-ring { animation: none; }
   * { transition: none !important; }
@@ -96,3 +142,11 @@ body {
 
 /* in-page anchors land below the sticky landing header */
 [id] { scroll-margin-top: 88px; }
+
+/* the account menu unfolds from its button */
+@keyframes menu-in {
+  from { opacity: 0; translate: 0 -4px; scale: 0.97; }
+  to { opacity: 1; translate: 0 0; scale: 1; }
+}
+.anim-menu { animation: menu-in 160ms var(--ease-out) both; transform-origin: top left; }
+@media (prefers-reduced-motion: reduce) { .anim-menu { animation: none; } }

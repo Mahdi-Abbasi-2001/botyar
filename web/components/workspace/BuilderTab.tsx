@@ -30,12 +30,23 @@ export function BuilderTab(p: Props) {
   const lastQ = !p.running && p.chat.length ? parseQuestions(p.chat[p.chat.length - 1].content) : null;
   const scroller = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
+  const gliding = useRef(false);  // a smooth scroll we started is under way: its in-between positions are not the owner scrolling up
+  const ready = useRef(false);    // the first paint jumps straight to the end; after that every move glides
   const [unseen, setUnseen] = useState(false);
 
   const toBottom = (smooth = true) => {
     const el = scroller.current;
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+    if (!el) return;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 2) return;
+    gliding.current = smooth;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
     setUnseen(false);
+  };
+  const follow = () => {
+    toBottom(ready.current);
+    // the history arrives after mount: stay instant until there is something to scroll through
+    const el = scroller.current;
+    if (el && el.scrollHeight > el.clientHeight + 4) ready.current = true;
   };
 
   // Stay pinned to the latest message whenever the content grows (messages loading in, new progress
@@ -48,7 +59,7 @@ export function BuilderTab(p: Props) {
     const ro = new ResizeObserver(() => {
       const grew = inner.offsetHeight > last;
       last = inner.offsetHeight;
-      if (atBottom.current) el.scrollTop = el.scrollHeight;
+      if (atBottom.current) follow();
       else if (grew) setUnseen(true);
     });
     ro.observe(inner);
@@ -58,7 +69,7 @@ export function BuilderTab(p: Props) {
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
-    if (atBottom.current) el.scrollTop = el.scrollHeight;
+    if (atBottom.current) follow();
     else setUnseen(true);
   }, [p.chat.length, p.events.length, !!lastQ]); // eslint-disable-line react-hooks/exhaustive-deps
   // sending a message always brings you back down
@@ -71,9 +82,12 @@ export function BuilderTab(p: Props) {
       <section className={`relative flex min-w-0 flex-[1_1_360px] flex-col overflow-hidden rounded-[20px] border border-line bg-ink ${PANEL_H}`}>
         <div ref={scroller} onScroll={(e) => {
           const el = e.currentTarget;
-          atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-          if (atBottom.current) setUnseen(false);
-        }} className="flex-1 overflow-y-auto overscroll-contain">
+          const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+          if (gliding.current) { if (near) gliding.current = false; return; }
+          atBottom.current = near;
+          if (near) setUnseen(false);
+        }} onWheel={() => { gliding.current = false; }} onTouchStart={() => { gliding.current = false; }}
+          className="flex-1 overflow-y-auto overscroll-contain">
         <div ref={content} className="flex flex-col gap-3.5 p-3.5">
         {p.chat.length === 0 && !p.running && (
           <div className="flex flex-col gap-3 rounded-2xl border border-line bg-panel p-4">
@@ -92,9 +106,9 @@ export function BuilderTab(p: Props) {
           if (qs && i === p.chat.length - 1 && lastQ) return <QuestionCards key={i} questions={qs} onSend={p.onSend} />;
           if (qs) return <PastQuestions key={i} questions={qs} />;
           return m.role === "user" ? (
-            <div key={i} className="max-w-[92%] self-start whitespace-pre-line rounded-[14px_14px_4px_14px] bg-raised px-3.5 py-3 text-sm leading-8">{m.content}</div>
+            <div key={i} className="anim-rise max-w-[92%] self-start whitespace-pre-line rounded-[14px_14px_4px_14px] bg-raised px-3.5 py-3 text-sm leading-8">{m.content}</div>
           ) : (
-            <div key={i} className="flex max-w-[94%] gap-2 self-end">
+            <div key={i} className="anim-rise flex max-w-[94%] gap-2 self-end">
               <span className="max-w-full whitespace-pre-line rounded-[14px_14px_14px_4px] border border-line bg-panel px-3.5 py-3 text-sm leading-8">{m.content}</span>
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-saffron text-sm font-black text-ink">ب</span>
             </div>

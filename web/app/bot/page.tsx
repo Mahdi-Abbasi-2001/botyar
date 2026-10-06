@@ -3,7 +3,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PENDING_KEY, api, getToken, isPlanLimit } from "@/lib/api";
-import { ErrorNote, Icon, Logo, PlanLimitNote, fa } from "@/components/ui";
+import { ErrorNote, Icon, PlanLimitNote, fa } from "@/components/ui";
 import { BuilderTab } from "@/components/workspace/BuilderTab";
 import { RecordsTab, StructureTab, TestsTab, VersionsTab } from "@/components/workspace/InspectorTabs";
 import { PublishTab } from "@/components/workspace/PublishTab";
@@ -16,6 +16,8 @@ import { InboxTab } from "@/components/workspace/InboxTab";
 import { CatalogTab } from "@/components/workspace/CatalogTab";
 import { PhoneSim } from "@/components/workspace/PhoneSim";
 import { progressOf, type Bot, type ChatMsg, type Rec, type RunResult, type RunStatus, type TestRes, type Ver } from "@/components/workspace/model";
+import { PageTransition } from "@/components/PageTransition";
+import { AppHeader } from "@/components/AppHeader";
 
 type Tab = "build" | "spec" | "tests" | "versions" | "publish" | "catalog" | "inbox" | "announce" | "customers" | "media" | "channels" | "records" | "try";
 const TAB_LABEL: Record<Tab, string> = { build: "گفت‌وگوی ساخت", spec: "ساختار", tests: "تست‌ها", versions: "نسخه‌ها", publish: "انتشار", catalog: "محصولات", inbox: "پیام‌ها", announce: "اطلاعیه", customers: "مشتریان", media: "فایل‌ها", channels: "کانال و گروه", records: "ثبت‌ها", try: "امتحان ربات" };
@@ -214,7 +216,7 @@ function Workspace() {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-10 text-center">
         <p className={error ? "text-lg font-bold" : "text-mute"}>{error || "در حال بارگذاری…"}</p>
-        {error && <Link href="/bots/" className="min-h-11 rounded-xl bg-saffron px-5 py-2.5 font-bold text-ink">بازگشت به ربات‌های من</Link>}
+        {error && <Link href="/bots/" className="min-h-11 rounded-xl bg-saffron px-5 py-2.5 font-bold text-ink">بازگشت به داشبورد</Link>}
       </main>
     );
   }
@@ -236,15 +238,12 @@ function Workspace() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3.5 sm:gap-4 sm:px-6">
-        <Logo href="/bots/" size="sm" />
-        <span className="hidden h-6 w-px bg-line sm:block" />
-        <div className="flex min-w-0 flex-1 basis-0 flex-col">
-          <span className="truncate text-[17px] font-extrabold">{bot.name}</span>
-          <span className="text-xs text-mute">
-            {running ? (spec ? `نسخه‌ی ${fa(bot.version)} · در حال ساخت نسخه‌ی بعدی` : "در حال ساخت اولین نسخه") : spec ? `نسخه‌ی ${fa(bot.version)}${tests.length ? ` · ${fa(passed)} از ${fa(tests.length)} تست موفق` : ""}` : "پیش‌نویس"}
-          </span>
-        </div>
+      <AppHeader crumb={<>
+        <span className="truncate text-[17px] font-extrabold">{bot.name}</span>
+        <span className="truncate text-xs text-mute">
+          {running ? (spec ? `نسخه‌ی ${fa(bot.version)} · در حال ساخت نسخه‌ی بعدی` : "در حال ساخت اولین نسخه") : spec ? `نسخه‌ی ${fa(bot.version)}${tests.length ? ` · ${fa(passed)} از ${fa(tests.length)} تست موفق` : ""}` : "پیش‌نویس"}
+        </span>
+      </>}>
         {cost !== null && cost > 0 && <span className="hidden rounded-lg border border-line px-2.5 py-1.5 text-xs text-mute xl:inline" dir="ltr" title="هزینه‌ی هوش مصنوعی این ربات تا این لحظه">هزینه‌ی هوش مصنوعی: <span dir="ltr">${cost.toFixed(4)}</span></span>}
         {/* where the bot stands with customers, and the one-click way forward */}
         {spec && live === "live" && (
@@ -272,7 +271,7 @@ function Workspace() {
             <Icon name="phone" size={16} /> {tab === "try" ? "بستن" : TAB_LABEL.try}
           </button>
         )}
-      </header>
+      </AppHeader>
       <div className="h-[3px] bg-panel">
         {running && <div className="h-[3px] bg-saffron transition-all duration-700" style={{ width: `${Math.round(progressOf(events) * 100)}%` }} />}
       </div>
@@ -299,7 +298,7 @@ function Workspace() {
             })}
           </div>
           {group && (
-            <nav role="tablist" aria-label="صفحه‌های این بخش" className="flex gap-1 overflow-x-auto px-4 pt-1 text-sm sm:px-6">
+            <nav key={group} role="tablist" aria-label="صفحه‌های این بخش" className="anim-tab flex gap-1 overflow-x-auto px-4 pt-1 text-sm sm:px-6">
               {GROUPS.find((g) => g.key === group)!.tabs.filter((t) => tabs.includes(t)).map((t) => (
                 <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
                   className={`min-h-11 shrink-0 border-b-2 px-3.5 ${tab === t ? "border-saffron font-bold text-fg" : "border-transparent text-mute hover:text-fg"}`}>
@@ -314,7 +313,8 @@ function Workspace() {
       )}
 
       <main className="flex flex-1 flex-wrap items-start gap-5 p-4 sm:p-6">
-        <div className={`min-w-0 flex-[1_1_640px] flex-col gap-4 ${tab === "try" ? "hidden" : "flex"}`}>
+        {/* keyed by tab: switching remounts it, so the new page fades up (.anim-tab) instead of popping in */}
+        <div key={tab} className={`anim-tab min-w-0 flex-[1_1_640px] flex-col gap-4 ${tab === "try" ? "hidden" : "flex"}`}>
           {error && <ErrorNote>{error}</ErrorNote>}
           {limit && tab === "build" && <PlanLimitNote text={limit} />}
           {spec && tab !== "build" && <DeliveryBanner botId={id!} />}
@@ -338,7 +338,7 @@ function Workspace() {
 
         {spec ? (
           // kept mounted so the conversation survives tab switches
-          <aside className={`w-full justify-center lg:w-auto lg:flex-[0_0_320px] ${tab === "try" ? "flex" : phoneTabs ? "hidden lg:flex" : "hidden"}`}>
+          <aside className={`w-full justify-center lg:w-auto lg:flex-[0_0_320px] ${tab === "try" ? "anim-tab flex" : phoneTabs ? "hidden lg:flex" : "hidden"}`}>
             <PhoneSim botId={id!} version={bot.version} labels={fieldLabels} onActivity={loadRecords} />
           </aside>
         ) : (
@@ -356,8 +356,10 @@ function Workspace() {
 
 export default function BotPage() {
   return (
-    <Suspense fallback={<main className="p-10 text-center text-mute">در حال بارگذاری…</main>}>
-      <Workspace />
-    </Suspense>
+    <PageTransition>
+      <Suspense fallback={<main className="p-10 text-center text-mute">در حال بارگذاری…</main>}>
+        <Workspace />
+      </Suspense>
+    </PageTransition>
   );
 }

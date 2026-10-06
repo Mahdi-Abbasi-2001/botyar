@@ -1,14 +1,18 @@
 import Link from "next/link";
+import { ViewTransition } from "react";
 
 export const fa = (n: number | string) => String(n).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[+d]);
 
 export function Logo({ href = "/", size = "md" }: { href?: string; size?: "sm" | "md" }) {
   const box = size === "sm" ? "h-8 w-8 rounded-[9px] text-base" : "h-9 w-9 rounded-[10px] text-xl";
   return (
-    <Link href={href} className="flex items-center gap-2.5 text-fg" aria-label="بات‌یار">
-      <span className={`flex items-center justify-center bg-saffron font-black text-ink ${box}`}>ب</span>
-      <span className={`font-extrabold ${size === "sm" ? "text-lg" : "text-[22px]"}`}>بات‌یار</span>
-    </Link>
+    // named, so it stays in place (and morphs between sizes) while the page around it changes
+    <ViewTransition name="site-logo" share="auto" default="none">
+      <Link href={href} className="flex items-center gap-2.5 text-fg" aria-label="بات‌یار">
+        <span className={`flex items-center justify-center bg-saffron font-black text-ink ${box}`}>ب</span>
+        <span className={`font-extrabold ${size === "sm" ? "text-lg" : "text-[22px]"}`}>بات‌یار</span>
+      </Link>
+    </ViewTransition>
   );
 }
 
