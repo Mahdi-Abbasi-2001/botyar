@@ -21,6 +21,9 @@ log = logging.getLogger("botyar.agent")
 MAX_DESIGN, MAX_REPAIR, MAX_CLARIFY_ROUNDS = 3, 3, 2
 
 
+DECLINE_MARK = "🚧 "  # starts a chat message in which the agent explained it can't build this kind of bot
+
+
 class ClarifyResult(BaseModel):
     ready: bool
     questions: list[str]
@@ -233,7 +236,8 @@ def run_builder(run_id: int, bot_id: int, request: str):
             run.status, run.result = "needs_input", {"message": msg, "cost_usd": b.cost()}
         elif outcome == "declined":
             msg = final["decline_message"]
-            db.add(BuilderMessage(bot_id=bot_id, role="assistant", content=msg))
+            # marked like the «❓» questions, so the workspace offers to send the request to the team (support tickets)
+            db.add(BuilderMessage(bot_id=bot_id, role="assistant", content=DECLINE_MARK + msg))
             run.status, run.result = "declined", {"message": msg, "cost_usd": b.cost()}
         elif outcome == "done":
             res = final["results"]

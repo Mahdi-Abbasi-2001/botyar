@@ -48,6 +48,7 @@ export default function Bots() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [limit, setLimit] = useState("");  // plan limit: shown beside the button the owner pressed
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (!getToken()) {
@@ -56,6 +57,13 @@ export default function Bots() {
     }
     api<BotRow[]>("/bots").then(setBots).catch((e) => setError(e.message));
     api<Tpl[]>("/templates").then(setTpls).catch(() => {});
+    // «ساخت همین ربات» on the landing page arrives with its sample description: prefill the new-bot box
+    const described = new URLSearchParams(window.location.search).get("describe");
+    if (described) {
+      setText(described.slice(0, 2000));
+      setCreating(true);
+      window.history.replaceState(null, "", "/bots/");
+    }
   }, [router]);
 
   async function startDescribed(e: React.FormEvent) {
@@ -89,9 +97,67 @@ export default function Bots() {
   const first = bots !== null && bots.length === 0;
   const hasBots = bots !== null && bots.length > 0;
 
+  // the new-bot box: the whole page for a first-time owner; for everyone else it opens under «ربات‌های من»
+  // from the «+ ربات جدید» button, so the list (what returning owners come for) stays on top
+  const creator = (
+    <div id="new-bot" className={`flex flex-wrap gap-5 ${first ? "" : "anim-tab"}`}
+      onKeyDown={(e) => { if (e.key === "Escape" && !first) setCreating(false); }}>
+      <form onSubmit={startDescribed} className="bp flex min-w-0 flex-[2_1_560px] flex-col gap-4 rounded-[22px] border border-saffron bg-panel p-5 sm:p-6">
+        {first ? (
+          <h1 className="m-0 text-2xl font-black sm:text-[32px]">اولین ربات خود را توضیح دهید</h1>
+        ) : (
+          <h2 className="m-0 text-xl font-black sm:text-2xl">ساخت ربات جدید</h2>
+        )}
+        <label htmlFor="nb" className="text-sm text-fg-2">ربات جدید شما قرار است چه کاری انجام دهد؟</label>
+        <textarea id="nb" autoFocus={!first} rows={3} value={text} onChange={(e) => setText(e.target.value)}
+          placeholder="مثلاً: برای کافه‌ام یک ربات سفارش می‌خواهم، با منوی نوشیدنی و کیک؛ هر سفارش که ثبت شد به من خبر بدهد."
+          className="resize-none rounded-2xl border border-line-2 bg-ink p-3.5 text-base leading-8 text-fg outline-none placeholder:text-dim focus:border-saffron" />
+        <div className="flex flex-wrap gap-2">
+          {EXAMPLES.map(([x, starter]) => (
+            <button key={x} type="button" onClick={() => setText(starter)} className="min-h-11 rounded-full border border-line-2 bg-raised px-3.5 text-[13px] text-fg-2 hover:text-fg">{x}</button>
+          ))}
+        </div>
+        {limit && <PlanLimitNote text={limit} />}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-[13px] text-dim">اگر بخشی از توضیح مبهم باشد، بات‌یار پیش از ساخت سؤال کوتاهی می‌پرسد.</span>
+          <button disabled={busy} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-saffron px-5 font-extrabold text-ink hover:bg-saffron-hi disabled:opacity-60">
+            {busy ? "در حال آماده‌سازی…" : "ساخت ربات"} <Icon name="send" strokeWidth={2.4} />
+          </button>
+        </div>
+      </form>
+
+      <div className="flex flex-[1_1_300px] flex-col gap-3">
+        <span className="text-sm text-mute">یا از یک نمونه‌ی آماده شروع کنید</span>
+        {tpls.map((t) => {
+          const info = TPL_INFO[t.key];
+          return (
+            <button key={t.key} onClick={() => fromTemplate(t.key)} className="lift flex flex-1 flex-col gap-2.5 rounded-[18px] border border-line-2 bg-panel p-[18px] text-right hover:border-saffron">
+              <span className="text-[17px] font-extrabold">{t.name}</span>
+              {info && <span className="text-[13px] leading-7 text-mute">{info.desc}</span>}
+              {info && (
+                <span className="flex flex-wrap gap-1.5 text-xs">
+                  {info.tags.map((tag, i) => (
+                    <span key={tag} className={`rounded-md border px-2 py-0.5 ${i === info.tags.length - 1 ? "border-amber-line text-amber-fg/80" : "border-line-3"}`}>{tag}</span>
+                  ))}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   const list = hasBots && (
     <section className="flex flex-col gap-3.5">
-      <h1 className="m-0 text-[26px] font-black">ربات‌های من</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="m-0 text-[26px] font-black">ربات‌های من</h1>
+        <button type="button" aria-expanded={creating} aria-controls="new-bot" onClick={() => setCreating(!creating)}
+          className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-bold ${creating ? "border border-line-2 text-fg-2 hover:text-fg" : "bg-saffron text-ink hover:bg-saffron-hi"}`}>
+          {creating ? "بستن" : <><Icon name="plus" size={16} strokeWidth={2.4} /> ربات جدید</>}
+        </button>
+      </div>
+      {creating && creator}
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(300px,1fr))]">
         {bots!.map((b) => {
           const isLive = !!b.live?.length;
@@ -134,53 +200,8 @@ export default function Bots() {
         <main className="mx-auto flex max-w-[1320px] flex-col gap-9 px-4 py-8 sm:px-6">
           {error && <ErrorNote>{error}</ErrorNote>}
           {bots === null && !error && <p className="text-mute">در حال بارگذاری…</p>}
-          {/* returning owners come for their bots: the list first, the "new bot" box after it */}
           {list}
-          <div className="flex flex-wrap gap-5">
-            <form onSubmit={startDescribed} className="bp flex min-w-0 flex-[2_1_560px] flex-col gap-4 rounded-[22px] border border-saffron bg-panel p-5 sm:p-6">
-              {first ? (
-                <h1 className="m-0 text-2xl font-black sm:text-[32px]">اولین ربات خود را توضیح دهید</h1>
-              ) : (
-                <h2 className="m-0 text-xl font-black sm:text-2xl">ساخت ربات جدید</h2>
-              )}
-              <label htmlFor="nb" className="text-sm text-fg-2">ربات جدید شما قرار است چه کاری انجام دهد؟</label>
-              <textarea id="nb" rows={3} value={text} onChange={(e) => setText(e.target.value)}
-                placeholder="مثلاً: برای کافه‌ام یک ربات سفارش می‌خواهم، با منوی نوشیدنی و کیک؛ هر سفارش که ثبت شد به من خبر بدهد."
-                className="resize-none rounded-2xl border border-line-2 bg-ink p-3.5 text-base leading-8 text-fg outline-none placeholder:text-dim focus:border-saffron" />
-              <div className="flex flex-wrap gap-2">
-                {EXAMPLES.map(([x, starter]) => (
-                  <button key={x} type="button" onClick={() => setText(starter)} className="min-h-11 rounded-full border border-line-2 bg-raised px-3.5 text-[13px] text-fg-2 hover:text-fg">{x}</button>
-                ))}
-              </div>
-              {limit && <PlanLimitNote text={limit} />}
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <span className="text-[13px] text-dim">اگر بخشی از توضیح مبهم باشد، بات‌یار پیش از ساخت سؤال کوتاهی می‌پرسد.</span>
-                <button disabled={busy} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-saffron px-5 font-extrabold text-ink hover:bg-saffron-hi disabled:opacity-60">
-                  {busy ? "در حال آماده‌سازی…" : "ساخت ربات"} <Icon name="send" strokeWidth={2.4} />
-                </button>
-              </div>
-            </form>
-
-            <div className="flex flex-[1_1_300px] flex-col gap-3">
-              <span className="text-sm text-mute">یا از یک نمونه‌ی آماده شروع کنید</span>
-              {tpls.map((t) => {
-                const info = TPL_INFO[t.key];
-                return (
-                  <button key={t.key} onClick={() => fromTemplate(t.key)} className="lift flex flex-1 flex-col gap-2.5 rounded-[18px] border border-line-2 bg-panel p-[18px] text-right hover:border-saffron">
-                    <span className="text-[17px] font-extrabold">{t.name}</span>
-                    {info && <span className="text-[13px] leading-7 text-mute">{info.desc}</span>}
-                    {info && (
-                      <span className="flex flex-wrap gap-1.5 text-xs">
-                        {info.tags.map((tag, i) => (
-                          <span key={tag} className={`rounded-md border px-2 py-0.5 ${i === info.tags.length - 1 ? "border-amber-line text-amber-fg/80" : "border-line-3"}`}>{tag}</span>
-                        ))}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {first && creator}
 
           {first && (
             <p className="flex items-center gap-2.5 text-[13px] text-mute"><Icon name="shield" className="text-mint" /> هر نسخه پیش از تحویل با تست خودکار بررسی می‌شود.</p>

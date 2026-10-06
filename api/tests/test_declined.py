@@ -40,5 +40,5 @@ def test_impossible_request_is_declined_with_an_explanation_and_creates_nothing(
         assert run.status == "declined" and run.result["message"] == explain
         assert not db.scalars(select(BotVersion).where(BotVersion.bot_id == bot_id)).first()  # nothing was built
         last = db.scalars(select(BuilderMessage).where(BuilderMessage.bot_id == bot_id).order_by(BuilderMessage.id.desc())).first()
-        assert last.role == "assistant" and last.content == explain and not last.content.startswith("❓")  # a plain message, not question cards
+        assert last.role == "assistant" and last.content == agent.DECLINE_MARK + explain and not last.content.startswith("❓")  # a plain message, not question cards
     assert calls == ["clarify"]  # it stopped right after the first model call: no design/test spend

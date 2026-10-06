@@ -5,6 +5,8 @@ import { api } from "@/lib/api";
 import { BlueprintPreview, TypedRequest, useTyping } from "@/components/TypingHero";
 import { Icon, Logo, fa } from "@/components/ui";
 import { PublicActions } from "@/components/PublicActions";
+import { useSignedIn } from "@/components/useSignedIn";
+import { SAMPLE_REQUEST } from "@/components/TypingHero";
 import { useReveal } from "@/components/useReveal";
 import { PageTransition } from "@/components/PageTransition";
 
@@ -83,6 +85,7 @@ export default function Home() {
   const n = useTyping();
   useReveal();
   const here = useSectionInView();
+  const signedIn = useSignedIn();  // the header and every «start» button adapt: an owner goes to the dashboard, not the login page
   const [plans, setPlans] = useState<{ plans: Plan[]; prices_proposed: boolean } | null>(null);
   useEffect(() => {
     api<{ plans: Plan[]; prices_proposed: boolean }>("/plans").then(setPlans).catch(() => {});
@@ -102,7 +105,7 @@ export default function Home() {
                 </a>
               ))}
               <span className="hidden h-5 w-px bg-line-2 sm:block" aria-hidden />
-              <PublicActions />
+              <PublicActions signedIn={signedIn} />
             </nav>
           </div>
         </header>
@@ -123,7 +126,7 @@ export default function Home() {
                   <TypedRequest n={n} />
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <span className="text-[13px] text-dim">یک نمونه؛ بعد از ورود، توضیح خودتان را می‌نویسید</span>
-                    <Link href="/login/" className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-saffron px-5 font-extrabold text-ink hover:bg-saffron-hi">
+                    <Link href={signedIn ? `/bots/?describe=${encodeURIComponent(SAMPLE_REQUEST)}` : "/login/"} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-saffron px-5 font-extrabold text-ink hover:bg-saffron-hi">
                       ساخت همین ربات <Icon name="send" strokeWidth={2.4} />
                     </Link>
                   </div>
@@ -274,12 +277,21 @@ export default function Home() {
           </section>
 
           <section data-reveal className="flex flex-col items-center gap-5 border-t border-line pt-16 text-center">
-            <h2 className="m-0 text-4xl font-black leading-snug sm:text-[52px]">اولین ربات خود را همین حالا بسازید.</h2>
-            <div className="flex flex-wrap justify-center gap-3">
-              <Link href="/login/" className="inline-flex min-h-13 items-center rounded-xl bg-saffron px-6 text-[17px] font-extrabold text-ink hover:bg-saffron-hi">شروع رایگان</Link>
-              <Link href="/login/" className="inline-flex min-h-13 items-center rounded-xl border border-line-2 bg-panel px-5 hover:border-line-3">شروع از یک نمونه</Link>
-            </div>
-            <span className="text-sm text-mute">برای ساخت ربات به کارت بانکی نیازی نیست؛ هزینه‌ی هوش مصنوعی هر ساخت را هم شفاف می‌بینید.</span>
+            {signedIn ? (
+              <>
+                <h2 className="m-0 text-4xl font-black leading-snug sm:text-[52px]">ربات بعدی خود را بسازید.</h2>
+                <Link href="/bots/" className="inline-flex min-h-13 items-center rounded-xl bg-saffron px-6 text-[17px] font-extrabold text-ink hover:bg-saffron-hi">ساخت ربات جدید</Link>
+              </>
+            ) : (
+              <>
+                <h2 className="m-0 text-4xl font-black leading-snug sm:text-[52px]">اولین ربات خود را همین حالا بسازید.</h2>
+                <div className="flex flex-wrap justify-center gap-3">
+                  <Link href="/login/" className="inline-flex min-h-13 items-center rounded-xl bg-saffron px-6 text-[17px] font-extrabold text-ink hover:bg-saffron-hi">شروع رایگان</Link>
+                  <Link href="/login/" className="inline-flex min-h-13 items-center rounded-xl border border-line-2 bg-panel px-5 hover:border-line-3">شروع از یک نمونه</Link>
+                </div>
+                <span className="text-sm text-mute">برای ساخت ربات به کارت بانکی نیازی نیست؛ هزینه‌ی هوش مصنوعی هر ساخت را هم شفاف می‌بینید.</span>
+              </>
+            )}
           </section>
         </div>
       </div>

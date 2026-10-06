@@ -19,6 +19,8 @@ const SEGS: [string, number][] = [
   [".", 0],
 ];
 const NUM = ["", "۱", "۲", "۳", "۴"];
+/** The whole sample, for «ساخت همین ربات»: a signed-in owner gets it prefilled in the dashboard's new-bot box. */
+export const SAMPLE_REQUEST = SEGS.map(([t]) => t).join("");
 const ENDS = SEGS.reduce<number[]>((a, [t]) => [...a, (a.at(-1) ?? 0) + t.length], []);
 const LEN = ENDS.at(-1)!;
 const TICK = 45;

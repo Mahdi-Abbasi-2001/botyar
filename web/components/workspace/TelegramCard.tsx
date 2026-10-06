@@ -5,7 +5,7 @@ import { PlanLimitNote, fa } from "@/components/ui";
 import { ShareLink } from "@/components/workspace/ShareLink";
 
 type Tg = {
-  enabled: boolean; published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string; listed: boolean;
+  enabled: boolean; published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string; listed: boolean; sample_products: boolean;
   mode?: "shared" | "own"; version?: number; code?: string; admin_code?: string; bot_username?: string; admin_linked?: boolean; up_to_date?: boolean;
 };
 
@@ -13,7 +13,8 @@ const card = "rounded-2xl border border-line-2 bg-panel p-4";
 const btn = "min-h-11 rounded-xl bg-saffron px-5 font-bold text-ink disabled:opacity-50";
 
 /** Publishing the same bot to Telegram (through the relay outside Iran). Independent of the Bale publication. */
-export function TelegramCard({ botId }: { botId: string }) {
+/** `allowSamples`: the owner ticked «publish with the demo products» in the publish tab (one choice for both messengers). */
+export function TelegramCard({ botId, allowSamples }: { botId: string; allowSamples: boolean }) {
   const [tg, setTg] = useState<Tg | null>(null);
   const [mode, setMode] = useState<"shared" | "own">("shared");
   const [token, setToken] = useState("");
@@ -40,7 +41,7 @@ export function TelegramCard({ botId }: { botId: string }) {
     setBusy(true);
     setError("");
     try {
-      setTg(await api<Tg>(`/bots/${botId}/telegram/publish`, { body: { mode: m, token: m === "own" ? token : undefined } }));
+      setTg(await api<Tg>(`/bots/${botId}/telegram/publish`, { body: { mode: m, token: m === "own" ? token : undefined, allow_samples: allowSamples } }));
       setToken("");
     } catch (e: any) {
       setError(e.message, e);
@@ -113,7 +114,7 @@ export function TelegramCard({ botId }: { botId: string }) {
               className="min-h-11 w-full rounded-xl border border-line-2 bg-ink px-3 text-left outline-none focus:border-saffron" />
           </label>
         )}
-        <button className={btn} disabled={busy || !tg.tests_ok || (mode === "own" && token.trim().length < 20)} onClick={() => publish(mode)}>
+        <button className={btn} disabled={busy || (tg.sample_products && !allowSamples) || !tg.tests_ok || (mode === "own" && token.trim().length < 20)} onClick={() => publish(mode)}>
           {busy ? "در حال انتشار…" : "انتشار در تلگرام"}
         </button>
       </div>
@@ -130,7 +131,7 @@ export function TelegramCard({ botId }: { botId: string }) {
       {!tg.up_to_date && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-saffron/50 bg-saffron/10 p-3 text-sm">
           <span>نسخه‌ی {fa(tg.latest_version)} آماده است، اما هنوز در تلگرام منتشر نشده است.</span>
-          <button className={btn + " !min-h-9 !px-4 text-sm"} disabled={busy || !tg.tests_ok} onClick={() => publish(tg.mode!)}>انتشار نسخه‌ی {fa(tg.latest_version)}</button>
+          <button className={btn + " !min-h-9 !px-4 text-sm"} disabled={busy || (tg.sample_products && !allowSamples) || !tg.tests_ok} onClick={() => publish(tg.mode!)}>انتشار نسخه‌ی {fa(tg.latest_version)}</button>
         </div>
       )}
       {tg.mode === "shared" ? (

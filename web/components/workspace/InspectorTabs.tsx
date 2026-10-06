@@ -152,6 +152,9 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
   if (b.type === "catalog_order")
     return (
       <>
+        {b.source === "table" && (
+          <span className="text-sm leading-7 text-fg-2">مشتری محصولات را بر اساس دسته‌بندی می‌بیند و جست‌وجو می‌کند. فهرست محصولات در بخش «محصولات» نگهداری می‌شود و از آنجا وارد یا ویرایش می‌شود.</span>
+        )}
         <div className="flex flex-col gap-1.5 text-sm">
           {b.items.map((it) => (
             <div key={it.id} className="flex justify-between gap-2 rounded-[10px] bg-raised px-3 py-2">

@@ -233,6 +233,22 @@ class UpgradeRequest(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
+class SupportTicket(Base):
+    """An owner's message to the Botyar team: a bot type the agent can't build yet, a problem, a question or an idea."""
+    __tablename__ = "support_tickets"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    bot_id: Mapped[int | None] = mapped_column(ForeignKey("bots.id"), nullable=True)
+    kind: Mapped[str] = mapped_column(String(16))  # unsupported | problem | question | idea
+    text: Mapped[str] = mapped_column(Text)
+    context: Mapped[str] = mapped_column(Text, default="")  # e.g. the agent's explanation when it declined the request
+    status: Mapped[str] = mapped_column(String(10), default="open")  # open | answered | closed
+    reply: Mapped[str] = mapped_column(Text, default="")
+    user_seen: Mapped[bool] = mapped_column(Boolean, default=True)  # false once the team replies, until the owner opens «پشتیبانی»
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    replied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class CustomerSeen(Base):
     """Everyone who has written to a live bot (Bale chats): feeds the customers tab and the plan's monthly customer cap."""
     __tablename__ = "customers_seen"

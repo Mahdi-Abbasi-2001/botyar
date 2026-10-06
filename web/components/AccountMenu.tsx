@@ -2,9 +2,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { getUsername, setToken, whoAmI } from "@/lib/api";
+import { api, getUsername, setToken, whoAmI } from "@/lib/api";
 
-const ITEMS: [string, string][] = [["/bots/", "داشبورد"], ["/account/", "پلن و مصرف"], ["/pricing/", "تعرفه‌ها"]];
+const ITEMS: [string, string][] = [["/bots/", "داشبورد"], ["/account/", "پلن و مصرف"], ["/pricing/", "تعرفه‌ها"], ["/support/", "پشتیبانی"]];
 
 /** The one account control of every app page: the username, opening a menu with the app's pages and sign-out.
  *  On phones only the person icon shows, so crowded headers (the bot workspace) still fit. */
@@ -13,12 +13,16 @@ export function AccountMenu() {
   const path = usePathname();
   const [name, setName] = useState("");
   const [open, setOpen] = useState(false);
+  // a reply from the team waiting in «پشتیبانی» (for admins: tickets still open) puts a dot on the menu
+  const [count, setNews] = useState(0);
+  const news = path.startsWith("/support") ? 0 : count;  // the page itself marks replies as read
   const box = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setName(getUsername() ?? "");
     whoAmI().then((u) => { if (u) setName(u); });
+    api<{ count: number; admin_open: number | null }>("/tickets/unread").then((r) => setNews(r.count + (r.admin_open ?? 0))).catch(() => {});
   }, []);
 
   // close on a click elsewhere or Escape (focus goes back to the button)
@@ -42,6 +46,7 @@ export function AccountMenu() {
           <circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0116 0" />
         </svg>
         <span dir="ltr" className="hidden max-w-[160px] truncate font-bold sm:inline">{name || "حساب من"}</span>
+        {news > 0 && <span className="h-2 w-2 shrink-0 rounded-full bg-saffron" aria-label="پاسخ تازه در پشتیبانی" />}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden
           className={`hidden shrink-0 text-mute transition-transform duration-200 sm:block ${open ? "rotate-180" : ""}`}><path d="M6 9l6 6 6-6" /></svg>
       </button>
@@ -55,7 +60,9 @@ export function AccountMenu() {
               <Link key={href} href={href} role="menuitem" aria-current={here ? "page" : undefined} onClick={() => setOpen(false)}
                 className={`${item} ${here ? "font-bold text-fg" : "text-fg-2 hover:text-fg"}`}>
                 {label}
-                {here && <span className="h-1.5 w-1.5 rounded-full bg-saffron" aria-hidden />}
+                {href === "/support/" && news > 0 && !here
+                  ? <span className="rounded-full bg-saffron px-2 text-xs font-bold text-ink">{news.toLocaleString("fa-IR")}</span>
+                  : here && <span className="h-1.5 w-1.5 rounded-full bg-saffron" aria-hidden />}
               </Link>
             );
           })}

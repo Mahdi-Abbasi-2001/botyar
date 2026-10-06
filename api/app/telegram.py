@@ -26,7 +26,7 @@ from .auth import current_user
 from .config import settings
 from .db import get_db
 from .models import Publication, TgChatLink, TgPublication, User
-from .publish import _json, _latest, _own, _tests_ok
+from .publish import _json, _latest, _own, _tests_ok, check_samples, sample_catalog
 from .spec import BotSpec
 
 log = logging.getLogger("botyar.telegram")
@@ -101,6 +101,7 @@ def _status(bot_id: int, db: Session) -> dict:
         "tests_ok": _tests_ok(bot_id, latest.version, db) if latest else False,
         "shared_bot_username": shared_username() if settings.telegram_shared_bot_token else "",
         "listed": not bale._hidden(db, bot_id),
+        "sample_products": sample_catalog(bot_id, db),
     }
     if pub:
         out |= {"mode": pub.mode, "version": pub.version, "code": pub.code, "admin_code": pub.admin_code,
@@ -112,6 +113,7 @@ def _status(bot_id: int, db: Session) -> dict:
 class TgPublishIn(BaseModel):
     mode: str  # shared | own
     token: str | None = None
+    allow_samples: bool = False
 
 
 @router.get("/api/bots/{bot_id}/telegram")
@@ -144,6 +146,7 @@ def tg_publish(bot_id: int, body: TgPublishIn, user: User = Depends(current_user
         raise HTTPException(409, "ربات هنوز ساخته نشده است")
     if not _tests_ok(bot_id, latest.version, db):
         raise HTTPException(409, "همه‌ی تست‌های نسخه‌ی فعلی هنوز موفق نشده‌اند؛ ابتدا ربات را در «گفت‌وگوی ساخت» اصلاح کنید")
+    check_samples(bot_id, body.allow_samples, db)
     if body.mode not in ("shared", "own"):
         raise HTTPException(400, "حالت انتشار نامعتبر است")
     pub = db.scalars(select(TgPublication).where(TgPublication.bot_id == bot_id)).first()

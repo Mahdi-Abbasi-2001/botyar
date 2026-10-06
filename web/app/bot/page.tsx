@@ -89,6 +89,8 @@ function Workspace() {
   const [tests, setTests] = useState<TestRes[]>([]);
   const [versions, setVersions] = useState<Ver[]>([]);
   const [cost, setCost] = useState<number | null>(null);
+  // the product table (shops with many products): its size, and whether it still holds only the build-time demo products
+  const [catalog, setCatalog] = useState<{ total: number; sample: boolean } | null>(null);
 
   const loadRecords = useCallback(() => {
     api<Rec[]>(`/bots/${id}/records?sandbox=true`).then(setRecords).catch(() => {});
@@ -196,7 +198,8 @@ function Workspace() {
     return () => { alive.current = false; };
   }, [id, router, loadAll]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // where the bot is live; refreshed on every tab change so the header follows what the owner just did in «انتشار»
+  // where the bot is live, and its product table; refreshed on every tab change so the header and the builder
+  // follow what the owner just did in «انتشار» or «محصولات»
   const hasSpec = !!bot?.spec;
   useEffect(() => {
     if (!id || !hasSpec) return;
@@ -204,6 +207,8 @@ function Workspace() {
       api<PubInfo>(`/bots/${id}/publication`).catch(() => null),
       api<PubInfo & { enabled?: boolean }>(`/bots/${id}/telegram`).catch(() => null),
     ]).then(([bale, tg]) => setPub({ bale, tg }));
+    api<{ block: string | null; total: number; sample: boolean }>(`/bots/${id}/catalog`)
+      .then((c) => setCatalog(c.block ? { total: c.total, sample: c.sample } : null)).catch(() => {});
   }, [id, hasSpec, tab, bot?.version]);
 
   function editPart(where: string) {
@@ -320,7 +325,7 @@ function Workspace() {
           {spec && tab !== "build" && <DeliveryBanner botId={id!} />}
           {tab === "build" && (
             <BuilderTab spec={spec} tests={tests} chat={chat} events={events} running={running} lastCost={lastCost} stamped={stamped}
-              input={input} setInput={setInput} inputRef={inputRef} onSend={sendBuild} />
+              input={input} setInput={setInput} inputRef={inputRef} onSend={sendBuild} botId={id!} catalog={catalog} onImport={() => setTab("catalog")} />
           )}
           {tab === "spec" && spec && <StructureTab spec={spec} records={records} onEdit={editPart} />}
           {tab === "tests" && <TestsTab tests={tests} spec={spec} version={bot.version} />}
@@ -332,7 +337,7 @@ function Workspace() {
           {tab === "customers" && spec && live !== "off" && <CustomersTab botId={id!} />}
           {tab === "announce" && spec && live !== "off" && <AnnounceTab botId={id!} />}
           {tab === "inbox" && spec && <InboxTab botId={id!} />}
-          {tab === "publish" && spec && <PublishTab botId={id!} />}
+          {tab === "publish" && spec && <PublishTab botId={id!} onImport={() => setTab("catalog")} />}
           {tab === "records" && spec && <RecordsTab records={records} spec={spec} botId={id!} onChanged={loadRecords} />}
         </div>
 

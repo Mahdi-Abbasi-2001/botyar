@@ -1,5 +1,7 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { api } from "@/lib/api";
 import { Icon, Stamp, fa } from "../ui";
 import { BLOCK_KIND, blockTitle, parseQuestions, toSteps, type ChatMsg, type Spec, type TestRes } from "./model";
 
@@ -21,6 +23,9 @@ type Props = {
   setInput: (s: string) => void;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   onSend: (text: string) => void;
+  botId: string;
+  catalog: { total: number; sample: boolean } | null;  // the product table, when the bot has one
+  onImport: () => void;                                 // opens «محصولات»
 };
 
 // Height left for the chat once the header, tab bar and page padding are drawn.
@@ -105,6 +110,11 @@ export function BuilderTab(p: Props) {
           const qs = m.role === "assistant" ? parseQuestions(m.content) : null;
           if (qs && i === p.chat.length - 1 && lastQ) return <QuestionCards key={i} questions={qs} onSend={p.onSend} />;
           if (qs) return <PastQuestions key={i} questions={qs} />;
+          // the agent can't build this kind of bot: offer to send the request to the team as a support ticket
+          if (m.role === "assistant" && m.content.startsWith(DECLINE_MARK)) {
+            const asked = p.chat.slice(0, i).reverse().find((x) => x.role === "user")?.content ?? "";
+            return <Declined key={i} botId={p.botId} message={m.content.slice(DECLINE_MARK.length)} request={asked} />;
+          }
           return m.role === "user" ? (
             <div key={i} className="anim-rise max-w-[92%] self-start whitespace-pre-line rounded-[14px_14px_4px_14px] bg-raised px-3.5 py-3 text-sm leading-8">{m.content}</div>
           ) : (
@@ -117,6 +127,17 @@ export function BuilderTab(p: Props) {
 
         {(p.running || (p.events.length > 0 && !lastQ)) && <Timeline events={p.events} running={p.running} />}
         {p.lastCost !== null && !p.running && <span className="text-xs text-dim">هزینه‌ی هوش مصنوعی این درخواست: <span dir="ltr">${p.lastCost.toFixed(4)}</span></span>}
+        {/* the shop was built with invented demo products (so it can be tested): the owner's real list is the next step */}
+        {p.catalog?.sample && !p.running && !lastQ && (
+          <div className="anim-rise flex flex-col gap-2.5 rounded-2xl border border-amber-line bg-amber-bg p-4 text-sm leading-7">
+            <strong className="text-amber-fg">قدم بعد: فهرست واقعی محصولات</strong>
+            <span className="text-fg-2">
+              ربات با {fa(p.catalog.total)} محصول نمونه ساخته شد تا بتوانید همین حالا امتحانش کنید. فهرست محصولات فروشگاه خود را
+              از فایل اکسل یا CSV، یک جدول کپی‌شده یا عکس فهرست قیمت وارد کنید تا جای نمونه‌ها را بگیرد.
+            </span>
+            <button type="button" onClick={p.onImport} className="min-h-11 self-start rounded-xl bg-saffron px-5 font-bold text-ink hover:bg-saffron-hi">وارد کردن محصولات</button>
+          </div>
+        )}
         </div>
         </div>
 
@@ -139,7 +160,7 @@ export function BuilderTab(p: Props) {
         )}
       </section>
 
-      <MiniMap spec={p.spec} tests={p.tests} running={p.running} stamped={p.stamped} />
+      <MiniMap spec={p.spec} tests={p.tests} running={p.running} stamped={p.stamped} catalog={p.catalog} />
     </div>
   );
 }
@@ -215,7 +236,7 @@ function PastQuestions({ questions }: { questions: string[] }) {
   );
 }
 
-function MiniMap({ spec, tests, running, stamped }: { spec: Spec | null; tests: TestRes[]; running: boolean; stamped: boolean }) {
+function MiniMap({ spec, tests, running, stamped, catalog }: { spec: Spec | null; tests: TestRes[]; running: boolean; stamped: boolean; catalog: Props["catalog"] }) {
   const passed = tests.filter((t) => t.passed).length;
   return (
     <section className={`bp relative flex min-w-0 flex-[1.3_1_420px] flex-col gap-3.5 overflow-y-auto overscroll-contain rounded-[20px] border border-line bg-ink-2 p-5 lg:max-h-[calc(100dvh-11rem)]`}>
@@ -242,7 +263,11 @@ function MiniMap({ spec, tests, running, stamped }: { spec: Spec | null; tests: 
                 <span className="text-sm leading-7">{blockTitle(b)}</span>
                 {b.type === "faq" && <span className="text-xs text-mute">{fa(b.entries.length)} پرسش و پاسخ</span>}
                 {b.type === "booking" && <span className="text-xs text-mute">{b.schedule ? `ساعت کاری · نوبت ${fa(b.schedule.duration_minutes)} دقیقه${b.schedule.staff.length ? ` · ${fa(b.schedule.staff.length)} نفر` : ""}` : `${fa(b.slots.length)} زمان${b.waitlist ? " · لیست انتظار" : ""}`}</span>}
-                {b.type === "catalog_order" && <span className="text-xs text-mute">{fa(b.items.length)} آیتم</span>}
+                {b.type === "catalog_order" && (
+                  b.source === "table"
+                    ? <span className={`text-xs ${catalog?.sample ? "text-amber-fg" : "text-mute"}`}>{catalog ? `${fa(catalog.total)} محصول${catalog.sample ? " نمونه" : ""}` : "فهرست محصولات"}</span>
+                    : <span className="text-xs text-mute">{fa(b.items.length)} آیتم</span>
+                )}
               </div>
             ))}
           </div>
@@ -262,5 +287,63 @@ function MiniMap({ spec, tests, running, stamped }: { spec: Spec | null; tests: 
       )}
       {stamped && <Stamp settle sub={`${fa(passed)} از ${fa(tests.length)} · قبول`} size={156} className="absolute left-7 top-16" />}
     </section>
+  );
+}
+
+const DECLINE_MARK = "🚧 ";  // api/app/agent.py: starts the message in which the agent declined the request
+
+/** The agent explained it can't build this; the owner can hand the request to the Botyar team in one step. */
+function Declined({ botId, message, request }: { botId: string; message: string; request: string }) {
+  const [writing, setWriting] = useState(false);
+  const [text, setText] = useState(request);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<number | null>(null);
+  const [error, setError] = useState("");
+
+  async function submit() {
+    setBusy(true);
+    setError("");
+    try {
+      const t = await api<{ id: number }>("/tickets", { body: { kind: "unsupported", text, bot_id: Number(botId), context: message } });
+      setDone(t.id);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="anim-rise flex max-w-[94%] gap-2 self-end">
+      <div className="flex min-w-0 flex-col gap-3 rounded-[14px_14px_14px_4px] border border-line bg-panel px-3.5 py-3 text-sm leading-8">
+        <span className="whitespace-pre-line">🚧 {message}</span>
+        <div className="flex flex-col gap-2.5 rounded-xl border border-line-2 bg-raised p-3">
+          {done !== null ? (
+            <span className="text-mint-fg">
+              درخواست شما با شماره‌ی {fa(done)} برای تیم بات‌یار ثبت شد. پاسخ را در <Link href="/support/" className="font-bold underline">پشتیبانی</Link> می‌بینید.
+            </span>
+          ) : writing ? (
+            <>
+              <label htmlFor="decline-request" className="text-xs text-mute">این درخواست برای تیم بات‌یار ارسال می‌شود؛ اگر لازم است کامل‌ترش کنید:</label>
+              <textarea id="decline-request" autoFocus rows={3} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)}
+                className="resize-y rounded-xl border border-line-2 bg-ink p-2.5 leading-7 outline-none focus:border-saffron" />
+              {error && <span className="text-bad-soft">{error}</span>}
+              <div className="flex gap-2">
+                <button type="button" disabled={busy || text.trim().length < 5} onClick={submit} className="min-h-10 rounded-xl bg-saffron px-4 font-bold text-ink hover:bg-saffron-hi disabled:opacity-50">
+                  {busy ? "در حال ثبت…" : "ثبت درخواست"}
+                </button>
+                <button type="button" onClick={() => setWriting(false)} className="min-h-10 rounded-xl border border-line-2 px-4 text-fg-2 hover:text-fg">انصراف</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <span className="text-fg-2">اگر این نوع ربات برای کسب‌وکارتان مهم است، درخواستتان را برای تیم بات‌یار بفرستید تا بررسی شود؛ پاسخ را در بخش «پشتیبانی» می‌بینید.</span>
+              <button type="button" onClick={() => setWriting(true)} className="min-h-10 self-start rounded-xl border border-saffron px-4 font-bold text-saffron hover:bg-saffron/10">ثبت درخواست برای تیم بات‌یار</button>
+            </>
+          )}
+        </div>
+      </div>
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-saffron text-sm font-black text-ink">ب</span>
+    </div>
   );
 }

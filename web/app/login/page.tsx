@@ -1,7 +1,8 @@
 "use client";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, setToken } from "@/lib/api";
+import { useSignedIn } from "@/components/useSignedIn";
 import { ErrorNote, Logo, Stamp } from "@/components/ui";
 import { PageTransition } from "@/components/PageTransition";
 
@@ -15,6 +16,10 @@ function LoginForm() {
   const [error, setError] = useState<{ text: string; taken?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const isReg = mode === "register";
+
+  // already signed in (an old link, the back button): nothing to do here, go to the dashboard
+  const signedIn = useSignedIn();
+  useEffect(() => { if (signedIn) router.replace("/bots/"); }, [signedIn, router]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

@@ -10,6 +10,7 @@ import { ShareLink } from "@/components/workspace/ShareLink";
 
 type Pub = {
   published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string; webhooks_enabled: boolean; listed: boolean;
+  sample_products: boolean;  // the product table still holds only the demo products made at build time
   mode?: "shared" | "own"; version?: number; code?: string; admin_code?: string; bot_username?: string; admin_linked?: boolean; up_to_date?: boolean;
 };
 type Live = { id: number; collection: string; data: Record<string, any>; created_at: string };
@@ -17,8 +18,11 @@ type Live = { id: number; collection: string; data: Record<string, any>; created
 const card = "rounded-2xl border border-line-2 bg-panel p-4";
 const btn = "min-h-11 rounded-xl bg-saffron px-5 font-bold text-ink disabled:opacity-50";
 
-export function PublishTab({ botId }: { botId: string }) {
+export function PublishTab({ botId, onImport }: { botId: string; onImport: () => void }) {
   const [pub, setPub] = useState<Pub | null>(null);
+  // publishing the invented demo products is refused (server too) unless the owner says it's only a trial
+  const [allowSamples, setAllowSamples] = useState(false);
+  const samplesBlock = !!pub?.sample_products && !allowSamples;
   const [mode, setMode] = useState<"shared" | "own">("shared");
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
@@ -44,7 +48,7 @@ export function PublishTab({ botId }: { botId: string }) {
     setBusy(true);
     setError("");
     try {
-      setPub(await api<Pub>(`/bots/${botId}/publish`, { body: { mode: m, token: m === "own" ? token : undefined } }));
+      setPub(await api<Pub>(`/bots/${botId}/publish`, { body: { mode: m, token: m === "own" ? token : undefined, allow_samples: allowSamples } }));
       setToken("");
     } catch (e: any) {
       setError(e.message, e);
@@ -83,6 +87,7 @@ export function PublishTab({ botId }: { botId: string }) {
   return (
     <div className="flex flex-col gap-4">
       {error && (limitHit ? <PlanLimitNote text={error} /> : <p className="rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-bad">{error}</p>)}
+      {pub.sample_products && <SampleProductsNote allow={allowSamples} setAllow={setAllowSamples} onImport={onImport} />}
 
       {!pub.published ? (
         <>
@@ -107,11 +112,11 @@ export function PublishTab({ botId }: { botId: string }) {
             </label>
           )}
           {!pub.webhooks_enabled && <p className="mb-3 text-sm text-mute">انتشار فقط در نسخه‌ی آنلاین بات‌یار کار می‌کند.</p>}
-          <button className={btn} disabled={busy || !pub.tests_ok || !pub.webhooks_enabled || (mode === "own" && token.trim().length < 10)} onClick={() => publish(mode)}>
+          <button className={btn} disabled={busy || samplesBlock || !pub.tests_ok || !pub.webhooks_enabled || (mode === "own" && token.trim().length < 10)} onClick={() => publish(mode)}>
             {busy ? "در حال انتشار…" : "انتشار در بله"}
           </button>
         </div>
-        <TelegramCard botId={botId} />
+        <TelegramCard botId={botId} allowSamples={allowSamples} />
         </>
       ) : (
         <>
@@ -123,7 +128,7 @@ export function PublishTab({ botId }: { botId: string }) {
             {!pub.up_to_date && (
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-saffron/50 bg-saffron/10 p-3 text-sm">
                 <span>نسخه‌ی {fa(pub.latest_version)} آماده است، اما هنوز منتشر نشده است.</span>
-                <button className={btn + " !min-h-9 !px-4 text-sm"} disabled={busy || !pub.tests_ok} onClick={() => publish(pub.mode!)}>انتشار نسخه‌ی {fa(pub.latest_version)}</button>
+                <button className={btn + " !min-h-9 !px-4 text-sm"} disabled={busy || samplesBlock || !pub.tests_ok} onClick={() => publish(pub.mode!)}>انتشار نسخه‌ی {fa(pub.latest_version)}</button>
               </div>
             )}
             {pub.mode === "shared" ? (
@@ -140,7 +145,7 @@ export function PublishTab({ botId }: { botId: string }) {
             )}
           </div>
 
-          <TelegramCard botId={botId} />
+          <TelegramCard botId={botId} allowSamples={allowSamples} />
 
           <div className={card}>
             <h3 className="mb-1 font-bold">اعلان ثبت‌های تازه</h3>
@@ -172,6 +177,23 @@ export function PublishTab({ botId }: { botId: string }) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/** The product table still holds the demo products the agent invented: say so before anything goes live. */
+function SampleProductsNote({ allow, setAllow, onImport }: { allow: boolean; setAllow: (v: boolean) => void; onImport: () => void }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-amber-line bg-amber-bg p-4 text-sm leading-7">
+      <strong className="text-base text-amber-fg">محصولات این ربات هنوز نمونه‌اند</strong>
+      <span className="text-fg-2">بات‌یار این محصولات را ساخته تا بتوانید ربات را امتحان کنید. اگر ربات با همین‌ها منتشر شود، مشتریان واقعی محصولاتی را می‌بینند و سفارش می‌دهند که وجود ندارند.</span>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <button type="button" onClick={onImport} className="min-h-11 rounded-xl bg-saffron px-5 font-bold text-ink hover:bg-saffron-hi">وارد کردن محصولات واقعی</button>
+        <label className="flex min-h-11 items-center gap-2 text-mute">
+          <input type="checkbox" checked={allow} onChange={(e) => setAllow(e.target.checked)} />
+          فقط برای آزمایش، با همین محصولات نمونه منتشر شود
+        </label>
+      </div>
     </div>
   );
 }

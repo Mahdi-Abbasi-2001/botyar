@@ -13,7 +13,7 @@ from . import billing
 from .auth import current_user
 from .config import settings
 from .db import get_db
-from .models import Bot, BotListing, BotVersion, ChatLink, Publication, User, VersionTests
+from .models import Bot, BotListing, BotVersion, ChatLink, Product, Publication, User, VersionTests
 from .spec import BotSpec
 
 router = APIRouter()
@@ -36,6 +36,22 @@ def _tests_ok(bot_id: int, version: int, db: Session) -> bool:
     return True if t is None else all(r["passed"] for r in t.results)
 
 
+def sample_catalog(bot_id: int, db: Session) -> bool:
+    """True while the bot's product table holds only the demo products the agent invented at build time:
+    real customers would see (and order) products that don't exist."""
+    flags = list(db.scalars(select(Product.is_sample).where(Product.bot_id == bot_id)))
+    return bool(flags) and all(flags)
+
+
+SAMPLE_MSG = ("محصولات این ربات هنوز نمونه‌اند و بات‌یار آن‌ها را برای امتحان ساخته است؛ مشتریان واقعی همین محصولات ساختگی را می‌بینند. "
+              "ابتدا فهرست واقعی محصولات را در بخش «محصولات» وارد کنید.")
+
+
+def check_samples(bot_id: int, allow: bool, db: Session):
+    if sample_catalog(bot_id, db) and not allow:
+        raise HTTPException(409, SAMPLE_MSG)
+
+
 def _status(bot_id: int, db: Session) -> dict:
     latest = _latest(bot_id, db)
     pub = db.scalars(select(Publication).where(Publication.bot_id == bot_id)).first()
@@ -46,6 +62,7 @@ def _status(bot_id: int, db: Session) -> dict:
         "shared_bot_username": bale.shared_username(),
         "webhooks_enabled": bool(settings.public_base_url),
         "listed": not bale._hidden(db, bot_id),
+        "sample_products": sample_catalog(bot_id, db),
     }
     if pub:
         out |= {"mode": pub.mode, "version": pub.version, "code": pub.code, "admin_code": pub.admin_code,
@@ -57,6 +74,7 @@ def _status(bot_id: int, db: Session) -> dict:
 class PublishIn(BaseModel):
     mode: str  # shared | own
     token: str | None = None
+    allow_samples: bool = False  # the owner ticked «publish with the demo products, only to try it»
 
 
 @router.get("/api/bots/{bot_id}/publication")
@@ -74,6 +92,7 @@ def publish(bot_id: int, body: PublishIn, user: User = Depends(current_user), db
         raise HTTPException(409, "ربات هنوز ساخته نشده است")
     if not _tests_ok(bot_id, latest.version, db):
         raise HTTPException(409, "همه‌ی تست‌های نسخه‌ی فعلی هنوز موفق نشده‌اند؛ ابتدا ربات را در «گفت‌وگوی ساخت» اصلاح کنید")
+    check_samples(bot_id, body.allow_samples, db)
     if body.mode not in ("shared", "own"):
         raise HTTPException(400, "حالت انتشار نامعتبر است")
     if not settings.public_base_url:

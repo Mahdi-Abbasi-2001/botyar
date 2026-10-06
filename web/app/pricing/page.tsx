@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { api, getToken, whoAmI } from "@/lib/api";
+import { api } from "@/lib/api";
+import { useSignedIn } from "@/components/useSignedIn";
 import { ErrorNote, Logo, fa } from "@/components/ui";
 import { PublicActions } from "@/components/PublicActions";
 import { AppHeader, HEADER_CLS } from "@/components/AppHeader";
@@ -13,10 +14,8 @@ type Plans = { plans: Plan[]; included: string[]; window_days: number; prices_pr
 export default function Pricing() {
   const [data, setData] = useState<Plans | null>(null);
   const [error, setError] = useState("");
-  const [loggedIn, setLoggedIn] = useState(false);
+  const signedIn = useSignedIn();
   useEffect(() => {
-    setLoggedIn(!!getToken());
-    whoAmI().then((u) => { if (u !== undefined) setLoggedIn(u !== null); });  // an expired session gets the public header
     api<Plans>("/plans").then(setData).catch((e) => setError(e.message));
   }, []);
 
@@ -24,11 +23,11 @@ export default function Pricing() {
     <PageTransition>
       <div className="min-h-screen">
         {/* the one page both visitors and owners use: an owner who opened it from the app stays inside the app */}
-        {loggedIn ? <AppHeader /> : (
+        {signedIn ? <AppHeader /> : (
           <header className={`${HEADER_CLS} justify-between`}>
             <Logo size="sm" />
             <nav className="flex items-center gap-4">
-              <PublicActions />
+              <PublicActions signedIn={signedIn} />
             </nav>
           </header>
         )}
@@ -56,7 +55,7 @@ export default function Pricing() {
                   <li>✓ تا {fa(p.customers.toLocaleString("en-US"))} مشتری فعال در ماه برای هر ربات</li>
                   <li>✓ {fa(p.ai_requests.toLocaleString("en-US"))} درخواست ساخت و تغییر ربات در ماه</li>
                 </ul>
-                <Link href={loggedIn ? "/account/" : "/login/"} className={`mt-auto inline-flex min-h-11 items-center justify-center rounded-xl px-4 font-bold ${p.key === "free" ? "border border-line-2 hover:border-saffron" : "bg-saffron text-ink hover:bg-saffron-hi"}`}>
+                <Link href={signedIn ? "/account/" : "/login/"} className={`mt-auto inline-flex min-h-11 items-center justify-center rounded-xl px-4 font-bold ${p.key === "free" ? "border border-line-2 hover:border-saffron" : "bg-saffron text-ink hover:bg-saffron-hi"}`}>
                   {p.key === "free" ? "شروع رایگان" : data?.demo ? "ارتقا (پرداخت آزمایشی)" : "درخواست این پلن"}
                 </Link>
               </section>

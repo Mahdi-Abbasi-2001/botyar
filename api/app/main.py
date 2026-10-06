@@ -401,6 +401,10 @@ from .telegram import router as telegram_router  # noqa: E402  (also registers t
 
 app.include_router(telegram_router)
 
+from .support import router as support_router  # noqa: E402
+
+app.include_router(support_router)
+
 # ---------- static frontend (Next.js export copied to api/static at build time) ----------
 import os  # noqa: E402
 
