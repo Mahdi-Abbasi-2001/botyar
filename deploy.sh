@@ -25,7 +25,7 @@ if [ -n "$(get TELEGRAM_RELAY_URL)" ] && [ -z "$(get TELEGRAM_RELAY_KEY)" ]; the
   exit 1
 fi
 TG_ENV=()
-for k in TELEGRAM_RELAY_URL TELEGRAM_RELAY_KEY TELEGRAM_SHARED_BOT_TOKEN ADMIN_EMAILS; do
+for k in TELEGRAM_RELAY_URL TELEGRAM_RELAY_KEY TELEGRAM_SHARED_BOT_TOKEN ADMIN_USERNAMES; do
   [ -n "$(get $k)" ] && TG_ENV+=("$k=$(get $k)")
 done
 

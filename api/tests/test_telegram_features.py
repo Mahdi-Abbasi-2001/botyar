@@ -48,12 +48,12 @@ def tw(monkeypatch):
     monkeypatch.setattr(telegram, "api_call", faker("tg"))
     bale._username_cache.clear(); telegram._username_cache.clear()
     with TestClient(app) as c:
-        tok = c.post("/api/auth/register", json={"email": "t@x.com", "password": "123456"}).json()["token"]
+        tok = c.post("/api/auth/register", json={"username": "t_x.com", "password": "123456"}).json()["token"]
         H = {"Authorization": f"Bearer {tok}"}
 
         def make(spec):
             with SessionLocal() as db:
-                uid = db.query(User).filter(User.email == "t@x.com").one().id
+                uid = db.query(User).filter(User.username == "t_x.com").one().id
                 bot = Bot(user_id=uid, name="کافه")
                 db.add(bot); db.flush()
                 db.add(BotVersion(bot_id=bot.id, version=1, spec=spec, note=""))

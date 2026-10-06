@@ -76,10 +76,10 @@ def world(monkeypatch):
     monkeypatch.setattr(bale, "api_call", fake)
     monkeypatch.setattr(bale, "api_upload", fake_upload)
     with TestClient(app) as c:
-        tok = c.post("/api/auth/register", json={"email": "m@x.com", "password": "123456"}).json()["token"]
+        tok = c.post("/api/auth/register", json={"username": "m_x.com", "password": "123456"}).json()["token"]
         H = {"Authorization": f"Bearer {tok}"}
         with SessionLocal() as db:
-            uid = db.query(User).filter(User.email == "m@x.com").one().id
+            uid = db.query(User).filter(User.username == "m_x.com").one().id
             bot = Bot(user_id=uid, name="فروشگاه")
             db.add(bot)
             db.flush()
@@ -108,7 +108,7 @@ def test_upload_rules(world):
     assert put(c, H, bid, "addr", "a.png", PNG).status_code == 404                                    # that block takes no file
     assert put(c, H, bid, "nope", "a.png", PNG).status_code == 404
     assert put(c, H, bid, "cat", "../../etc/passwd.pdf", PDF).json()["filename"] == "passwd.pdf"      # path parts are dropped
-    other = {"Authorization": "Bearer " + c.post("/api/auth/register", json={"email": "o@x.com", "password": "123456"}).json()["token"]}
+    other = {"Authorization": "Bearer " + c.post("/api/auth/register", json={"username": "o_x.com", "password": "123456"}).json()["token"]}
     assert put(c, other, bid, "cat", "c.pdf", PDF).status_code == 404 and c.get(f"/api/bots/{bid}/media", headers=other).status_code == 404
     assert c.delete(f"/api/bots/{bid}/media/cat", headers=other).status_code == 404
     assert c.delete(f"/api/bots/{bid}/media/cat", headers=H).status_code == 200

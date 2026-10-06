@@ -40,10 +40,10 @@ def world(monkeypatch):
     monkeypatch.setattr(bale, "api_call", fake)
     monkeypatch.setattr(outreach.threading, "Thread", lambda target, args=(), **kw: type("T", (), {"start": lambda self: target(*args)})())
     with TestClient(app) as c:
-        tok = c.post("/api/auth/register", json={"email": "o@x.com", "password": "123456"}).json()["token"]
+        tok = c.post("/api/auth/register", json={"username": "o_x.com", "password": "123456"}).json()["token"]
         H = {"Authorization": f"Bearer {tok}"}
         with SessionLocal() as db:
-            uid = db.query(User).filter(User.email == "o@x.com").one().id
+            uid = db.query(User).filter(User.username == "o_x.com").one().id
             bot = Bot(user_id=uid, name="سالن")
             db.add(bot)
             db.flush()
@@ -142,7 +142,7 @@ def test_broadcast_limits_and_authorization(world):
         assert c.post(f"/api/bots/{bid}/broadcasts", json={"text": f"پیام {i}"}, headers=H).status_code == 200
     assert c.post(f"/api/bots/{bid}/broadcasts", json={"text": "چهارم"}, headers=H).status_code == 429
     assert c.post(f"/api/bots/{bid}/broadcasts", json={"text": "x" * 1001}, headers=H).status_code == 422
-    tok2 = c.post("/api/auth/register", json={"email": "z@x.com", "password": "123456"}).json()["token"]
+    tok2 = c.post("/api/auth/register", json={"username": "z_x.com", "password": "123456"}).json()["token"]
     H2 = {"Authorization": f"Bearer {tok2}"}
     assert c.get(f"/api/bots/{bid}/broadcasts", headers=H2).status_code == 404
     assert c.post(f"/api/bots/{bid}/broadcasts", json={"text": "هک"}, headers=H2).status_code == 404

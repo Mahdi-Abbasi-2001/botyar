@@ -57,8 +57,8 @@ The full description of the system is in `docs/technical.md`; what must still be
 
 ## Station 1 — Sign up / log in
 
-**What it is:** email + password accounts; a login token (JWT, 72 h) kept in the browser.
-**Do:** register; log out; log in; try a wrong password; register the same email again; use a 5-character password.
+**What it is:** username + password accounts (accounts made earlier with an email sign in with that email); a login token (JWT, 72 h) kept in the browser.
+**Do:** register; log out; log in; try a wrong password; register the same username again (also in capitals); try usernames like `ab`, `1abc`, `علی` or `a b`; use a 5-character password.
 **Expect:** Persian error messages; no crash.
 **Break it:** register 9 accounts quickly from one network → the 9th is refused (limit: 8/hour/IP). Open
 `/bots/` in a private window → sent to login. Edit the token in DevTools → sent to login.
@@ -257,7 +257,7 @@ You do not need special tools:
 2. **Self-graded tests.** The agent that designs the bot also writes its tests. Idea: show the owner a plain-language "what I understood" summary to confirm *before* building; add a second "reviewer" pass.
 3. **Category lists aren't paginated** (a store with 40 categories shows 40 buttons; Bale's limit is unknown). Product lists reload the whole catalog per tap — fine for hundreds of items, untested for thousands.
 4. **Single server instance.** The anti-double-booking lock and the background jobs live in memory, so we cannot run two instances without moving locks into the database. No uptime monitoring/alerts; database backup policy unverified.
-5. **No password reset, email verification, account/data deletion.** (Out of competition scope, needed for a real product.)
+5. **No password reset, account/data deletion.** (Out of competition scope, needed for a real product.)
 6. **Dates are Gregorian in exports** (conversations use Jalali). Telegram exists (through a relay) but is tested against a fake relay only. One owner chat gets notifications per publication.
 7. **Several things are untested on real messengers**: own-token mode, channel/group message delivery on Bale (post forwarding, moderation, channel linking), file upload format, invoices — see `docs/real-bale-checklist.md`.
 8. **No owner analytics** (e.g. "40% of customers drop out at the phone-number step") — also a strong pitch point.

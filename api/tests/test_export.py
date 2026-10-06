@@ -21,10 +21,10 @@ def ctx():
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     with TestClient(app) as c:
-        tok = c.post("/api/auth/register", json={"email": "ex@x.com", "password": "123456"}).json()["token"]
+        tok = c.post("/api/auth/register", json={"username": "ex_x.com", "password": "123456"}).json()["token"]
         H = {"Authorization": f"Bearer {tok}"}
         with SessionLocal() as db:
-            uid = db.query(User).filter(User.email == "ex@x.com").one().id
+            uid = db.query(User).filter(User.username == "ex_x.com").one().id
             bot = Bot(user_id=uid, name="shop")
             db.add(bot)
             db.flush()
@@ -81,7 +81,7 @@ def test_records_xlsx_keeps_phone_numbers_as_text_and_describes_orders(ctx):
 
 def test_access_control_and_errors(ctx):
     c, H, bid = ctx
-    other = c.post("/api/auth/register", json={"email": "other@x.com", "password": "123456"}).json()["token"]
+    other = c.post("/api/auth/register", json={"username": "other_x.com", "password": "123456"}).json()["token"]
     O = {"Authorization": f"Bearer {other}"}
     assert c.get(f"/api/bots/{bid}/export/products", headers=O).status_code == 404
     assert c.get(f"/api/bots/{bid}/export/records", headers=O).status_code == 404

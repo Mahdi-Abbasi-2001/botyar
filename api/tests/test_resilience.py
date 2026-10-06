@@ -146,11 +146,11 @@ def db_world(monkeypatch):
 
     monkeypatch.setattr(bale, "api_call", fake)
     with TestClient(app) as c:
-        tok = c.post("/api/auth/register", json={"email": "r@x.com", "password": "123456"}).json()["token"]
+        tok = c.post("/api/auth/register", json={"username": "r_x.com", "password": "123456"}).json()["token"]
         H = {"Authorization": f"Bearer {tok}"}
         spec = {"name": "کافه", "welcome": "سلام", "menu": [{"label": "درباره", "block": "a"}], "blocks": [{"type": "message", "id": "a", "text": "ما کافه‌ایم"}]}
         with SessionLocal() as db:
-            uid = db.query(User).filter(User.email == "r@x.com").one().id
+            uid = db.query(User).filter(User.username == "r_x.com").one().id
             bot = Bot(user_id=uid, name="کافه")
             db.add(bot); db.flush()
             db.add(BotVersion(bot_id=bot.id, version=1, spec=spec, note=""))
@@ -283,7 +283,7 @@ def test_delivery_status_endpoint_shape_and_authorisation(db_world):
         resilience.record("bale", False, "cannot connect")
     st = c.get(f"/api/bots/{bid}/delivery", headers=H).json()
     assert st["messengers"][0]["status"] == "down" and st["outbox"] == {"pending": 0, "sent_24h": 0, "failed_24h": 0}
-    other = {"Authorization": "Bearer " + c.post("/api/auth/register", json={"email": "z@x.com", "password": "123456"}).json()["token"]}
+    other = {"Authorization": "Bearer " + c.post("/api/auth/register", json={"username": "z_x.com", "password": "123456"}).json()["token"]}
     assert c.get(f"/api/bots/{bid}/delivery", headers=other).status_code == 404
     c.post(f"/api/bots/{bid}/unpublish", headers=H)
     assert c.get(f"/api/bots/{bid}/delivery", headers=H).json()["messengers"] == []

@@ -111,10 +111,10 @@ def world(monkeypatch):
 
     monkeypatch.setattr(bale, "api_call", fake)
     with TestClient(app) as c:
-        tok = c.post("/api/auth/register", json={"email": "p@x.com", "password": "123456"}).json()["token"]
+        tok = c.post("/api/auth/register", json={"username": "p_x.com", "password": "123456"}).json()["token"]
         H = {"Authorization": f"Bearer {tok}"}
         with SessionLocal() as db:
-            uid = db.query(User).filter(User.email == "p@x.com").one().id
+            uid = db.query(User).filter(User.username == "p_x.com").one().id
             bot = Bot(user_id=uid, name="کافه")
             db.add(bot)
             db.flush()
@@ -220,7 +220,7 @@ def test_unpaid_orders_expire_in_the_background_job_and_owner_cannot_move_them_f
 
 def test_payment_endpoints_are_private(world):
     c, H, bid, pub, calls = world
-    tok2 = c.post("/api/auth/register", json={"email": "q@x.com", "password": "123456"}).json()["token"]
+    tok2 = c.post("/api/auth/register", json={"username": "q_x.com", "password": "123456"}).json()["token"]
     H2 = {"Authorization": f"Bearer {tok2}"}
     assert c.get(f"/api/bots/{bid}/payment", headers=H2).status_code == 404
     assert c.put(f"/api/bots/{bid}/payment", json={"wallet_token": "WALLET-TEST-1111111111111111"}, headers=H2).status_code == 404

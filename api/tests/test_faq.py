@@ -191,7 +191,7 @@ def indexed(monkeypatch):
     monkeypatch.setattr(faq_index, "_embed", fake_embed)
     monkeypatch.setattr(faq_index, "_variants", fake_variants)
     with SessionLocal() as db:
-        u = User(email="f@x.com", password_hash="x")
+        u = User(username="f_x.com", password_hash="x")
         db.add(u)
         db.flush()
         bot = Bot(user_id=u.id, name="b")

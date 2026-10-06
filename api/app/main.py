@@ -1,9 +1,10 @@
+import re
 import copy
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
@@ -40,6 +41,9 @@ def _fail_interrupted_runs(older_than_min: int = 0):
 
 @asynccontextmanager
 async def lifespan(app):
+    from .migrate import run_all
+
+    run_all(engine)  # bring an older database up to the current models first
     Base.metadata.create_all(engine)
     _fail_interrupted_runs()
     import threading
@@ -74,9 +78,16 @@ def health():
 
 
 # ---------- auth ----------
+USERNAME_RE = re.compile(r"[a-z][a-z0-9_.]{2,31}")
+USERNAME_RULE = "نام کاربری باید ۳ تا ۳۲ حرف باشد: حروف کوچک انگلیسی، عدد، _ یا نقطه، و با یک حرف انگلیسی شروع شود."
+
+
 class Credentials(BaseModel):
-    email: EmailStr
+    username: str = Field(max_length=255)
     password: str = Field(min_length=6, max_length=128)
+
+    def login_id(self) -> str:
+        return self.username.strip().lower()
 
 
 _reg_hits: dict[str, list[float]] = {}
@@ -96,26 +107,29 @@ def register(body: Credentials, request: Request, db: Session = Depends(get_db))
     if len(hits) >= settings.register_per_ip_hour:
         raise HTTPException(429, "تعداد ثبت‌نام از این شبکه زیاد بوده؛ کمی بعد دوباره تلاش کنید")
     _reg_hits[ip] = hits + [now_]
-    email = body.email.lower()
-    if db.scalar(select(User).where(User.email == email)):
-        raise HTTPException(409, "این ایمیل قبلاً ثبت شده است")
-    user = User(email=email, password_hash=hash_password(body.password))
+    login_id = body.login_id()
+    if not USERNAME_RE.fullmatch(login_id):
+        raise HTTPException(422, USERNAME_RULE)
+    if db.scalar(select(User).where(User.username == login_id)):
+        raise HTTPException(409, "این نام کاربری قبلاً گرفته شده است")
+    user = User(username=login_id, password_hash=hash_password(body.password))
     db.add(user)
     db.commit()
-    return {"token": make_token(user.id), "email": user.email}
+    return {"token": make_token(user.id), "username": user.username}
 
 
 @app.post("/api/auth/login")
 def login(body: Credentials, db: Session = Depends(get_db)):
-    user = db.scalar(select(User).where(User.email == body.email.lower()))
+    login_id = body.login_id()  # accounts made before usernames existed sign in with their old email, kept as their username
+    user = db.scalar(select(User).where(User.username == login_id)) if login_id else None
     if not user or not check_password(body.password, user.password_hash):
-        raise HTTPException(401, "ایمیل یا رمز عبور اشتباه است")
-    return {"token": make_token(user.id), "email": user.email}
+        raise HTTPException(401, "نام کاربری یا رمز عبور اشتباه است")
+    return {"token": make_token(user.id), "username": user.username}
 
 
 @app.get("/api/me")
 def me(user: User = Depends(current_user)):
-    return {"email": user.email}
+    return {"username": user.username}
 
 
 # ---------- bots ----------

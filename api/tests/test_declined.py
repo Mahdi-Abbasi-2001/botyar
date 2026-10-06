@@ -14,7 +14,7 @@ def test_impossible_request_is_declined_with_an_explanation_and_creates_nothing(
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     with SessionLocal() as db:
-        u = User(email="d@x.com", password_hash="x")
+        u = User(username="d_x.com", password_hash="x")
         db.add(u)
         db.flush()
         bot = Bot(user_id=u.id, name="ربات جدید")

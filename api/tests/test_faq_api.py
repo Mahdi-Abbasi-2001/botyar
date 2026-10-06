@@ -53,10 +53,10 @@ def world(monkeypatch):
 
     monkeypatch.setattr(bale, "api_call", fake)
     with TestClient(app) as c:
-        tok = c.post("/api/auth/register", json={"email": "faq@x.com", "password": "123456"}).json()["token"]
+        tok = c.post("/api/auth/register", json={"username": "faq_x.com", "password": "123456"}).json()["token"]
         H = {"Authorization": f"Bearer {tok}"}
         with SessionLocal() as db:
-            uid = db.query(User).filter(User.email == "faq@x.com").one().id
+            uid = db.query(User).filter(User.username == "faq_x.com").one().id
             bot = Bot(user_id=uid, name="کلینیک")
             db.add(bot)
             db.flush()

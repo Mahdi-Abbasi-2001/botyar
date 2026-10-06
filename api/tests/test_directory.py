@@ -42,8 +42,8 @@ def env(monkeypatch):
     bale._seen.clear()
 
 
-def owner(c, email):
-    tok = c.post("/api/auth/register", json={"email": email, "password": "123456"}).json()["token"]
+def owner(c, username):
+    tok = c.post("/api/auth/register", json={"username": username, "password": "123456"}).json()["token"]
     return {"Authorization": f"Bearer {tok}"}
 
 
@@ -74,7 +74,7 @@ def buttons(payload):
 
 def test_directory_pages_newest_first_and_picking_opens_the_bot(env):
     c, calls = env
-    H = owner(c, "many@x.com")
+    H = owner(c, "many_x.com")
     ids = [bot(c, H) for _ in range(10)]
     for b in ids:
         assert c.post(f"/api/bots/{b}/publish", json={"mode": "shared"}, headers=H).status_code == 200
@@ -93,7 +93,7 @@ def test_directory_pages_newest_first_and_picking_opens_the_bot(env):
 
 def test_hidden_and_own_token_bots_are_not_listed_but_links_still_work(env):
     c, calls = env
-    H = owner(c, "o@x.com")
+    H = owner(c, "o_x.com")
     shown, hidden, own = bot(c, H), bot(c, H), bot(c, H, "cafe")
     pub_shown = c.post(f"/api/bots/{shown}/publish", json={"mode": "shared"}, headers=H).json()
     pub_hidden = c.post(f"/api/bots/{hidden}/publish", json={"mode": "shared"}, headers=H).json()
@@ -116,7 +116,7 @@ def test_hidden_and_own_token_bots_are_not_listed_but_links_still_work(env):
 
 def test_typed_codes_and_unknown_links_fall_back_to_the_directory(env):
     c, calls = env
-    H = owner(c, "t@x.com")
+    H = owner(c, "t_x.com")
     b = bot(c, H)
     code = c.post(f"/api/bots/{b}/publish", json={"mode": "shared"}, headers=H).json()["code"]
     c.post(BALE_URL(), json=msg(70, code))
@@ -134,15 +134,15 @@ def test_empty_directory_says_so(env):
 
 def test_listing_switch_is_owner_only(env):
     c, _ = env
-    b = bot(c, owner(c, "a@x.com"))
-    H2 = owner(c, "b@x.com")
+    b = bot(c, owner(c, "a_x.com"))
+    H2 = owner(c, "b_x.com")
     assert c.put(f"/api/bots/{b}/listing", json={"listed": False}).status_code in (401, 403)
     assert c.put(f"/api/bots/{b}/listing", json={"listed": False}, headers=H2).status_code == 404
 
 
 def test_telegram_shared_bot_has_its_own_directory(env):
     c, calls = env
-    H = owner(c, "tg@x.com")
+    H = owner(c, "tg_x.com")
     b1, b2 = bot(c, H), bot(c, H)
     c.post(f"/api/bots/{b1}/publish", json={"mode": "shared"}, headers=H)          # Bale only
     c.post(f"/api/bots/{b2}/telegram/publish", json={"mode": "shared"}, headers=H)  # Telegram only
@@ -157,7 +157,7 @@ def test_bot_list_shows_where_each_bot_is_live_and_its_last_change(env):
     from app.models import VersionTests
 
     c, _ = env
-    H = owner(c, "cards@x.com")
+    H = owner(c, "cards_x.com")
     both, bale_only, none = bot(c, H), bot(c, H), bot(c, H)
     draft = c.post("/api/bots/draft", json={}, headers=H).json()["id"]
     c.post(f"/api/bots/{both}/publish", json={"mode": "shared"}, headers=H)

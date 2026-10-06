@@ -15,10 +15,10 @@ def setup_module():
 
 def test_full_flow():
     c = TestClient(app)
-    assert c.post("/api/auth/register", json={"email": "a@b.com", "password": "123456"}).status_code == 200
-    assert c.post("/api/auth/register", json={"email": "a@b.com", "password": "123456"}).status_code == 409
-    assert c.post("/api/auth/login", json={"email": "a@b.com", "password": "wrong1"}).status_code == 401
-    tok = c.post("/api/auth/login", json={"email": "a@b.com", "password": "123456"}).json()["token"]
+    assert c.post("/api/auth/register", json={"username": "a_b.com", "password": "123456"}).status_code == 200
+    assert c.post("/api/auth/register", json={"username": "a_b.com", "password": "123456"}).status_code == 409
+    assert c.post("/api/auth/login", json={"username": "a_b.com", "password": "wrong1"}).status_code == 401
+    tok = c.post("/api/auth/login", json={"username": "a_b.com", "password": "123456"}).json()["token"]
     h = {"Authorization": f"Bearer {tok}"}
     assert c.get("/api/bots").status_code == 401
     bot = c.post("/api/bots", json={"template": "workshop"}, headers=h).json()
@@ -29,7 +29,7 @@ def test_full_flow():
     recs = c.get(f"/api/bots/{bot['id']}/records?sandbox=true", headers=h).json()
     assert recs[0]["data"]["name"] == "سارا"
     # another user cannot see it
-    tok2 = c.post("/api/auth/register", json={"email": "x@y.com", "password": "123456"}).json()["token"]
+    tok2 = c.post("/api/auth/register", json={"username": "x_y.com", "password": "123456"}).json()["token"]
     assert c.get(f"/api/bots/{bot['id']}", headers={"Authorization": f"Bearer {tok2}"}).status_code == 404
 
 
@@ -39,7 +39,7 @@ def test_two_option_groups_in_a_row_survive_persistence():
     from app.models import Bot, BotVersion, User
 
     c = TestClient(app)
-    tok = c.post("/api/auth/register", json={"email": "opt@b.com", "password": "123456"}).json()["token"]
+    tok = c.post("/api/auth/register", json={"username": "opt_b.com", "password": "123456"}).json()["token"]
     H = {"Authorization": f"Bearer {tok}"}
     me = c.get("/api/me", headers=H).json()
     spec = {"name": "t", "welcome": "سلام", "menu": [{"label": "سفارش", "block": "o"}],
@@ -47,7 +47,7 @@ def test_two_option_groups_in_a_row_survive_persistence():
                         "items": [{"id": "tee", "name": "تی‌شرت", "price": 100000,
                                    "options": [{"name": "سایز", "choices": ["S", "M"]}, {"name": "رنگ", "choices": ["سفید", "مشکی"]}]}]}]}
     with SessionLocal() as db:
-        uid = db.query(User).filter(User.email == me["email"]).one().id
+        uid = db.query(User).filter(User.username == me["username"]).one().id
         bot = Bot(user_id=uid, name="t")
         db.add(bot)
         db.flush()
@@ -70,12 +70,12 @@ def test_register_is_rate_limited_per_ip_and_global_run_cap(monkeypatch):
     monkeypatch.setattr(settings, "register_per_ip_hour", 2)
     c = TestClient(app)
     h = {"x-forwarded-for": "9.9.9.9"}
-    codes = [c.post("/api/auth/register", json={"email": f"rl{i}@b.com", "password": "123456"}, headers=h).status_code for i in range(3)]
+    codes = [c.post("/api/auth/register", json={"username": f"rl{i}_b.com", "password": "123456"}, headers=h).status_code for i in range(3)]
     assert codes == [200, 200, 429]
     # a different IP is unaffected
-    assert c.post("/api/auth/register", json={"email": "rl9@b.com", "password": "123456"}, headers={"x-forwarded-for": "8.8.8.8"}).status_code == 200
+    assert c.post("/api/auth/register", json={"username": "rl9_b.com", "password": "123456"}, headers={"x-forwarded-for": "8.8.8.8"}).status_code == 200
 
-    tok = c.post("/api/auth/login", json={"email": "rl0@b.com", "password": "123456"}).json()["token"]
+    tok = c.post("/api/auth/login", json={"username": "rl0_b.com", "password": "123456"}).json()["token"]
     H = {"Authorization": f"Bearer {tok}"}
     bot = c.post("/api/bots/draft", headers=H).json()["id"]
     monkeypatch.setattr(settings, "global_daily_runs", 0)
@@ -91,7 +91,7 @@ def test_interrupted_agent_run_does_not_lock_the_bot():
     from app.models import BuilderRun
 
     c = TestClient(app)
-    tok = c.post("/api/auth/register", json={"email": "stuck@b.com", "password": "123456"}).json()["token"]
+    tok = c.post("/api/auth/register", json={"username": "stuck_b.com", "password": "123456"}).json()["token"]
     H = {"Authorization": f"Bearer {tok}"}
     bot = c.post("/api/bots/draft", headers=H).json()["id"]
     with SessionLocal() as db:
@@ -117,7 +117,7 @@ def test_active_run_endpoint_lets_the_page_resume_after_a_refresh():
     from app.models import BuilderRun
 
     c = TestClient(app)
-    tok = c.post("/api/auth/register", json={"email": "resume@b.com", "password": "123456"}).json()["token"]
+    tok = c.post("/api/auth/register", json={"username": "resume_b.com", "password": "123456"}).json()["token"]
     H = {"Authorization": f"Bearer {tok}"}
     bot = c.post("/api/bots/draft", headers=H).json()["id"]
     assert c.get(f"/api/bots/{bot}/builder/active", headers=H).json() == {"run_id": None, "events": []}
@@ -128,5 +128,5 @@ def test_active_run_endpoint_lets_the_page_resume_after_a_refresh():
         rid = run.id
     got = c.get(f"/api/bots/{bot}/builder/active", headers=H).json()
     assert got["run_id"] == rid and got["events"] == ["در حال طراحی ساختار ربات…"]
-    other = c.post("/api/auth/register", json={"email": "resume2@b.com", "password": "123456"}).json()["token"]
+    other = c.post("/api/auth/register", json={"username": "resume2_b.com", "password": "123456"}).json()["token"]
     assert c.get(f"/api/bots/{bot}/builder/active", headers={"Authorization": f"Bearer {other}"}).status_code == 404

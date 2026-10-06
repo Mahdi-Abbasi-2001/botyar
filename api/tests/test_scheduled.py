@@ -82,7 +82,7 @@ def test_validation_limits_and_authorisation(world):
     for i in range(5):
         assert c.post(S, json={"text": f"t{i}", "mode": "once", "at": tehran(ok)}, headers=H).status_code == 200
     assert c.post(S, json={"text": "sixth", "mode": "once", "at": tehran(ok)}, headers=H).status_code == 409
-    other = {"Authorization": "Bearer " + c.post("/api/auth/register", json={"email": "z@x.com", "password": "123456"}).json()["token"]}
+    other = {"Authorization": "Bearer " + c.post("/api/auth/register", json={"username": "z_x.com", "password": "123456"}).json()["token"]}
     sid = c.get(S, headers=H).json()["items"][0]["id"]
     assert c.get(S, headers=other).status_code == 404
     assert c.post(S, json={"text": "x", "mode": "daily", "time": "08:00"}, headers=other).status_code == 404

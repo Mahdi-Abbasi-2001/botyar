@@ -150,7 +150,7 @@ Background jobs run in one daemon thread (production only, i.e. when `PUBLIC_BAS
 | Pro | 349,000 | 10 / 3 | 3,000 | 300 |
 | Agency | 1,490,000 | 50 / 10 | 3,000 | 1,500 |
 
-All features are in all plans. Limits are enforced when creating a bot, publishing, calling the agent, and when a *new* customer arrives (existing customers are never cut off; the owner is told once a day). **Demo billing** (`BILLING_DEMO=true`, the default): upgrading simulates a successful payment, activates the plan at once and records a clearly labelled simulated payment; no money moves. `BILLING_DEMO=false` switches to request-and-approve by accounts listed in `ADMIN_EMAILS`.
+All features are in all plans. Limits are enforced when creating a bot, publishing, calling the agent, and when a *new* customer arrives (existing customers are never cut off; the owner is told once a day). **Demo billing** (`BILLING_DEMO=true`, the default): upgrading simulates a successful payment, activates the plan at once and records a clearly labelled simulated payment; no money moves. `BILLING_DEMO=false` switches to request-and-approve by accounts listed in `ADMIN_USERNAMES`.
 
 ## 11. Community features (channels, groups, growth)
 
@@ -166,7 +166,7 @@ All need the bot to be inside the channel/group; the owner links a chat by posti
 
 ## 12. Security
 
-- **Auth**: email + password (hashed), JWT (72 h); every `/api/bots/{id}/…` route checks ownership (an automated test enumerates all routes from the OpenAPI schema and checks that each one rejects anonymous calls and other users' ids).
+- **Auth**: username + password (hashed), JWT (72 h). Usernames are 3–32 characters (`a-z`, digits, `_`, `.`, starting with a letter), case-insensitive; stored in `users.username` (unique). There is no email column: on startup `app/migrate.py` moved older databases from `users.email` to `users.username` (copying each address, so accounts created before usernames sign in by typing their old email), then dropped `email`; the step is idempotent and was rehearsed on PostgreSQL 18; every `/api/bots/{id}/…` route checks ownership (an automated test enumerates all routes from the OpenAPI schema and checks that each one rejects anonymous calls and other users' ids).
 - **Secrets**: bot tokens and wallet tokens are encrypted at rest; webhook URLs contain per-bot secrets; shared-bot webhook secret is derived from `JWT_SECRET`; nothing secret is returned by any endpoint (customers lists never include chat ids).
 - **Abuse limits**: 8 sign-ups/IP/hour, agent run limits, per-customer FAQ/anon/feedback limits, announcement limits, upload limits (5 MB per file, 25 MB per bot, magic-byte checks for images, extension whitelist for documents), spreadsheet formula-injection neutralised in exports.
 - **Customer isolation**: sessions are per bot and customer; owner actions on records verify the record belongs to the owner's bot; `pay:` test-payment buttons exist only in the simulator and tests.
@@ -195,7 +195,7 @@ Owner panel `…/records` (+`PATCH` cancel/status), `…/inbox` (+reply), `…/b
 ## 15. Deployment and operations
 
 - `./deploy.sh` builds the frontend into `api/static`, sets the environment on the Liara app from `api/.env` (never printing secrets) and deploys the Docker image. Liara allows 20 deployments per day.
-- Environment: `DATABASE_URL`, `JWT_SECRET`, `OPENAI_API_KEY`, `BALE_SHARED_BOT_TOKEN`, `PUBLIC_BASE_URL`, `TELEGRAM_RELAY_URL`, `TELEGRAM_RELAY_KEY`, `TELEGRAM_SHARED_BOT_TOKEN`, `BILLING_DEMO`, `ADMIN_EMAILS`, `CORS_ORIGINS` (see `README.md`).
+- Environment: `DATABASE_URL`, `JWT_SECRET`, `OPENAI_API_KEY`, `BALE_SHARED_BOT_TOKEN`, `PUBLIC_BASE_URL`, `TELEGRAM_RELAY_URL`, `TELEGRAM_RELAY_KEY`, `TELEGRAM_SHARED_BOT_TOKEN`, `BILLING_DEMO`, `ADMIN_USERNAMES`, `CORS_ORIGINS` (see `README.md`).
 - Telegram relay: `relay/main.ts` on Deno Deploy (`relay/README.md`).
 - Cost evidence: per-call LLM log; UI shows cost per request and per bot.
 
@@ -203,7 +203,7 @@ Owner panel `…/records` (+`PATCH` cancel/status), `…/inbox` (+reply), `…/b
 
 1. **Single instance**: locks and the scheduler are in process; two instances would need database locks and a leader for background jobs.
 2. **Unverified on real messengers**: channel post / group message delivery on Bale, multipart file upload format, invoice flow, deep-link payload with referral codes, join check on channels. Telegram paths are tested against a fake relay only.
-3. **No password reset, email verification, or account/data deletion.**
+3. **No password reset or account/data deletion** (accounts have no email to reset through).
 4. **No monitoring/alerting or database backup policy** beyond Liara's defaults.
 5. **Catalog** loads the whole product list per tap (fine for hundreds of items, untested at thousands); category lists are not paginated.
 6. **Agent tests are written by the same agent** that designs the bot: «all tests pass» means the bot matches the agent's understanding; the simulator is where the owner confirms intent.

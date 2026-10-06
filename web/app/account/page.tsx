@@ -9,7 +9,7 @@ type Plan = { key: string; name: string; price: number; bots: number; live_bots:
 type Pay = { id: number; plan: string; name: string; amount: number; simulated: boolean; at: string };
 type Me = { demo?: boolean; payments?: Pay[]; plan: Plan; usage: { bots: number; live_bots: number; ai_requests: number; per_bot: { id: number; name: string; live: boolean; customers: number }[] }; pending_request: string | null; admin: boolean };
 type Plans = { plans: (Plan & { tagline: string })[] };
-type Req = { id: number; email: string; plan: string; current: string; note: string; status: string };
+type Req = { id: number; username: string; plan: string; current: string; note: string; status: string };
 
 const card = "rounded-2xl border border-line-2 bg-panel p-4";
 
@@ -161,7 +161,7 @@ export default function Account() {
                 {reqs.length === 0 && <p className="m-0 text-sm text-mute">درخواستی نیست.</p>}
                 {reqs.map((r) => (
                   <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line-2 p-3 text-sm">
-                    <span dir="ltr">{r.email}</span><span>{r.current} → <b>{r.plan}</b></span>{r.note && <span className="text-mute">{r.note}</span>}
+                    <span dir="ltr">{r.username}</span><span>{r.current} → <b>{r.plan}</b></span>{r.note && <span className="text-mute">{r.note}</span>}
                     {r.status === "pending" ? (
                       <span className="flex gap-2"><button className="rounded-lg bg-saffron px-3 py-1 font-bold text-ink" onClick={() => decide(r.id, true)}>تأیید</button><button className="rounded-lg border border-line-2 px-3 py-1" onClick={() => decide(r.id, false)}>رد</button></span>
                     ) : <span className="text-mute">{r.status === "approved" ? "تأیید شد" : "رد شد"}</span>}

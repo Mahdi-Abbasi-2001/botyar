@@ -36,10 +36,10 @@ def world(monkeypatch):
 
     monkeypatch.setattr(bale, "api_call", fake)
     with TestClient(app) as c:
-        tok = c.post("/api/auth/register", json={"email": "own@x.com", "password": "123456"}).json()["token"]
+        tok = c.post("/api/auth/register", json={"username": "own_x.com", "password": "123456"}).json()["token"]
         H = {"Authorization": f"Bearer {tok}"}
         with SessionLocal() as db:
-            uid = db.query(User).filter(User.email == "own@x.com").one().id
+            uid = db.query(User).filter(User.username == "own_x.com").one().id
             bot = Bot(user_id=uid, name="t")
             db.add(bot)
             db.flush()
@@ -124,14 +124,14 @@ def test_invalid_actions_are_refused(world):
 def test_only_the_owner_can_act_on_a_record(world):
     c, H, bid, add, sent = world
     rid = add("b", {"name": "علی", "slot": "once", "status": "confirmed", "_cust": "bale:111"})
-    other = c.post("/api/auth/register", json={"email": "evil@x.com", "password": "123456"}).json()["token"]
+    other = c.post("/api/auth/register", json={"username": "evil_x.com", "password": "123456"}).json()["token"]
     O = {"Authorization": f"Bearer {other}"}
     assert act(c, O, bid, rid, action="cancel").status_code == 404
     assert c.patch(f"/api/bots/{bid}/records/{rid}", json={"action": "cancel"}).status_code == 401
     assert status_of(c, H, bid, rid) == "confirmed" and sent == []
     # a record id from ANOTHER bot cannot be reached through my bot's URL either
     with SessionLocal() as db:
-        uid = db.query(User).filter(User.email == "evil@x.com").one().id
+        uid = db.query(User).filter(User.username == "evil_x.com").one().id
         b2 = Bot(user_id=uid, name="x")
         db.add(b2)
         db.flush()

@@ -21,7 +21,7 @@ def shop():
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     with TestClient(app, raise_server_exceptions=False) as c:
-        tok = c.post("/api/auth/register", json={"email": "rb@x.com", "password": "123456"}).json()["token"]
+        tok = c.post("/api/auth/register", json={"username": "rb_x.com", "password": "123456"}).json()["token"]
         H = {"Authorization": f"Bearer {tok}"}
         bot = c.post("/api/bots", json={"template": "cafe"}, headers=H).json()["id"]
         with SessionLocal() as db:  # turn the cafe into a table-catalog bot

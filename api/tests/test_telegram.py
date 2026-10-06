@@ -48,8 +48,8 @@ def env(monkeypatch):
     bale._seen.clear()
 
 
-def owner(c, email="tg@x.com", template="workshop"):
-    tok = c.post("/api/auth/register", json={"email": email, "password": "123456"}).json()["token"]
+def owner(c, username="tg_x.com", template="workshop"):
+    tok = c.post("/api/auth/register", json={"username": username, "password": "123456"}).json()["token"]
     H = {"Authorization": f"Bearer {tok}"}
     return H, c.post("/api/bots", json={"template": template}, headers=H).json()["id"]
 
@@ -139,8 +139,8 @@ def test_telegram_is_off_without_a_relay(env, monkeypatch):
 
 def test_other_owners_cannot_touch_telegram_publishing(env):
     c, _ = env
-    _, bot = owner(c, "a@x.com")
-    H2, _ = owner(c, "b@x.com")
+    _, bot = owner(c, "a_x.com")
+    H2, _ = owner(c, "b_x.com")
     assert c.get(f"/api/bots/{bot}/telegram", headers=H2).status_code == 404
     assert c.post(f"/api/bots/{bot}/telegram/publish", json={"mode": "shared"}, headers=H2).status_code == 404
     assert c.post(f"/api/bots/{bot}/telegram/unpublish", json={}, headers=H2).status_code == 404
@@ -189,12 +189,12 @@ def test_place_freed_on_bale_goes_to_the_waiting_telegram_customer(env):
     from app.models import Bot, BotVersion, User
 
     c, calls = env
-    H, _ = owner(c, "wl@x.com")
+    H, _ = owner(c, "wl_x.com")
     spec = {"name": "کلاس", "welcome": "سلام", "menu": [{"label": "ثبت‌نام", "block": "b"}],
             "blocks": [{"type": "booking", "id": "b", "title": "ثبت‌نام کلاس", "waitlist": True, "allow_cancel": True,
                         "slots": [{"id": "once", "label": "کارگاه ویژه", "capacity": 1}]}]}
     with SessionLocal() as db:
-        uid = db.query(User).filter(User.email == "wl@x.com").one().id
+        uid = db.query(User).filter(User.username == "wl_x.com").one().id
         bot = Bot(user_id=uid, name="کلاس")
         db.add(bot)
         db.flush()

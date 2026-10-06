@@ -138,7 +138,7 @@ def test_report_gives_the_owner_evidence_and_the_owner_can_ban(world):
     sent.clear()
     msg(802, "/start", "علی")
     assert not any("مسدود" in t for t in texts(sent, 802))
-    other = {"Authorization": "Bearer " + c.post("/api/auth/register", json={"email": "q@x.com", "password": "123456"}).json()["token"]}
+    other = {"Authorization": "Bearer " + c.post("/api/auth/register", json={"username": "q_x.com", "password": "123456"}).json()["token"]}
     assert c.post(f"/api/bots/{bid}/customers/{rep['reported_id']}/ban", headers=other).status_code == 404
 
 

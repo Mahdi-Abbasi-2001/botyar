@@ -84,10 +84,10 @@ def world(monkeypatch):
 
     monkeypatch.setattr(bale, "api_call", fake)
     with TestClient(app) as c:
-        tok = c.post("/api/auth/register", json={"email": "ct@x.com", "password": "123456"}).json()["token"]
+        tok = c.post("/api/auth/register", json={"username": "ct_x.com", "password": "123456"}).json()["token"]
         H = {"Authorization": f"Bearer {tok}"}
         with SessionLocal() as db:
-            uid = db.query(User).filter(User.email == "ct@x.com").one().id
+            uid = db.query(User).filter(User.username == "ct_x.com").one().id
             bot = Bot(user_id=uid, name="فروشگاه")
             db.add(bot)
             db.flush()
@@ -132,7 +132,7 @@ def test_owner_reply_from_the_inbox_reaches_the_customer_on_bale(world):
     assert [m["from"] for m in box[0]["messages"]] == ["customer", "owner"] and box[0]["unanswered"] is False
 
     # other owners can neither read nor answer
-    tok2 = c.post("/api/auth/register", json={"email": "other@x.com", "password": "123456"}).json()["token"]
+    tok2 = c.post("/api/auth/register", json={"username": "other_x.com", "password": "123456"}).json()["token"]
     H2 = {"Authorization": f"Bearer {tok2}"}
     assert c.get(f"/api/bots/{bid}/inbox", headers=H2).status_code == 404
     assert c.post(f"/api/bots/{bid}/inbox/{t['collection']}/{t['thread']}/reply", json={"text": "x"}, headers=H2).status_code == 404

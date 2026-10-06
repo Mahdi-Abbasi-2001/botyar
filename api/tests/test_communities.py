@@ -41,10 +41,10 @@ def cw(monkeypatch):
 
     monkeypatch.setattr(bale, "api_call", fake)
     with TestClient(app) as c:
-        tok = c.post("/api/auth/register", json={"email": "c@x.com", "password": "123456"}).json()["token"]
+        tok = c.post("/api/auth/register", json={"username": "c_x.com", "password": "123456"}).json()["token"]
         H = {"Authorization": f"Bearer {tok}"}
         with SessionLocal() as db:
-            uid = db.query(User).filter(User.email == "c@x.com").one().id
+            uid = db.query(User).filter(User.username == "c_x.com").one().id
             bot = Bot(user_id=uid, name="کافه")
             db.add(bot); db.flush()
             db.add(BotVersion(bot_id=bot.id, version=1, spec=SPEC, note=""))
@@ -116,9 +116,9 @@ def test_expired_code_and_non_admin_group_link_are_refused(cw):
 def test_a_chat_cannot_be_hijacked_by_another_owner(cw):
     c, H, bid, calls, st, channel_post, group_msg, link = cw
     link(channel_post, -100)
-    other = {"Authorization": "Bearer " + c.post("/api/auth/register", json={"email": "z@x.com", "password": "123456"}).json()["token"]}
+    other = {"Authorization": "Bearer " + c.post("/api/auth/register", json={"username": "z_x.com", "password": "123456"}).json()["token"]}
     with SessionLocal() as db:
-        uid = db.query(User).filter(User.email == "z@x.com").one().id
+        uid = db.query(User).filter(User.username == "z_x.com").one().id
         b2 = Bot(user_id=uid, name="دیگری")
         db.add(b2); db.flush()
         db.add(BotVersion(bot_id=b2.id, version=1, spec=SPEC, note=""))
@@ -265,7 +265,7 @@ def test_unlinking_removes_rules_and_authorisation(cw):
     link(channel_post, -100); link(channel_post, -200)
     ch = {x["title"]: x["id"] for x in c.get(f"/api/bots/{bid}/chats", headers=H).json()["chats"]}
     c.post(f"/api/bots/{bid}/forwards", json={"source": ch["کانال -100"], "dest": ch["کانال -200"]}, headers=H)
-    other = {"Authorization": "Bearer " + c.post("/api/auth/register", json={"email": "z@x.com", "password": "123456"}).json()["token"]}
+    other = {"Authorization": "Bearer " + c.post("/api/auth/register", json={"username": "z_x.com", "password": "123456"}).json()["token"]}
     assert c.delete(f"/api/bots/{bid}/chats/{ch['کانال -100']}", headers=other).status_code == 404
     assert c.delete(f"/api/bots/{bid}/chats/{ch['کانال -100']}", headers=H).status_code == 200
     with SessionLocal() as db:

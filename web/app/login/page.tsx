@@ -9,7 +9,7 @@ type Mode = "login" | "register";
 function LoginForm() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>(useSearchParams().get("mode") === "login" ? "login" : "register");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<{ text: string; taken?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -20,12 +20,12 @@ function LoginForm() {
     setBusy(true);
     setError(null);
     try {
-      const r = await api<{ token: string }>(`/auth/${mode}`, { body: { email, password } });
+      const r = await api<{ token: string }>(`/auth/${mode}`, { body: { username: username.trim(), password } });
       setToken(r.token);
       router.push("/bots/");
     } catch (err: any) {
-      const taken = isReg && /ثبت شده/.test(err.message);
-      setError({ text: taken ? "این ایمیل قبلاً ثبت شده." : err.message, taken });
+      const taken = isReg && /گرفته شده|ثبت شده/.test(err.message);
+      setError({ text: taken ? "این نام کاربری قبلاً گرفته شده؛ یکی دیگر انتخاب کن، یا اگر حساب خودت است:" : err.message, taken });
     } finally {
       setBusy(false);
     }
@@ -49,8 +49,14 @@ function LoginForm() {
       </div>
 
       <label className="flex flex-col gap-2">
-        <span className="text-sm text-fg-2">ایمیل</span>
-        <input dir="ltr" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className={field(!!error)} />
+        <span className="text-sm text-fg-2">نام کاربری</span>
+        <input dir="ltr" type="text" required autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+          maxLength={isReg ? 32 : 255} pattern={isReg ? "[A-Za-z][A-Za-z0-9_.]{2,31}" : undefined}
+          title={isReg ? "۳ تا ۳۲ حرف: حروف انگلیسی، عدد، _ یا نقطه؛ با یک حرف شروع شود" : undefined}
+          placeholder={isReg ? "مثلاً cafe_nimkat" : ""} value={username} onChange={(e) => setUsername(e.target.value)} className={field(!!error)} />
+        <span className="text-[13px] leading-6 text-mute">
+          {isReg ? "حروف انگلیسی، عدد، _ یا نقطه · ۳ تا ۳۲ حرف" : "اگر قبلاً با ایمیل ثبت‌نام کرده‌ای، همان ایمیل را بنویس."}
+        </span>
       </label>
       <label className="flex flex-col gap-2">
         <span className="text-sm text-fg-2">رمز عبور</span>

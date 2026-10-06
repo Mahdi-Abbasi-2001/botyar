@@ -68,12 +68,12 @@ def world(monkeypatch):
 
     monkeypatch.setattr(bale, "api_call", fake)
     with TestClient(app) as c:
-        tok = c.post("/api/auth/register", json={"email": "r@x.com", "password": "123456"}).json()["token"]
+        tok = c.post("/api/auth/register", json={"username": "r_x.com", "password": "123456"}).json()["token"]
         H = {"Authorization": f"Bearer {tok}"}
 
         def make(spec):
             with SessionLocal() as db:
-                uid = db.query(User).filter(User.email == "r@x.com").one().id
+                uid = db.query(User).filter(User.username == "r_x.com").one().id
                 bot = Bot(user_id=uid, name="کافه")
                 db.add(bot); db.flush()
                 db.add(BotVersion(bot_id=bot.id, version=1, spec=spec, note=""))
@@ -138,7 +138,7 @@ def test_unknown_or_foreign_invite_codes_do_nothing_harmful(world):
     sent.clear()
     msg(710, "/start rzzzzzzz")                                                  # well-formed but unknown code
     assert not any("وارد شد" in t for _, t, _ in sent)
-    other = {"Authorization": "Bearer " + c.post("/api/auth/register", json={"email": "o@x.com", "password": "123456"}).json()["token"]}
+    other = {"Authorization": "Bearer " + c.post("/api/auth/register", json={"username": "o_x.com", "password": "123456"}).json()["token"]}
     assert c.get("/api/bots/1/referrals", headers=other).status_code == 404
 
 
@@ -197,5 +197,5 @@ def test_gate_setup_status_for_the_owner(world):
     assert st["messengers"][0]["ok"] is False and "chat not found" in st["messengers"][0]["error"]
     plain = make(BASE)
     assert c.get(f"/api/bots/{plain}/gate", headers=H).json() == {"configured": False, "messengers": []}
-    other = {"Authorization": "Bearer " + c.post("/api/auth/register", json={"email": "z@x.com", "password": "123456"}).json()["token"]}
+    other = {"Authorization": "Bearer " + c.post("/api/auth/register", json={"username": "z_x.com", "password": "123456"}).json()["token"]}
     assert c.get(f"/api/bots/{bid}/gate", headers=other).status_code == 404

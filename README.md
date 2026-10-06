@@ -103,7 +103,7 @@ For frontend work with hot reload, run `npm run dev` in `web/` with `NEXT_PUBLIC
 | `TELEGRAM_RELAY_URL`, `TELEGRAM_RELAY_KEY` | – | The Telegram relay outside Iran (see [`relay/README.md`](relay/README.md)); empty = Telegram off |
 | `TELEGRAM_SHARED_BOT_TOKEN` | – | Optional shared Telegram bot (links + directory, like the shared Bale bot) |
 | `BILLING_DEMO` | `true` | Demo app: upgrading a plan simulates a successful payment and activates it at once; `false` = request and admin approval |
-| `ADMIN_EMAILS` | – | Comma-separated accounts that may approve upgrade requests (only used when `BILLING_DEMO=false`) |
+| `ADMIN_USERNAMES` | – | Comma-separated usernames that may approve upgrade requests (only used when `BILLING_DEMO=false`) |
 | `CORS_ORIGINS` | `http://localhost:3000` | Only needed when the UI runs on another origin |
 
 ### Spending guards

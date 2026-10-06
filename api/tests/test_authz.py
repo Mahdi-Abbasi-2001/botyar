@@ -23,11 +23,11 @@ def world():
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     with TestClient(app) as c:
-        def user(email):
-            tok = c.post("/api/auth/register", json={"email": email, "password": "123456"}).json()["token"]
+        def user(name):
+            tok = c.post("/api/auth/register", json={"username": name, "password": "123456"}).json()["token"]
             return {"Authorization": f"Bearer {tok}"}
 
-        a, b = user("a@x.com"), user("b@x.com")
+        a, b = user("a_x.com"), user("b_x.com")
         bot = c.post("/api/bots", json={"template": "cafe"}, headers=a).json()["id"]
         with SessionLocal() as db:
             db.add(Product(bot_id=bot, block_id="order", name="x", category="", price=1, stock=None, options=[], position=0))

@@ -49,7 +49,7 @@ def sent(calls, chat):
 
 def test_shared_bot_full_journey(env):
     c, calls = env
-    tok = c.post("/api/auth/register", json={"email": "o@x.com", "password": "123456"}).json()["token"]
+    tok = c.post("/api/auth/register", json={"username": "o_x.com", "password": "123456"}).json()["token"]
     H = {"Authorization": f"Bearer {tok}"}
     bot = c.post("/api/bots", json={"template": "workshop"}, headers=H).json()["id"]
     st = c.post(f"/api/bots/{bot}/publish", json={"mode": "shared"}, headers=H).json()
@@ -99,7 +99,7 @@ def test_shared_bot_full_journey(env):
 
 def test_duplicate_delivery_is_ignored(env):
     c, calls = env
-    tok = c.post("/api/auth/register", json={"email": "d@x.com", "password": "123456"}).json()["token"]
+    tok = c.post("/api/auth/register", json={"username": "d_x.com", "password": "123456"}).json()["token"]
     H = {"Authorization": f"Bearer {tok}"}
     bot = c.post("/api/bots", json={"template": "cafe"}, headers=H).json()["id"]
     code = c.post(f"/api/bots/{bot}/publish", json={"mode": "shared"}, headers=H).json()["code"]
@@ -125,7 +125,7 @@ def test_cannot_publish_when_tests_fail(env):
     from app.models import VersionTests
 
     c, _ = env
-    tok = c.post("/api/auth/register", json={"email": "f@x.com", "password": "123456"}).json()["token"]
+    tok = c.post("/api/auth/register", json={"username": "f_x.com", "password": "123456"}).json()["token"]
     H = {"Authorization": f"Bearer {tok}"}
     bot = c.post("/api/bots", json={"template": "cafe"}, headers=H).json()["id"]
     with SessionLocal() as db:
@@ -140,12 +140,12 @@ def test_next_page_edits_the_clicked_message_but_typed_text_sends_new(env):
     from app.models import Bot, BotVersion, Product, User
 
     c, calls = env
-    tok = c.post("/api/auth/register", json={"email": "pg@x.com", "password": "123456"}).json()["token"]
+    tok = c.post("/api/auth/register", json={"username": "pg_x.com", "password": "123456"}).json()["token"]
     H = {"Authorization": f"Bearer {tok}"}
     spec = {"name": "shop", "welcome": "سلام", "menu": [{"label": "خرید", "block": "shop"}],
             "blocks": [{"type": "catalog_order", "id": "shop", "title": "فروشگاه", "source": "table", "items": []}]}
     with SessionLocal() as db:
-        uid = db.query(User).filter(User.email == "pg@x.com").one().id
+        uid = db.query(User).filter(User.username == "pg_x.com").one().id
         bot = Bot(user_id=uid, name="shop")
         db.add(bot)
         db.flush()
@@ -192,7 +192,7 @@ def test_edit_failure_falls_back_to_a_new_message():
 
 def test_customers_see_persian_digits_but_callback_data_stays_ascii(env):
     c, calls = env
-    tok = c.post("/api/auth/register", json={"email": "dg@x.com", "password": "123456"}).json()["token"]
+    tok = c.post("/api/auth/register", json={"username": "dg_x.com", "password": "123456"}).json()["token"]
     H = {"Authorization": f"Bearer {tok}"}
     bot = c.post("/api/bots", json={"template": "workshop"}, headers=H).json()["id"]
     code = c.post(f"/api/bots/{bot}/publish", json={"mode": "shared"}, headers=H).json()["code"]
@@ -211,7 +211,7 @@ def test_customers_see_persian_digits_but_callback_data_stays_ascii(env):
 
 def test_owner_notification_keeps_phone_digits_as_typed(env):
     c, calls = env
-    tok = c.post("/api/auth/register", json={"email": "nt@x.com", "password": "123456"}).json()["token"]
+    tok = c.post("/api/auth/register", json={"username": "nt_x.com", "password": "123456"}).json()["token"]
     H = {"Authorization": f"Bearer {tok}"}
     bot = c.post("/api/bots", json={"template": "workshop"}, headers=H).json()["id"]
     st = c.post(f"/api/bots/{bot}/publish", json={"mode": "shared"}, headers=H).json()
@@ -229,14 +229,14 @@ def test_cancel_on_bale_promotes_the_waiting_customer_and_messages_them(env):
     from app.models import Bot, BotVersion, User
 
     c, calls = env
-    tok = c.post("/api/auth/register", json={"email": "cx@x.com", "password": "123456"}).json()["token"]
+    tok = c.post("/api/auth/register", json={"username": "cx_x.com", "password": "123456"}).json()["token"]
     H = {"Authorization": f"Bearer {tok}"}
     spec = {"name": "کلاس", "welcome": "سلام", "menu": [{"label": "ثبت‌نام", "block": "b"}],
             "blocks": [{"type": "booking", "id": "b", "title": "ثبت‌نام کلاس", "waitlist": True, "allow_cancel": True,
                         "slots": [{"id": "once", "label": "کارگاه ویژه", "capacity": 1}]},
                        {"type": "admin_notify", "id": "n", "on": "b", "text": "ثبت‌نام جدید"}]}
     with SessionLocal() as db:
-        uid = db.query(User).filter(User.email == "cx@x.com").one().id
+        uid = db.query(User).filter(User.username == "cx_x.com").one().id
         bot = Bot(user_id=uid, name="کلاس")
         db.add(bot)
         db.flush()

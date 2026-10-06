@@ -3,7 +3,7 @@
 The limits are enforced (bots, live bots, AI requests, customers per live bot). Prices are PROPOSED numbers (see
 docs/business-plan.md); they are shown as «پیشنهادی» until the founder has validated them with owners. There is no payment
 gateway yet: in demo mode (settings.billing_demo) an upgrade simulates a successful payment and activates the plan at once;
-otherwise an owner sends an upgrade request and an admin (ADMIN_EMAILS) activates the plan by hand."""
+otherwise an owner sends an upgrade request and an admin (ADMIN_USERNAMES) activates the plan by hand."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -58,7 +58,7 @@ def limits(db: Session, user_id: int) -> dict:
 
 
 def is_admin(user: User) -> bool:
-    return user.email.lower() in {e.strip().lower() for e in settings.admin_emails.split(",") if e.strip()}
+    return user.username in {u.strip().lower() for u in settings.admin_usernames.split(",") if u.strip()}
 
 
 def ai_requests_30d(db: Session, user_id: int) -> int:
@@ -200,7 +200,7 @@ def _admin(user: User = Depends(current_user)) -> User:
 @router.get("/api/admin/upgrades")
 def list_upgrades(_: User = Depends(_admin), db: Session = Depends(get_db)):
     rows = db.execute(select(UpgradeRequest, User).join(User, User.id == UpgradeRequest.user_id).order_by(UpgradeRequest.id.desc()).limit(100)).all()
-    return [{"id": r.id, "email": u.email, "plan": r.plan, "current": plan_key(db, u.id), "note": r.note, "status": r.status,
+    return [{"id": r.id, "username": u.username, "plan": r.plan, "current": plan_key(db, u.id), "note": r.note, "status": r.status,
              "created_at": r.created_at.isoformat()} for r, u in rows]
 
 
