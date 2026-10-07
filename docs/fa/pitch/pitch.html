@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>بات‌یار — پیچ</title>
+<style>
+@font-face { font-family: "Vazirmatn"; src: url("Vazirmatn.woff2") format("woff2"); font-weight: 100 900; }
+@page { size: 1280px 720px; margin: 0; }
+:root { --ink:#0B0D12; --panel:#12151C; --raised:#1A1E28; --line:#2A3040; --fg:#ECE8DF; --mute:#9AA0AE; --saffron:#F2A93B; --mint:#4FD1B5; --bad:#FF6B5E; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #000; }
+body { font-family: "Vazirmatn", sans-serif; color: var(--fg); }
+.slide { width: 1280px; height: 720px; padding: 52px 72px 44px; background: var(--ink); position: relative; overflow: hidden; page-break-after: always; break-after: page;
+  background-image: radial-gradient(circle at 12% 8%, rgba(242,169,59,.10), transparent 40%), linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+  background-size: auto, 40px 40px, 40px 40px; }
+.slide:last-child { page-break-after: auto; break-after: auto; }
+.kicker { color: var(--saffron); font-weight: 700; font-size: 20px; margin-bottom: 8px; }
+h1 { margin: 0; font-size: 46px; line-height: 1.45; font-weight: 900; }
+h2 { margin: 0 0 22px; font-size: 40px; line-height: 1.45; font-weight: 900; }
+h3 { margin: 0 0 8px; font-size: 24px; font-weight: 800; }
+p { margin: 0; font-size: 22px; line-height: 1.9; color: #cfd2da; }
+.acc { color: var(--saffron); }
+.mint { color: var(--mint); }
+.foot { position: absolute; bottom: 20px; left: 72px; right: 72px; display: flex; justify-content: space-between; font-size: 14px; color: var(--mute); }
+.cards { display: grid; gap: 22px; }
+.c3 { grid-template-columns: repeat(3, 1fr); }
+.c2 { grid-template-columns: repeat(2, 1fr); }
+.c4 { grid-template-columns: repeat(4, 1fr); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 24px 26px; }
+.card p { font-size: 20px; line-height: 1.85; }
+.big { font-size: 66px; font-weight: 900; line-height: 1.2; }
+.shot { border: 1px solid var(--line); border-radius: 16px; overflow: hidden; box-shadow: 0 18px 50px rgba(0,0,0,.55); background: #000; }
+.shot img { display: block; width: 100%; }
+.cap { font-size: 18px; color: var(--mute); line-height: 1.8; margin-top: 12px; }
+.step { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px 18px; text-align: center; }
+.step .n { display: inline-grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: var(--saffron); color: #0B0D12; font-weight: 900; font-size: 22px; margin-bottom: 10px; }
+.step b { display: block; font-size: 22px; margin-bottom: 6px; }
+.step span { font-size: 17px; color: var(--mute); line-height: 1.7; display: block; }
+table { width: 100%; border-collapse: collapse; font-size: 18px; }
+th, td { padding: 11px 14px; text-align: right; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.7; }
+th { color: var(--mute); font-weight: 600; font-size: 16px; }
+td.us, th.us { background: rgba(242,169,59,.09); color: var(--fg); }
+.pill { display: inline-block; padding: 3px 14px; border-radius: 99px; border: 1px solid var(--line); color: var(--mute); font-size: 16px; }
+.quote { border-right: 4px solid var(--saffron); padding: 4px 22px; font-size: 24px; line-height: 1.9; color: var(--fg); }
+.warn { background: #1F1A10; border: 1px solid #6B4E1D; border-radius: 16px; padding: 16px 22px; font-size: 18px; line-height: 1.85; color: #FFD27A; }
+.row { display: flex; gap: 28px; align-items: flex-start; }
+ul { margin: 0; padding: 0 22px 0 0; font-size: 21px; line-height: 2; color: #cfd2da; }
+</style>
+</head>
+<body>
+
+<!-- 1. عنوان -->
+<section class="slide" style="display:flex;flex-direction:column;justify-content:center">
+  <div class="kicker">BuildX · مسئلهٔ ۳ · سازندهٔ ربات بله و تلگرام</div>
+  <h1 style="font-size:96px;line-height:1.3">بات‌یار</h1>
+  <h1 class="acc" style="font-size:52px;margin-top:6px">بگو چی می‌خوای، ربات رو می‌سازم.</h1>
+  <p style="margin-top:28px;max-width:900px">ایجنتی که ربات بله و تلگرام کسب‌وکارها را از روی توضیح فارسی می‌سازد، پیش از انتشار مثل یک مشتری واقعی تستش می‌کند و هر تغییر را با یک جمله، با نمایش تفاوت و تست دوباره، اعمال می‌کند.</p>
+  <div class="foot"><span>botyar.liara.run</span><span>ربات مشترک بله: @botyar_ai_bot</span></div>
+</section>
+
+<!-- 2. مسئله -->
+<section class="slide">
+  <div class="kicker">مسئله</div>
+  <h2>ربات داشتن برای کسب‌وکار کوچک یا گران است یا سخت</h2>
+  <div class="cards c3">
+    <div class="card"><h3>سپردن به برنامه‌نویس</h3><p>۲ تا ۸ میلیون تومان برای ربات ساده، ۱۲ تا ۳۰ میلیون برای فروشگاه؛ هفته‌ها انتظار؛ هر تغییر کوچک دوباره هزینه و صبر.</p></div>
+    <div class="card"><h3>ساختن با ابزار بصری</h3><p>باید بلوک و افزونه یاد بگیری؛ بعضی ابزارها صورتحساب را به ازای هر قابلیت در روز و هر پیام حساب می‌کنند. صاحب کافه وقتش را ندارد.</p></div>
+    <div class="card"><h3>هیچ‌کدام تضمین نمی‌کنند</h3><p>ربات پیش از رسیدن به مشتری واقعاً درست کار می‌کند یا نه. خطای یک ظرفیت یا قیمت را مشتری می‌فهمد، نه صاحب کسب‌وکار.</p></div>
+  </div>
+  <div class="quote" style="margin-top:34px">«نوبت‌دهی می‌خواهم، ولی نه برنامه‌نویس دارم، نه وقت یاد گرفتن، و نمی‌خواهم مشتری‌ام تست‌کنندهٔ رباتم باشد.»</div>
+  <div class="foot"><span>قیمت‌ها: راهنمای عمومی قیمت ربات بله، ۱۴۰۵</span><span>۲</span></div>
+</section>
+
+<!-- 3. فرصت -->
+<section class="slide">
+  <div class="kicker">فرصت بازار</div>
+  <h2>مشتری‌ها در پیام‌رسان‌اند؛ کسب‌وکارهای کوچک هنوز نه</h2>
+  <div class="cards c3">
+    <div class="card"><div class="big acc">۱۶٫۵م</div><p>کاربر فعال ماهانهٔ بله (اردیبهشت ۱۴۰۲، وزارت ارتباطات)</p></div>
+    <div class="card"><div class="big acc">۳۵م+</div><p>کاربر ثبت‌شدهٔ بله؛ تلگرام هم از طریق رله پشتیبانی می‌شود</p></div>
+    <div class="card"><div class="big mint">۰٫۰۰۲ دلار</div><p>هزینهٔ اندازه‌گیری‌شدهٔ ساخت یک ربات؛ ساخت ۱۲ تا ۴۵ ثانیه</p></div>
+  </div>
+  <div class="cards c2" style="margin-top:26px">
+    <div class="card"><h3>چرا الان؟</h3><p>مدل‌های زبانی امروز می‌توانند از یک توضیح فارسی ساختاری دقیق و اعتبارسنجی‌شده بسازند و برایش تست بنویسند؛ این با این هزینه تا همین اواخر ممکن نبود.</p></div>
+    <div class="card"><h3>بازار نخست</h3><p>کسب‌وکارهای نوبت‌محور و سفارش‌محور: کلینیک، آرایشگاه، کافه، آموزشگاه، باشگاه، فروشگاه‌های کوچک و صاحبان کانال. شمار دقیقشان را نداریم و حدس نمی‌زنیم.</p></div>
+  </div>
+  <div class="foot"><span>منبع کاربران بله: وزارت ارتباطات؛ هزینهٔ ساخت: لاگ محصول</span><span>۳</span></div>
+</section>
+
+<!-- 4. راهکار -->
+<section class="slide">
+  <div class="kicker">راهکار</div>
+  <h2>از یک جمله تا رباتِ تست‌شده در چند دقیقه</h2>
+  <div class="cards c4" style="grid-template-columns:repeat(5,1fr);gap:16px">
+    <div class="step"><div class="n">۱</div><b>توضیح بده</b><span>به فارسی، هر طور که به یک همکار می‌گویی</span></div>
+    <div class="step"><div class="n">۲</div><b>ایجنت می‌سازد</b><span>فقط اگر لازم باشد می‌پرسد؛ ربات را به‌صورت ساختار معتبر می‌نویسد</span></div>
+    <div class="step"><div class="n">۳</div><b>تست مثل مشتری</b><span>گفت‌وگوهای واقعی با ربات؛ خطا اصلاح می‌شود؛ تا همه سبز نشوند انتشار قفل است</span></div>
+    <div class="step"><div class="n">۴</div><b>انتشار</b><span>روی بله و تلگرام با لینک و QR، یا با توکن خودت</span></div>
+    <div class="step"><div class="n">۵</div><b>تغییر با یک جمله</b><span>نمایش تفاوت، اجرای دوبارهٔ همهٔ تست‌ها، نسخهٔ جدید</span></div>
+  </div>
+  <div class="cards c2" style="margin-top:30px">
+    <div class="card"><h3>ایجنت هرگز کد نمی‌نویسد</h3><p>خروجی ایجنت یک ساختار اعتبارسنجی‌شده است که یک موتور ثابت اجرا می‌کند؛ پس ربات قابل‌بررسی، قابل‌تست و امن است.</p></div>
+    <div class="card"><h3>مشتری هرگز با مدل زبانی حرف نمی‌زند</h3><p>پاسخ‌ها همیشه یکسان‌اند، کسی نمی‌تواند ربات را «گول بزند» و هر پیام مشتری هزینهٔ هوش مصنوعی ندارد.</p></div>
+  </div>
+  <div class="foot"><span>بات‌یار</span><span>۴</span></div>
+</section>
+
+<!-- 5. نمایش: ساخت -->
+<section class="slide">
+  <div class="kicker">نمایش محصول ۱ · ساخت</div>
+  <div class="row">
+    <div style="width:700px"><div class="shot"><img src="img/builder.png"></div></div>
+    <div style="flex:1">
+      <h2 style="font-size:34px">یک صفحه، کل ماجرا</h2>
+      <ul>
+        <li>راست: گفت‌وگو با ایجنت و فرض‌هایی که کرده</li>
+        <li>وسط: نقشهٔ زندهٔ ربات و نتیجهٔ تست‌ها</li>
+        <li>چپ: شبیه‌ساز گوشی؛ ربات را همان‌جا امتحان کن</li>
+      </ul>
+      <div class="cap">مثال واقعی: «ربات نوبت‌دهی آرایشگاه با دو کارشناس، دو خدمت با مدت و قیمت، یادآوری و لغو» — ساخته‌شده با ۲ تست موفق.</div>
+    </div>
+  </div>
+  <div class="foot"><span>تصویر از نسخهٔ واقعی محصول</span><span>۵</span></div>
+</section>
+
+<!-- 6. نمایش: تست -->
+<section class="slide">
+  <div class="kicker">نمایش محصول ۲ · تست خودکار</div>
+  <div class="row">
+    <div style="width:700px"><div class="shot"><img src="img/tests_crop.png"></div></div>
+    <div style="flex:1">
+      <h2 style="font-size:34px">هر سناریو، یک مشتری واقعی</h2>
+      <ul>
+        <li>ایجنت سناریو می‌نویسد؛ موتور واقعی اجرایش می‌کند</li>
+        <li>متن کامل هر گفت‌وگو قابل خواندن است</li>
+        <li>خطا؟ اصلاح خودکار تا سه بار؛ وگرنه انتشار قفل می‌ماند</li>
+        <li>هر تغییر، همهٔ تست‌های قبلی را دوباره اجرا می‌کند</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>تصویر از نسخهٔ واقعی محصول</span><span>۶</span></div>
+</section>
+
+<!-- 7. نمایش: انتشار -->
+<section class="slide">
+  <div class="kicker">نمایش محصول ۳ · انتشار</div>
+  <h2 style="font-size:34px">بله و تلگرام، هرکدام با ظاهر خودش؛ از امتحان تا ربات اختصاصی</h2>
+  <div class="shot"><img src="img/publish.png"></div>
+  <div class="cards c3" style="margin-top:22px">
+    <div class="card" style="padding:16px 20px"><h3 style="font-size:20px">شروع سریع (آزمایشی)</h3><p style="font-size:17px;line-height:1.7">ربات مشترک بات‌یار: لینک و QR فوری، بدون ساختن ربات جداگانه.</p></div>
+    <div class="card" style="padding:16px 20px"><h3 style="font-size:20px">ربات اختصاصی</h3><p style="font-size:17px;line-height:1.7">با نام و تصویر خود کسب‌وکار؛ راهنمای سه‌مرحله‌ای BotFather و انتقال بدون از دست رفتن داده.</p></div>
+    <div class="card" style="padding:16px 20px"><h3 style="font-size:20px">پنل مدیریت</h3><p style="font-size:17px;line-height:1.7">ثبت‌ها، پیام‌ها، اطلاعیه، مشتری‌ها و خروجی Excel.</p></div>
+  </div>
+  <div class="foot"><span>تصویر از نسخهٔ واقعی محصول</span><span>۷</span></div>
+</section>
+
+<!-- 8. گستره -->
+<section class="slide">
+  <div class="kicker">یک موتور، کسب‌وکارهای مختلف</div>
+  <h2 style="font-size:34px;margin-bottom:18px">فروشگاه، آزمون، عضویت اجباری، نوبت‌دهی، فرم و پرسش‌وپاسخ</h2>
+  <div class="cards c3" style="gap:20px">
+    <div><div class="shot"><img src="img/products_crop.png"></div><div class="cap"><b>فروشگاه:</b> جدول محصولات از Excel، متن یا عکس؛ موجودی، کد تخفیف، پرداخت درون بله یا کارت‌به‌کارت</div></div>
+    <div><div class="shot"><img src="img/quiz_crop.png"></div><div class="cap"><b>آزمون:</b> بانک سؤال تا ۵۰۰ مورد؛ وارد کردن فایل یا ساخت از روی موضوع؛ هر نفر ۱۰ سؤال تصادفی</div></div>
+    <div><div class="shot"><img src="img/join_crop.png"></div><div class="cap"><b>رشد کانال:</b> محتوا فقط پس از عضویت در کانال‌ها؛ لینک اختصاصی هر محتوا</div></div>
+  </div>
+  <div class="foot"><span>تصاویر از نسخهٔ واقعی محصول</span><span>۸</span></div>
+</section>
+
+<!-- 9. مزیت رقابتی -->
+<section class="slide">
+  <div class="kicker">مزیت رقابتی</div>
+  <h2 style="font-size:34px;margin-bottom:14px">در گستردگی نمی‌بَریم؛ در سرعت، اطمینان و قیمتِ قابل‌پیش‌بینی می‌بَریم</h2>
+  <table>
+    <tr><th></th><th class="us">بات‌یار</th><th>سازندهٔ بصری (صورتحساب مصرفی)</th><th>سازندهٔ دکمه‌ای (پلن ثابت)</th><th>برنامه‌نویس</th></tr>
+    <tr><td>ساخت</td><td class="us">توضیح فارسی</td><td>بلوک و افزونه</td><td>تنظیم منو</td><td>شرح نیاز، انتظار</td></tr>
+    <tr><td>تست پیش از انتشار</td><td class="us">خودکار و اجباری</td><td>ندیدیم</td><td>بررسی نکردیم</td><td>دستی</td></tr>
+    <tr><td>قیمت</td><td class="us">پلن ثابت ماهانه (پیشنهادی)</td><td>حدود ۱۵۰–۲۳۵ هزار تومان در ماه (نمونه‌های خودشان)</td><td>۱۸۳ / ۲۸۷ / ۶۰۹ هزار تومان</td><td>۲–۳۰ میلیون یک‌باره</td></tr>
+    <tr><td>مشتری با مدل زبانی؟</td><td class="us">هرگز؛ ایمن و بی‌هزینه</td><td>—</td><td>—</td><td>—</td></tr>
+    <tr><td>تغییر</td><td class="us">یک جمله + تفاوت + تست دوباره</td><td>ویرایش بلوک‌ها</td><td>ویرایش منو</td><td>یک سفارش تازه</td></tr>
+  </table>
+  <div class="foot"><span>اطلاعات عمومی رقبا، خوانده‌شده در ۱۴۰۵/۰۷/۱۳؛ نام شرکت‌ها عمداً نیامده</span><span>۹</span></div>
+</section>
+
+<!-- 10. مدل کسب‌وکار -->
+<section class="slide">
+  <div class="kicker">مدل کسب‌وکار</div>
+  <h2 style="font-size:34px;margin-bottom:14px">اشتراک ماهانهٔ ثابت؛ همهٔ قابلیت‌ها در همهٔ پلن‌ها، فقط سقف‌ها فرق دارند</h2>
+  <table>
+    <tr><th>پلن</th><th>قیمت (تومان/ماه)</th><th>تعداد ربات</th><th>مشتری فعال هر ربات</th><th>درخواست ایجنت</th></tr>
+    <tr><td>رایگان</td><td>۰</td><td>۳ ربات · ۱ زنده</td><td>۱۰۰</td><td>۳۰</td></tr>
+    <tr><td>پایه</td><td>۱۴۹٬۰۰۰</td><td>۳ ربات · ۱ زنده</td><td>۵۰۰</td><td>۱۰۰</td></tr>
+    <tr><td>حرفه‌ای</td><td>۳۴۹٬۰۰۰</td><td>۱۰ ربات · ۳ زنده</td><td>۳٬۰۰۰</td><td>۳۰۰</td></tr>
+    <tr><td>سازمانی (آژانس‌ها)</td><td>۱٬۴۹۰٬۰۰۰</td><td>۵۰ ربات · ۱۰ زنده</td><td>۳٬۰۰۰</td><td>۱٬۵۰۰</td></tr>
+  </table>
+  <div class="cards c3" style="margin-top:22px">
+    <div class="card" style="padding:16px 22px"><h3 style="font-size:20px">هزینهٔ AI ناچیز</h3><p style="font-size:17px;line-height:1.7">≈ ۰٫۰۰۲ دلار برای هر ساخت؛ حداکثر ≈ ۰٫۹۰ دلار در ماه برای پلن پایه اگر کل سقف مصرف شود. پیام مشتری هزینهٔ AI ندارد.</p></div>
+    <div class="card" style="padding:16px 22px"><h3 style="font-size:20px">زیرساخت ≈ ۱ میلیون تومان در ماه</h3><p style="font-size:17px;line-height:1.7">حدود ۷ حساب پلن پایه آن را می‌پوشاند (قیمت فهرست لیارا، تقریبی).</p></div>
+    <div class="card" style="padding:16px 22px"><h3 style="font-size:20px">سهمی از پول مشتریان نمی‌گیریم</h3><p style="font-size:17px;line-height:1.7">پرداخت مستقیم به کیف پول خود صاحب کسب‌وکار می‌رود.</p></div>
+  </div>
+  <div class="foot"><span>قیمت‌ها پیشنهادی‌اند و هنوز با صاحبان کسب‌وکار راستی‌آزمایی نشده‌اند · ارتقای پلن در این نسخه آزمایشی است</span><span>۱۰</span></div>
+</section>
+
+<!-- 11. رشد -->
+<section class="slide">
+  <div class="kicker">جذب کاربر و مسیر رشد</div>
+  <h2 style="font-size:34px;margin-bottom:18px">از چند پایلوت صنفی تا کانال فروش از طریق آژانس‌ها</h2>
+  <div class="cards c4" style="gap:16px">
+    <div class="card"><h3>۱ · پایلوت</h3><p style="font-size:18px;line-height:1.8">۳ تا ۵ کسب‌وکار واقعی (کلینیک، کافه، آرایشگاه)؛ هدف: ربات منتشرشده با ≥۱۰ مشتری واقعی در هفتهٔ اول.</p></div>
+    <div class="card"><h3>۲ · قیف رایگان</h3><p style="font-size:18px;line-height:1.8">پلن رایگان روی ربات مشترک؛ فهرست کسب‌وکارها مشتری می‌آورد؛ ارتقا برای ربات اختصاصی و سقف بالاتر.</p></div>
+    <div class="card"><h3>۳ · محتوا و صنف</h3><p style="font-size:18px;line-height:1.8">ویدیوهای «ربات در ۳ دقیقه» برای هر صنف با قالب آماده؛ همکاری با اتحادیه‌ها.</p></div>
+    <div class="card"><h3>۴ · آژانس‌ها</h3><p style="font-size:18px;line-height:1.8">فریلنسرها همین حالا ربات میلیونی می‌فروشند؛ پلن سازمانی کارشان را چند برابر سریع می‌کند.</p></div>
+  </div>
+  <div class="card" style="margin-top:24px"><h3>قلاب رشد داخل محصول</h3><p style="font-size:19px;line-height:1.8">صاحبان کانال با «عضویت اجباری و ارسال محتوا» و «لینک دعوت» برای رشد کانال‌شان ابزار می‌گیرند؛ آن‌ها خودشان در بله فعال‌اند و کم‌هزینه‌ترین مشتری برای جذب‌اند.</p></div>
+  <div class="foot"><span>بعدی: درگاه پرداخت واقعی، آزمون میدانی روی بله و تلگرام، چندنمونه‌ای کردن سرور، ایتا و روبیکا</span><span>۱۱</span></div>
+</section>
+
+<!-- 12. شواهد -->
+<section class="slide">
+  <div class="kicker">آنچه ساخته و سنجیده‌ایم</div>
+  <h2 style="font-size:34px;margin-bottom:18px">زنده، تست‌شده و صادق دربارهٔ محدودیت‌هایش</h2>
+  <div class="cards c4" style="gap:16px">
+    <div class="card" style="text-align:center"><div class="big acc" style="font-size:54px">۴۵۷</div><p style="font-size:17px">تست خودکار (بدون شبکه و بدون هزینه)</p></div>
+    <div class="card" style="text-align:center"><div class="big acc" style="font-size:54px">۶۸</div><p style="font-size:17px">سناریوی ارزیابی ایجنت با مدل واقعی</p></div>
+    <div class="card" style="text-align:center"><div class="big acc" style="font-size:54px">۹۸</div><p style="font-size:17px">عملیات API با مجوزدهی تست‌شده</p></div>
+    <div class="card" style="text-align:center"><div class="big mint" style="font-size:54px">۶</div><p style="font-size:17px">روز از صفر تا نسخهٔ آنلاین</p></div>
+  </div>
+  <div class="warn" style="margin-top:26px"><b>صادقانه:</b> پرداخت اشتراک بات‌یار آزمایشی است (درگاه وصل نیست)؛ دریافت پیام کانال/گروه، قفل عضویت و پرداخت درون بله باید روی پیام‌رسان واقعی آزموده شوند (فهرست آزمایش میدانی نوشته شده)؛ سرور یک نمونه است؛ قیمت‌ها راستی‌آزمایی نشده‌اند.</div>
+  <div class="foot"><span>مستندات فنی: معماری، جریان ایجنت، هزینه‌ها و محدودیت‌ها</span><span>۱۲</span></div>
+</section>
+
+<!-- 13. تیم -->
+<section class="slide">
+  <div class="kicker">تیم و درخواست</div>
+  <h2 style="font-size:34px;margin-bottom:18px">یک بنیان‌گذار، یک محصول کامل؛ حالا به مشتری و تیم نیاز داریم</h2>
+  <div class="cards c2">
+    <div class="card"><h3>تیم</h3><p style="font-size:19px;line-height:1.85">مهدی عباسی، بنیان‌گذار: ایجنت، موتور، رابط، استقرار و آزمون را در ۶ روز ساخته است (حدود صد کامیت)؛ تخصص در Python، ربات‌های پیام‌رسان و React.</p></div>
+    <div class="card"><h3>چه چیزی می‌خواهیم</h3><p style="font-size:19px;line-height:1.85">یک هم‌بنیان‌گذار برای فروش و ارتباط با کسب‌وکارها، یک مهندس زیرساخت، و سرمایه برای پایلوت صنفی، درگاه پرداخت، چندنمونه‌ای کردن و محتوای آموزشی.</p></div>
+  </div>
+  <div class="card" style="margin-top:22px"><h3>مسیر ۹۰ روز آینده</h3>
+    <p style="font-size:19px;line-height:1.85">هفتهٔ ۱: ۳ تا ۵ پایلوت ← هفتهٔ ۲–۴: آزمون میدانی و رفع اشکال روی بله و تلگرام + درگاه پرداخت اشتراک ← ماه ۲: قالب‌های صنفی و برنامهٔ آژانس‌ها ← ماه ۳: ۵۰ حساب پولی.</p></div>
+  <div class="foot"><span>مبلغ و شرایط درخواستی را بنیان‌گذار پس از نتایج پایلوت تعیین می‌کند</span><span>۱۳</span></div>
+</section>
+
+<!-- 14. پایان -->
+<section class="slide" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+  <h1 style="font-size:72px">بات‌یار</h1>
+  <h1 class="acc" style="font-size:40px;margin-top:6px">بگو چی می‌خوای، ربات رو می‌سازم.</h1>
+  <p style="margin-top:34px;font-size:28px">امتحانش کن: <b class="mint">botyar.liara.run</b></p>
+  <p style="margin-top:6px;font-size:24px">ربات مشترک بله: <b>@botyar_ai_bot</b></p>
+</section>
+
+</body>
+</html>

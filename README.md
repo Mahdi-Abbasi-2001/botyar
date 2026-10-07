@@ -62,6 +62,7 @@ is logged with its token count and cost (kept for the operator; the UI does not 
 | `api/app/communities.py`, `gate.py`, `referral.py`, `anon.py` | Channel/group linking, post forwarding, group moderation, forced join, invite links, anonymous chat |
 | `api/tests/` | Backend tests (no network, no OpenAI) |
 | `web/` | Next.js frontend (static export, Persian RTL) |
+| `docs/fa/` | **Persian competition documents**: `technical.fa.md`, `business-plan.fa.md`, `pitch/pitch.html`, `video-script.fa.md`; `make-submission.sh` builds the zip |
 | `docs/` | **`technical.md`** (architecture and behaviour), `business-plan.md`, `TEST-TOUR.md`, `real-bale-checklist.md`, agent and FAQ evaluations, design brief, sample import files |
 | `build.sh`, `deploy.sh` | Build the frontend into `api/static`; deploy to Liara |
 

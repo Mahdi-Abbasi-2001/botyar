@@ -1,6 +1,6 @@
 # Botyar (بات‌یار) — Technical documentation
 
-Version of 2026-10-06. Live: https://botyar.liara.run · Shared Bale bot: `@botyar_ai_bot`. This document describes what is in the repository; things that are built but not yet proven on a real messenger are marked **[unverified on a real messenger]** and listed in `docs/real-bale-checklist.md`.
+Version of 2026-10-08. Persian versions for the competition judges: `docs/fa/technical.fa.md`, `docs/fa/business-plan.fa.md`, `docs/fa/pitch/pitch.html`. Live: https://botyar.liara.run · Shared Bale bot: `@botyar_ai_bot`. This document describes what is in the repository; things that are built but not yet proven on a real messenger are marked **[unverified on a real messenger]** and listed in `docs/real-bale-checklist.md`.
 
 ## 1. What the system does
 
@@ -57,8 +57,8 @@ Design principles (each is enforced in code, not just intended):
 | `api/app/catalog.py`, `export.py`, `faq_index.py`, `faq_match.py`, `media.py`, `customers.py`, `records_ops.py` | Catalog import, exports, FAQ retrieval, files, customers list/bans, owner actions on records |
 | `api/app/models.py`, `store.py`, `db.py`, `auth.py`, `config.py`, `dates.py` | Tables, record store, DB session, JWT auth, settings, Jalali dates and the fixed test clock |
 | `web/app/*`, `web/components/workspace/*` | UI: landing, auth, bots, workspace tabs, pricing, account |
-| `api/tests/` (41 files, 261 test functions) | Backend tests (no network, no OpenAI) |
-| `api/scripts/` | Agent regression harness (`eval_agent.py`, 54 cases), `odd_requests.py`, FAQ evaluation scripts |
+| `api/tests/` (457 tests) | Backend tests (no network, no OpenAI) |
+| `api/scripts/` | Agent regression harness (`eval_agent.py`, 68 cases), `odd_requests.py`, FAQ evaluation scripts |
 
 ## 4. The BotSpec
 
@@ -69,7 +69,7 @@ Blocks (all validated by Pydantic; a menu entry points at any non-`admin_notify`
 
 | Block | What the customer experiences | Notes |
 |---|---|---|
-| `message` | text; optional random `variants` (never the same twice in a row), a photo/file (`media`), a map pin (`location`) | files and pins are sent after the text; the owner uploads the real file in the Files tab |
+| `message` | text; optional random `variants` (never the same twice in a row), a photo/file (`media`), a map pin (`location`), contact card, opening hours, link buttons; **`join`**: content delivered only after the customer is in every listed channel (per-content deep link `?start=CODE-<block id>` / `go-<block id>`) | files and pins are sent after the text; the owner uploads the real file in the Files tab |
 | `form` | field-by-field questions (text, phone with Iranian-mobile check, number, choice) | `done_text` may contain `{field_key}` and `{id}` |
 | `booking` | fixed slots with capacity and optional waitlist; weekly repeating slots with per-date capacity and Jalali dates; **appointments generated from working hours** (staff, duration, break, paged times); cancellation with deadline; **reschedule** | `reminder_hours`; waitlist promotion messages another customer |
 | `catalog_order` | inline items or a database catalog (categories, search, paging, options, quantity, stock), cart, contact fields | `delivery_fee`, `free_delivery_over`, `discount_codes` (percent/amount, min total, max uses); `payment: online` (Bale invoice); cancel window; owner status flow new→preparing→ready→done |
@@ -77,7 +77,7 @@ Blocks (all validated by Pydantic; a menu entry points at any non-`admin_notify`
 | `contact` | message to the owner; the owner replies from the panel and the reply arrives in the customer's chat | inbox with opaque thread ids |
 | `feedback` | 1–5 stars + comment; max 5 per customer per day | panel shows the average |
 | `menu` | a sub-menu (nestable, no loops, 1–10 items) | message items keep the customer inside the sub-menu |
-| `quiz` | multiple choice with one correct answer, score at the end | results stored for the owner |
+| `quiz` | multiple choice (or personality quiz), score at the end, pass mark and code; `show_history` adds a built-in «نتیجه‌های من» menu button; **question bank** (`quiz_questions` table, panel tab «سؤال‌ها»: add, import table/text/photo/PDF, generate from a topic, edit) replaces the spec's questions while it has rows | results stored for the owner |
 | `referral` | personal invite link, invite count, goal, the owner's own reward text | counts brand-new customers only |
 | `anon_chat` | anonymous text chat between two customers | see §11 |
 | `admin_notify` | (owner side) notifies the owner when the watched block completes | |
@@ -89,7 +89,7 @@ Validation rules worth knowing: block ids unique; menu targets exist; `admin_not
 
 `engine.handle(spec, session, text, store, now=None, matcher=None, rng=None) -> list[action]`
 
-- **Actions** are plain dicts: `send {text, buttons, edit}`, `notify_admin`, `notify_customer {cust, text, buttons?}`, `media`, `location`, `invoice`, and `anon_*` (find/relay/end/report). The channel layer turns them into messenger calls; the simulator and the test runner consume the same list. `edit: true` is set only on navigation replies (next page, category, time paging) and makes Bale edit the tapped message in place, falling back to a new message.
+- **Actions** are plain dicts: `send {text, buttons, edit}`, `notify_admin`, `notify_customer {cust, text, buttons?}`, `media`, `location`, `invoice`, and `anon_*` (find/relay/end/report). The channel layer turns them into messenger calls; the simulator and the test runner consume the same list. `edit: true` makes the channel replace the message the customer just tapped (in place). `engine.handle(..., clicked=True)` (set by the channel for button presses and by the simulator) marks a reply as editable when it is a single message, or a title plus the question under it merged into one; replies that finish something (confirmation + menu), or carry a photo/location/contact/invoice, stay new messages; typed text always gets a new message. The engine also appends «بازگشت به منو» to every screen of choice buttons that has no way out (except yes/no questions).
 - **Sessions** are JSON (`block`, `step`, `data`, `cust`, plus adapter-set keys such as `ref`, `pay_ok`); they are deep-copied before use because in-place edits are invisible to SQLAlchemy change detection.
 - **Button data** is ASCII and ≤64 bytes (longer values are mapped to `~n` tokens); display text gets Persian digits only at the channel layer, so tests and logic stay ASCII.
 - **Stale-state recovery**: if the owner republishes while a customer is mid-flow and the saved state points at something that no longer exists, the engine resets that customer with an explanation instead of failing.
@@ -106,7 +106,7 @@ LangGraph: `clarify → design → validate → write_tests → run_tests → re
 - **Change requests** receive the current spec, produce a readable diff, and re-run old and new tests.
 - **Cost control**: per-user 40 runs/day, global 300 runs/day, plan limit on agent requests per 30 days, every call logged in `llm_calls` with tokens and cost; the owner UI does not show them.
 - **Interrupted runs** (server restart) are failed at startup or after 6 minutes so a bot is never locked.
-- **Quality harness**: `api/scripts/eval_agent.py` runs 54 real-model cases (supported builds with content checks, honest declines, no-invention rules, regression cases for every past failure). It is run only for the affected cases after a prompt change and once in full before a deploy.
+- **Quality harness**: `api/scripts/eval_agent.py` runs 68 real-model cases (supported builds with content checks, honest declines, no-invention rules, regression cases for every past failure). It is run only for the affected cases after a prompt change and once in full before a deploy.
 
 ## 7. Messenger layer
 
@@ -183,9 +183,9 @@ All need the bot to be inside the channel/group; the owner links a chat by posti
 | Mutation checks | key rules were broken on purpose to confirm tests fail (done for cancellation and capacity logic) |
 | Agent quality | `scripts/eval_agent.py` against the real model (see `docs/agent-quality-eval.md`) |
 
-Run: `cd api && OPENAI_API_KEY=sk-invalid DATABASE_URL=sqlite:///./test.db .venv/bin/python -m pytest -q` (an invalid key guarantees no credits are spent). Last full run: **273 passed**. Tests do **not** prove behaviour on the real Bale/Telegram servers; that is what `docs/real-bale-checklist.md` is for.
+Run: `cd api && OPENAI_API_KEY=sk-invalid DATABASE_URL=sqlite:///./test.db .venv/bin/python -m pytest -q` (an invalid key guarantees no credits are spent). Last full run: **457 collected, all passing at the last full run of each group**. Tests do **not** prove behaviour on the real Bale/Telegram servers; that is what `docs/real-bale-checklist.md` is for.
 
-## 14. API surface (70 operations)
+## 14. API surface (98 operations)
 
 Auth `POST /api/auth/register|login`, `GET /api/me`, `GET /api/health`, `GET /api/templates`. Plans `GET /api/plans` (public), `GET /api/me/plan`, `POST /api/me/upgrade`, `POST /api/me/plan/cancel`, admin `GET/POST /api/admin/upgrades…`.
 Bots `GET/POST /api/bots`, `POST /api/bots/draft`, `GET /api/bots/{id}`, builder (`POST …/builder`, `GET …/builder/{active|messages|runs/{run}}`), `GET …/versions|tests|cost`, simulator (`POST …/simulate`, `…/simulate/reset`).
