@@ -38,10 +38,10 @@ export function useTyping() {
   return n;
 }
 
-export function TypedRequest({ n }: { n: number }) {
+function Sentence({ n, caret }: { n: number; caret?: boolean }) {
   let start = 0;
   return (
-    <p className="m-0 min-h-[205px] text-xl leading-[2.05]">
+    <>
       {SEGS.map(([text, tag], i) => {
         const s = start;
         start += text.length;
@@ -55,7 +55,17 @@ export function TypedRequest({ n }: { n: number }) {
           </span>
         );
       })}
-      {n < LEN && <span className="anim-caret font-light text-saffron">|</span>}
+      {caret && n < LEN && <span className="anim-caret font-light text-saffron">|</span>}
+    </>
+  );
+}
+
+export function TypedRequest({ n }: { n: number }) {
+  return (
+    // the finished sentence is laid out invisibly in the same cell, so the box is exactly as tall as the full text at every width
+    <p className="m-0 grid text-xl leading-[2.05]">
+      <span aria-hidden className="invisible col-start-1 row-start-1"><Sentence n={LEN + 1} /></span>
+      <span className="col-start-1 row-start-1"><Sentence n={n} caret /></span>
     </p>
   );
 }
@@ -73,7 +83,7 @@ const Num = ({ n }: { n: string }) => (
 export function BlueprintPreview({ n }: { n: number }) {
   const cap = n >= ENDS[7];
   return (
-    <div className="relative flex flex-col gap-3">
+    <div className="relative mb-12 flex flex-col gap-3">
       <span className="text-[13px] text-mute">نقشه‌ی ربات، هم‌زمان با نوشتن شما</span>
       <Node on={n >= ENDS[0]} className="flex items-center gap-3 rounded-2xl border border-line-2 bg-panel px-4 py-3.5">
         <Num n="۱" />
@@ -103,9 +113,8 @@ export function BlueprintPreview({ n }: { n: number }) {
       </div>
       <Node on={n >= LEN + 15} className="flex items-center gap-3.5 rounded-2xl border border-mint-line bg-mint-bg px-4 py-3.5 text-mint-fg">
         <span className="flex-1 text-[15px] font-extrabold">۵ سناریوی تست نوشته و اجرا شد</span>
-        <span>۵/۵</span>
       </Node>
-      {n >= LEN + 32 && <Stamp sub="۵ از ۵" size={146} className="absolute bottom-16 left-2.5" />}
+      {n >= LEN + 32 && <Stamp sub="۵ از ۵" size={146} className="absolute -bottom-14 left-1" />}
     </div>
   );
 }

@@ -112,7 +112,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-[1320px] flex-col gap-24 pb-16 sm:gap-32">
           <div className="flex flex-col gap-10 pt-8 sm:pt-10">
 
-            <section className="flex flex-wrap items-start gap-12">
+            <section className="flex flex-wrap items-center gap-12">
               <div className="flex min-w-0 flex-[1_1_540px] flex-col gap-5">
                 <span className="self-start rounded-full border border-line-2 px-3.5 py-1.5 text-[13px] text-fg-2">ساخت ربات بله و تلگرام با هوش مصنوعی</span>
                 <h1 className="m-0 text-5xl font-black leading-[1.2] sm:text-[68px]">
@@ -132,7 +132,7 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-              <div className="min-w-0 flex-[1_1_480px] pt-2">
+              <div className="min-w-0 flex-[1_1_480px]">
                 <BlueprintPreview n={n} />
               </div>
             </section>
