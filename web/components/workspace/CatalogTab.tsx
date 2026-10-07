@@ -238,7 +238,7 @@ export function CatalogTab({ botId }: { botId: string }) {
                 {cat.products.map((p) => (
                   <tr key={p.id} className="border-t border-line-2">
                     <td className="p-2"><PhotoCell botId={botId} p={p} onChange={load} onError={setError} /></td>
-                    <td className="p-2"><div className="flex flex-wrap items-center gap-x-2 gap-y-1"><span>{p.name}</span>{p.is_sample && <span className="shrink-0 rounded bg-saffron/20 px-1.5 text-xs text-saffron">نمونه</span>}</div></td>
+                    <td className="min-w-48 max-w-80 p-2 align-middle"><span className="block break-words leading-6">{p.name}</span>{p.is_sample && <span className="mt-1 inline-block rounded bg-saffron/20 px-1.5 text-xs leading-5 text-saffron">نمونه</span>}</td>
                     <td className="p-2 text-mute">{p.category || "—"}</td>
                     <td className="p-2"><input type="number" defaultValue={p.price} min={0} onBlur={(e) => +e.target.value !== p.price && patch(p, { price: +e.target.value })} className="w-28 rounded-lg border border-line-2 bg-ink px-2 py-1" /></td>
                     <td className="p-2"><input type="number" defaultValue={p.stock ?? ""} min={0} placeholder="نامحدود" onBlur={(e) => {

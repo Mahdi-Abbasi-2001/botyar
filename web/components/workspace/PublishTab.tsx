@@ -7,6 +7,7 @@ import { RecordActions } from "@/components/workspace/RecordActions";
 import { PaymentCard } from "@/components/workspace/PaymentCard";
 import { TelegramCard } from "@/components/workspace/TelegramCard";
 import { ShareLink } from "@/components/workspace/ShareLink";
+import { BrandButton, ModeTile, PlatformCard, StatusPill } from "@/components/workspace/Messengers";
 
 type Pub = {
   published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string; webhooks_enabled: boolean; listed: boolean;
@@ -101,60 +102,51 @@ export function PublishTab({ botId, onImport }: { botId: string; onImport: () =>
 
       {!pub.published ? (
         <>
-        <div className={card}>
-          <h3 className="mb-1 text-lg font-extrabold">انتشار در بله</h3>
-          <p className="mb-4 text-sm leading-7 text-mute">ربات شما همین‌جا آزمایش شده است. پس از انتشار، مشتریان می‌توانند در بله با آن گفت‌وگو کنند و ثبت‌ها به‌صورت واقعی ذخیره می‌شوند.</p>
+        <PlatformCard p="bale" title="انتشار در بله" lead="ربات شما همین‌جا آزمایش شده است. پس از انتشار، مشتریان در بله با آن گفت‌وگو می‌کنند و ثبت‌ها به‌صورت واقعی ذخیره می‌شوند." status={<StatusPill on={false}>منتشر نشده</StatusPill>}>
           {!pub.tests_ok && <p className="mb-3 rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-bad">همه‌ی تست‌های نسخه‌ی فعلی هنوز موفق نشده‌اند. ابتدا در «گفت‌وگوی ساخت» ربات را اصلاح کنید.</p>}
           <div className="mb-4 grid gap-3 sm:grid-cols-2">
-            {([["shared", "ربات بات‌یار", "سریع‌ترین راه، بدون نیاز به ساخت ربات جداگانه. یک لینک و کد QR دریافت می‌کنید که مشتری را مستقیم به ربات شما در \u2066@" + (pub.shared_bot_username || "botyar") + "\u2069 می‌برد."], ["own", "ربات اختصاصی شما (پیشنهادی)", "با نام و تصویر خودتان. توکن را از \u2066@botfather\u2069 در بله دریافت می‌کنید."]] as const).map(([m, t, d]) => (
-              <button key={m} onClick={() => setMode(m)} aria-pressed={mode === m}
-                className={`rounded-xl border p-4 text-right ${mode === m ? "border-saffron bg-saffron/10" : "border-line-2 hover:border-mute"}`}>
-                <div className="font-bold">{t}</div>
-                <div className="mt-1 text-sm leading-6 text-mute">{d}</div>
-              </button>
-            ))}
+            <ModeTile selected={mode === "shared"} onClick={() => setMode("shared")} title="ربات بات‌یار"
+              text={<>سریع‌ترین راه، بدون ساخت ربات جداگانه. یک لینک و کد QR می‌گیرید که مشتری را مستقیم به ربات شما در <span dir="ltr">@{pub.shared_bot_username || "botyar"}</span> می‌برد.</>} />
+            <ModeTile selected={mode === "own"} onClick={() => setMode("own")} title="ربات اختصاصی شما" badge="پیشنهادی"
+              text={<>با نام و تصویر خودتان. توکن را از <span dir="ltr">@botfather</span> در بله دریافت می‌کنید.</>} />
           </div>
           {mode === "own" && (
             <label className="mb-4 block text-sm">
               <span className="mb-1 block text-mute">توکن ربات (محرمانه است و به‌صورت رمزنگاری‌شده ذخیره می‌شود)</span>
               <input dir="ltr" value={token} onChange={(e) => setToken(e.target.value)} placeholder="123456789:ABC…" autoComplete="off"
-                className="min-h-11 w-full rounded-xl border border-line-2 bg-ink px-3 text-left outline-none focus:border-saffron" />
+                className="min-h-11 w-full rounded-xl border border-line-2 bg-ink px-3 text-left outline-none focus:border-[var(--brand)]" />
             </label>
           )}
           {!pub.webhooks_enabled && <p className="mb-3 text-sm text-mute">انتشار فقط در نسخه‌ی آنلاین بات‌یار کار می‌کند.</p>}
-          <button className={btn} disabled={busy || samplesBlock || !pub.tests_ok || !pub.webhooks_enabled || (mode === "own" && token.trim().length < 10)} onClick={() => publish(mode)}>
+          <BrandButton disabled={busy || samplesBlock || !pub.tests_ok || !pub.webhooks_enabled || (mode === "own" && token.trim().length < 10)} onClick={() => publish(mode)}>
             {busy ? "در حال انتشار…" : "انتشار در بله"}
-          </button>
-        </div>
+          </BrandButton>
+        </PlatformCard>
         <TelegramCard botId={botId} allowSamples={allowSamples} />
         </>
       ) : (
         <>
-          <div className={card}>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-lg font-extrabold"><span className="ml-2 inline-block h-2.5 w-2.5 rounded-full bg-mint" />منتشرشده در بله · نسخه‌ی {fa(pub.version ?? 0)}</h3>
-              <button onClick={unpublish} disabled={busy} className="text-sm text-mute hover:text-bad">توقف انتشار</button>
-            </div>
+          <PlatformCard p="bale" title="بله" lead={pub.mode === "own" ? "ربات اختصاصی شما" : "ربات بات‌یار"} status={<StatusPill on>منتشرشده · نسخه‌ی {fa(pub.version ?? 0)}</StatusPill>}
+            action={<button onClick={unpublish} disabled={busy} className="text-sm text-mute hover:text-bad">توقف انتشار</button>}>
             {!pub.up_to_date && (
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-saffron/50 bg-saffron/10 p-3 text-sm">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--brand)]/50 bg-[var(--brand)]/10 p-3 text-sm">
                 <span>نسخه‌ی {fa(pub.latest_version)} آماده است، اما هنوز منتشر نشده است.</span>
-                <button className={btn + " !min-h-9 !px-4 text-sm"} disabled={busy || samplesBlock || !pub.tests_ok} onClick={() => publish(pub.mode!)}>انتشار نسخه‌ی {fa(pub.latest_version)}</button>
+                <BrandButton className="!min-h-9 !px-4 text-sm" disabled={busy || samplesBlock || !pub.tests_ok} onClick={() => publish(pub.mode!)}>انتشار نسخه‌ی {fa(pub.latest_version)}</BrandButton>
               </div>
             )}
             {pub.mode === "shared" ? (
               <div className="flex flex-col gap-4">
-                <ShareLink url={`https://ble.ir/${handle}?start=${pub.code}`} fileName={`bale-${pub.code}`}
+                <ShareLink brand url={`https://ble.ir/${handle}?start=${pub.code}`} fileName={`bale-${pub.code}`}
                   hint="این لینک را در اینستاگرام، واتس‌اپ یا کنار صندوق قرار دهید؛ مشتری با باز کردن آن مستقیم وارد ربات شما می‌شود." />
                 <label className="flex items-start gap-3 rounded-xl border border-line-2 p-3 text-sm leading-7">
-                  <input type="checkbox" checked={pub.listed} onChange={(e) => setListed(e.target.checked)} disabled={busy} className="mt-1.5 h-5 w-5 accent-[var(--color-saffron)]" />
+                  <input type="checkbox" checked={pub.listed} onChange={(e) => setListed(e.target.checked)} disabled={busy} className="mt-1.5 h-5 w-5 accent-[var(--brand)]" />
                   <span>نمایش در فهرست <span dir="ltr">@{handle}</span><span className="block text-mute">مشتریانی که بدون لینک وارد ربات بات‌یار شوند، ربات شما را در فهرست کسب‌وکارها می‌بینند. لینک اختصاصی شما در هر صورت کار می‌کند.</span></span>
                 </label>
               </div>
             ) : (
-              <ShareLink url={`https://ble.ir/${handle}`} fileName={`bale-${handle}`} hint="ربات اختصاصی شما فعال است. این لینک را در اختیار مشتریان قرار دهید." />
+              <ShareLink brand url={`https://ble.ir/${handle}`} fileName={`bale-${handle}`} hint="ربات اختصاصی شما فعال است. این لینک را در اختیار مشتریان قرار دهید." />
             )}
-          </div>
-
+          </PlatformCard>
           <TelegramCard botId={botId} allowSamples={allowSamples} />
 
           <div className={card}>

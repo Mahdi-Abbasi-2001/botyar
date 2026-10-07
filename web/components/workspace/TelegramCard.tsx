@@ -3,14 +3,13 @@ import { useCallback, useEffect, useState } from "react";
 import { api, isPlanLimit } from "@/lib/api";
 import { PlanLimitNote, fa } from "@/components/ui";
 import { ShareLink } from "@/components/workspace/ShareLink";
+import { BrandButton, ModeTile, PlatformCard, StatusPill } from "@/components/workspace/Messengers";
 
 type Tg = {
   enabled: boolean; published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string; listed: boolean; sample_products: boolean;
   mode?: "shared" | "own"; version?: number; code?: string; admin_code?: string; bot_username?: string; admin_linked?: boolean; up_to_date?: boolean;
 };
 
-const card = "rounded-2xl border border-line-2 bg-panel p-4";
-const btn = "min-h-11 rounded-xl bg-saffron px-5 font-bold text-ink disabled:opacity-50";
 
 /** Publishing the same bot to Telegram (through the relay outside Iran). Independent of the Bale publication. */
 /** `allowSamples`: the owner ticked «publish with the demo products» in the publish tab (one choice for both messengers). */
@@ -78,10 +77,9 @@ export function TelegramCard({ botId, allowSamples }: { botId: string; allowSamp
   if (!tg) return null;
   if (!tg.enabled) {
     return (
-      <div className={card}>
-        <h3 className="mb-1 font-bold">تلگرام</h3>
+      <PlatformCard p="telegram" title="تلگرام" status={<StatusPill on={false}>غیرفعال</StatusPill>}>
         <p className="text-sm leading-7 text-mute">اتصال به تلگرام روی این سرور فعال نیست.</p>
-      </div>
+      </PlatformCard>
     );
   }
   const handle = tg.mode === "own" ? tg.bot_username : tg.shared_bot_username;
@@ -89,62 +87,51 @@ export function TelegramCard({ botId, allowSamples }: { botId: string; allowSamp
 
   if (!tg.published) {
     return (
-      <div className={card}>
-        <h3 className="mb-1 text-lg font-extrabold">انتشار در تلگرام</h3>
-        <p className="mb-4 text-sm leading-7 text-mute">همین ربات با همین تست‌ها، برای مشتریانی که از تلگرام استفاده می‌کنند. ثبت‌ها و اعلان‌های تلگرام در کنار ثبت‌های بله نمایش داده می‌شوند. پرداخت آنلاین فقط در بله فعال است.</p>
+      <PlatformCard p="telegram" title="انتشار در تلگرام" lead="همین ربات با همین تست‌ها، برای مشتریانی که از تلگرام استفاده می‌کنند. ثبت‌ها و اعلان‌ها کنار ثبت‌های بله نمایش داده می‌شوند. پرداخت آنلاین فقط در بله فعال است." status={<StatusPill on={false}>منتشر نشده</StatusPill>}>
         {err}
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
           {tg.shared_bot_username && (
-            <button onClick={() => setMode("shared")} aria-pressed={mode === "shared"}
-              className={`rounded-xl border p-4 text-right ${mode === "shared" ? "border-saffron bg-saffron/10" : "border-line-2 hover:border-mute"}`}>
-              <div className="font-bold">ربات بات‌یار در تلگرام</div>
-              <div className="mt-1 text-sm leading-6 text-mute">سریع‌ترین راه، بدون نیاز به ساخت ربات جداگانه. یک لینک و کد QR برای ربات شما در <span dir="ltr">@{tg.shared_bot_username}</span> دریافت می‌کنید.</div>
-            </button>
+            <ModeTile selected={mode === "shared"} onClick={() => setMode("shared")} title="ربات بات‌یار در تلگرام"
+              text={<>سریع‌ترین راه، بدون ساخت ربات جداگانه. یک لینک و کد QR برای ربات شما در <span dir="ltr">@{tg.shared_bot_username}</span> می‌گیرید.</>} />
           )}
-          <button onClick={() => setMode("own")} aria-pressed={mode === "own"}
-            className={`rounded-xl border p-4 text-right ${mode === "own" ? "border-saffron bg-saffron/10" : "border-line-2 hover:border-mute"}`}>
-            <div className="font-bold">ربات تلگرام خودتان</div>
-            <div className="mt-1 text-sm leading-6 text-mute">با نام و تصویر خودتان. توکن را از <span dir="ltr">@BotFather</span> در تلگرام دریافت می‌کنید.</div>
-          </button>
+          <ModeTile selected={mode === "own"} onClick={() => setMode("own")} title="ربات تلگرام خودتان"
+            text={<>با نام و تصویر خودتان. توکن را از <span dir="ltr">@BotFather</span> در تلگرام دریافت می‌کنید.</>} />
         </div>
         {mode === "own" && (
           <label className="mb-4 block text-sm">
             <span className="mb-1 block text-mute">توکن ربات تلگرام (محرمانه است و به‌صورت رمزنگاری‌شده ذخیره می‌شود)</span>
             <input dir="ltr" value={token} onChange={(e) => setToken(e.target.value)} placeholder="123456789:AA…" autoComplete="off"
-              className="min-h-11 w-full rounded-xl border border-line-2 bg-ink px-3 text-left outline-none focus:border-saffron" />
+              className="min-h-11 w-full rounded-xl border border-line-2 bg-ink px-3 text-left outline-none focus:border-[var(--brand)]" />
           </label>
         )}
-        <button className={btn} disabled={busy || (tg.sample_products && !allowSamples) || !tg.tests_ok || (mode === "own" && token.trim().length < 20)} onClick={() => publish(mode)}>
+        <BrandButton disabled={busy || (tg.sample_products && !allowSamples) || !tg.tests_ok || (mode === "own" && token.trim().length < 20)} onClick={() => publish(mode)}>
           {busy ? "در حال انتشار…" : "انتشار در تلگرام"}
-        </button>
-      </div>
+        </BrandButton>
+      </PlatformCard>
     );
   }
 
   return (
-    <div className={card}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-lg font-extrabold"><span className="ml-2 inline-block h-2.5 w-2.5 rounded-full bg-mint" />منتشرشده در تلگرام · نسخه‌ی {fa(tg.version ?? 0)}</h3>
-        <button onClick={unpublish} disabled={busy} className="text-sm text-mute hover:text-bad">توقف انتشار</button>
-      </div>
+    <PlatformCard p="telegram" title="تلگرام" lead={tg.mode === "own" ? "ربات تلگرام خودتان" : "ربات بات‌یار"} status={<StatusPill on>منتشرشده · نسخه‌ی {fa(tg.version ?? 0)}</StatusPill>}
+      action={<button onClick={unpublish} disabled={busy} className="text-sm text-mute hover:text-bad">توقف انتشار</button>}>
       {err}
       {!tg.up_to_date && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-saffron/50 bg-saffron/10 p-3 text-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--brand)]/50 bg-[var(--brand)]/10 p-3 text-sm">
           <span>نسخه‌ی {fa(tg.latest_version)} آماده است، اما هنوز در تلگرام منتشر نشده است.</span>
-          <button className={btn + " !min-h-9 !px-4 text-sm"} disabled={busy || (tg.sample_products && !allowSamples) || !tg.tests_ok} onClick={() => publish(tg.mode!)}>انتشار نسخه‌ی {fa(tg.latest_version)}</button>
+          <BrandButton className="!min-h-9 !px-4 text-sm" disabled={busy || (tg.sample_products && !allowSamples) || !tg.tests_ok} onClick={() => publish(tg.mode!)}>انتشار نسخه‌ی {fa(tg.latest_version)}</BrandButton>
         </div>
       )}
       {tg.mode === "shared" ? (
         <div className="flex flex-col gap-4">
-          <ShareLink url={`https://t.me/${handle}?start=${tg.code}`} fileName={`telegram-${tg.code}`}
+          <ShareLink brand url={`https://t.me/${handle}?start=${tg.code}`} fileName={`telegram-${tg.code}`}
             hint="مشتریان تلگرام با این لینک یا کد QR مستقیم وارد ربات شما می‌شوند." />
           <label className="flex items-start gap-3 rounded-xl border border-line-2 p-3 text-sm leading-7">
-            <input type="checkbox" checked={tg.listed} onChange={(e) => setListed(e.target.checked)} disabled={busy} className="mt-1.5 h-5 w-5 accent-[var(--color-saffron)]" />
+            <input type="checkbox" checked={tg.listed} onChange={(e) => setListed(e.target.checked)} disabled={busy} className="mt-1.5 h-5 w-5 accent-[var(--brand)]" />
             <span>نمایش در فهرست <span dir="ltr">@{handle}</span><span className="block text-mute">این تنظیم برای فهرست ربات بات‌یار در بله هم اعمال می‌شود.</span></span>
           </label>
         </div>
       ) : (
-        <ShareLink url={`https://t.me/${handle}`} fileName={`telegram-${handle}`} hint="ربات تلگرام شما فعال است. این لینک را در اختیار مشتریان قرار دهید." />
+        <ShareLink brand url={`https://t.me/${handle}`} fileName={`telegram-${handle}`} hint="ربات تلگرام شما فعال است. این لینک را در اختیار مشتریان قرار دهید." />
       )}
       <div className="mt-3 border-t border-line pt-3 text-sm leading-7">
         {tg.admin_linked ? (
@@ -152,9 +139,9 @@ export function TelegramCard({ botId, allowSamples }: { botId: string; allowSamp
         ) : (
           <span className="text-mute">برای دریافت اعلان در تلگرام، این پیام را از حساب خودتان به <span dir="ltr">@{handle}</span> بفرستید:
             <span dir="ltr" className="mr-2 inline-block rounded-lg bg-ink px-3 py-1 font-mono text-fg">/admin {tg.admin_code}</span>
-            <button onClick={load} className="mr-2 text-saffron underline">بررسی دوباره</button></span>
+            <button onClick={load} className="mr-2 text-[var(--brand)] underline">بررسی دوباره</button></span>
         )}
       </div>
-    </div>
+    </PlatformCard>
   );
 }

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 
 /** How customers reach a published bot: a link to share and a QR code to print. Dark-on-white so every phone scans it. */
-export function ShareLink({ url, fileName, hint }: { url: string; fileName: string; hint?: string }) {
+export function ShareLink({ url, fileName, hint, brand }: { url: string; fileName: string; hint?: string; brand?: boolean }) {
   const [svg, setSvg] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -39,10 +39,10 @@ export function ShareLink({ url, fileName, hint }: { url: string; fileName: stri
       )}
       <div className="flex min-w-0 flex-[1_1_220px] flex-col gap-2">
         {hint && <span className="text-sm leading-7 text-mute">{hint}</span>}
-        <a href={url} target="_blank" rel="noreferrer" dir="ltr" className="break-all text-left font-bold text-saffron underline">{url.replace(/^https:\/\//, "")}</a>
+        <a href={url} target="_blank" rel="noreferrer" dir="ltr" className="break-all text-left font-bold text-[var(--brand,var(--color-saffron))] underline">{url.replace(/^https:\/\//, "")}</a>
         <div className="flex flex-wrap gap-2">
-          <button onClick={copy} className="min-h-11 rounded-xl bg-saffron px-4 text-sm font-bold text-ink">{copied ? "کپی شد ✓" : "کپی لینک"}</button>
-          <button onClick={download} className="min-h-11 rounded-xl border border-line-2 px-4 text-sm hover:border-saffron">دریافت کد QR برای چاپ</button>
+          <button onClick={copy} className={`min-h-11 rounded-xl px-4 text-sm font-bold ${brand ? "bg-[var(--brand-deep)] text-white" : "bg-saffron text-ink"}`}>{copied ? "کپی شد ✓" : "کپی لینک"}</button>
+          <button onClick={download} className="min-h-11 rounded-xl border border-line-2 px-4 text-sm hover:border-[var(--brand,var(--color-saffron))]">دریافت کد QR برای چاپ</button>
         </div>
       </div>
     </div>
