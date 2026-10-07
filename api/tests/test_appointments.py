@@ -32,7 +32,7 @@ class Chat:
 
 
 def buttons(actions):
-    return [(b["text"], b["data"]) for a in actions for b in a.get("buttons", [])]
+    return [(b["text"], b["data"]) for a in actions for b in a.get("buttons", []) if b["data"] != "/menu"]
 
 
 def text(actions):

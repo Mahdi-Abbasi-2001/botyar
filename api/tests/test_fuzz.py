@@ -39,7 +39,7 @@ PRODUCTS = [{"name": f"کالا {i}", "category": ["الف", "ب", ""][i % 3], "
 
 
 def buttons_of(actions):
-    return [b["data"] for a in actions if a["type"] == "send" for b in a.get("buttons", [])]
+    return [b["data"] for a in actions if a["type"] == "send" for b in a.get("buttons", []) if b["data"] != "/menu"]
 
 
 def run(spec, seed, catalog=None, steps=(5, 60), p_valid=0.7):

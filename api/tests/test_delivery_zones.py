@@ -43,7 +43,7 @@ def test_checkout_asks_for_the_area_and_charges_its_fee():
         handle(spec, s, t, store)
     ask = handle(spec, s, "checkout", store)
     assert "محل ارسال را انتخاب کنید" in text(ask)
-    assert [b["text"] for b in ask[-1]["buttons"]] == ["تهران - 100,000 تومان", "سایر شهرها - 200,000 تومان", "تحویل حضوری (ارسال رایگان)"]
+    assert [b["text"] for b in ask[-1]["buttons"] if b["data"] != "/menu"] == ["تهران - 100,000 تومان", "سایر شهرها - 200,000 تومان", "تحویل حضوری (ارسال رایگان)"]
     out = [handle(spec, s, "z:1", store), handle(spec, s, "مریم", store)][-1]
     assert "هزینه‌ی ارسال (سایر شهرها): 200,000 تومان" in text(out) and "جمع کل: 700,000" in text(out)
     rec = store.find("o")[0]

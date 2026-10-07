@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, isPlanLimit } from "@/lib/api";
 import { PlanLimitNote, fa } from "@/components/ui";
 import { ShareLink } from "@/components/workspace/ShareLink";
-import { BrandButton, ModeTile, PlatformCard, StatusPill } from "@/components/workspace/Messengers";
+import { BrandButton, ModeTile, OwnBotSetup, PlatformCard, StatusPill, SwitchToOwn } from "@/components/workspace/Messengers";
 
 type Tg = {
   enabled: boolean; published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string; listed: boolean; sample_products: boolean;
@@ -91,20 +91,14 @@ export function TelegramCard({ botId, allowSamples }: { botId: string; allowSamp
         {err}
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
           {tg.shared_bot_username && (
-            <ModeTile selected={mode === "shared"} onClick={() => setMode("shared")} title="ربات بات‌یار"
-              text={<>سریع‌ترین راه، بدون ساخت ربات جداگانه. یک لینک و کد QR می‌گیرید که مشتری را مستقیم به ربات شما در <span dir="ltr">@{tg.shared_bot_username}</span> می‌برد.</>} />
+            <ModeTile selected={mode === "shared"} onClick={() => setMode("shared")} title="شروع سریع" badge="آزمایشی"
+              text={<>بدون ساخت ربات جداگانه. یک لینک و کد QR می‌گیرید که مشتری را به ربات شما در <span dir="ltr">@{tg.shared_bot_username}</span> می‌برد. برای امتحان کردن ربات با چند مشتری مناسب است.</>} />
           )}
-          <ModeTile selected={mode === "own"} onClick={() => setMode("own")} title="ربات اختصاصی شما" badge="پیشنهادی"
-            text={<>با نام و تصویر خودتان. توکن را از <span dir="ltr">@BotFather</span> در تلگرام دریافت می‌کنید.</>} />
+          <ModeTile selected={mode === "own"} onClick={() => setMode("own")} title="ربات اختصاصی شما" badge="برای کسب‌وکار واقعی"
+            text="با نام و تصویر خودتان. ساختنش حدود یک دقیقه طول می‌کشد و راهنمای قدم‌به‌قدم همین‌جاست." />
         </div>
         <p className="mb-4 text-sm leading-7 text-mute">ثبت‌ها و اعلان‌های تلگرام کنار ثبت‌های بله نمایش داده می‌شوند. پرداخت آنلاین فقط در بله فعال است.</p>
-        {mode === "own" && (
-          <label className="mb-4 block text-sm">
-            <span className="mb-1 block text-mute">توکن ربات (محرمانه است و به‌صورت رمزنگاری‌شده ذخیره می‌شود)</span>
-            <input dir="ltr" value={token} onChange={(e) => setToken(e.target.value)} placeholder="123456789:AA…" autoComplete="off"
-              className="min-h-11 w-full rounded-xl border border-line-2 bg-ink px-3 text-left outline-none focus:border-[var(--brand)]" />
-          </label>
-        )}
+        {mode === "own" && <OwnBotSetup p="telegram" token={token} setToken={setToken} />}
         <BrandButton disabled={busy || (tg.sample_products && !allowSamples) || !tg.tests_ok || (mode === "own" && token.trim().length < 20)} onClick={() => publish(mode)}>
           {busy ? "در حال انتشار…" : "انتشار در تلگرام"}
         </BrandButton>
@@ -134,6 +128,7 @@ export function TelegramCard({ botId, allowSamples }: { botId: string; allowSamp
       ) : (
         <ShareLink brand url={`https://t.me/${handle}`} fileName={`telegram-${handle}`} hint="ربات اختصاصی شما فعال است. این لینک را در اختیار مشتریان قرار دهید." />
       )}
+      {tg.mode === "shared" && <SwitchToOwn p="telegram" busy={busy} token={token} setToken={setToken} minToken={20} onSwitch={() => publish("own")} />}
       <div className="mt-3 border-t border-line pt-3 text-sm leading-7">
         {tg.admin_linked ? (
           <span className="text-mint">✓ اعلان ثبت‌های تازه در تلگرام برای شما فعال است.</span>

@@ -350,15 +350,21 @@ def _field_step(session, fields: list[FormField], text: str) -> tuple[bool, list
     return False, [_ask(fields[nxt], d)]
 
 
+def _is_appointment(spec: BotSpec, b) -> bool:
+    """A calendar bot, or one the owner themself calls a «نوبت» (a dentist with fixed weekly times): its records are نوبت, not ثبت‌نام."""
+    return bool(b.schedule) or "نوبت" in b.title or any("نوبت" in m.label and m.block == b.id for m in spec.menu)
+
+
 def my_label(spec: BotSpec) -> str:
     """«سفارش‌های من» for a shop, «نوبت‌های من» for appointments, «ثبت‌نام‌های من» for classes; several kinds are named together."""
     nouns = []
     blocks = [b for _, b in _cancel_blocks(spec)]
     if any(b.type == "catalog_order" for b in blocks):
         nouns.append("سفارش")
-    if any(b.type == "booking" and b.schedule for b in blocks):
+    bookings = [b for b in blocks if b.type == "booking"]
+    if any(_is_appointment(spec, b) for b in bookings):
         nouns.append("نوبت")
-    if any(b.type == "booking" and not b.schedule for b in blocks):
+    if any(not _is_appointment(spec, b) for b in bookings):
         nouns.append("ثبت‌نام")
     if not nouns:
         return MY_LABEL
@@ -440,7 +446,29 @@ def pick_text(block, session: dict, rng) -> str:
     return opts[idx]
 
 
+# A screen made only of choices ends here: «بازگشت به منو» is added to every other one that offers buttons but no way out,
+# so no flow of any bot can strand a customer. Yes/no questions, skips and the notices the bot sends by itself are left alone.
+_NO_EXIT_NEEDED = {"ru:yes", "ru:no", "xy", "xn", "sk", "ac:end", "dc:no"}
+_NOTICE_PREFIXES = ("rc:", "fbr:", "pay:", "tr:", "tx:", "url:", "go:")
+
+
+def _with_exit(actions: list[dict]) -> list[dict]:
+    for a in actions:
+        buttons = a.get("buttons") if a.get("type") == "send" else None
+        if not buttons:
+            continue
+        datas = [b["data"] for b in buttons]
+        if any(d == "/menu" or d.startswith("m:") or d in _NO_EXIT_NEEDED or d.startswith(_NOTICE_PREFIXES) for d in datas):
+            continue
+        a["buttons"] = [*buttons, _btn("بازگشت به منو", "/menu")]
+    return actions
+
+
 def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matcher=None, rng=None) -> list[dict]:
+    return _with_exit(_handle(spec, session, text, store, now, matcher, rng))
+
+
+def _handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matcher=None, rng=None) -> list[dict]:
     now = now or dates.now_tehran()  # injectable so tests run on a fixed clock
     rng = rng or _RNG
     text_n = norm(text)
@@ -794,7 +822,7 @@ def _slot_prompt(block: BookingBlock, store, now):
             buttons.append(_btn(f"{name} (تکمیل - لیست انتظار)", data))
         else:
             buttons.append(_btn(f"{name} (تکمیل)", data))
-    return send("زمان مورد نظر را انتخاب کنید:", buttons)
+    return send("زمان مورد نظر را انتخاب کنید:", buttons + [_btn("بازگشت به منو", "/menu")])
 
 
 def _booking(spec, session, block: BookingBlock, text, store, now):
@@ -1041,7 +1069,7 @@ def _appt_label(day: date, hhmm: str | None = None, staff: str = "", service: st
 
 def _service_prompt(block: BookingBlock):
     return send("کدام خدمت را می‌خواهید؟", [_btn(f"{s.name} — {s.duration_minutes} دقیقه" + (f" — {s.price:,} تومان" if s.price else ""), f"sv:{i}")
-                                         for i, s in enumerate(block.schedule.services)])
+                                         for i, s in enumerate(block.schedule.services)] + [_btn("بازگشت به منو", "/menu")])
 
 
 def _allowed_staff(block: BookingBlock, d: dict) -> list[str]:
@@ -1052,7 +1080,7 @@ def _allowed_staff(block: BookingBlock, d: dict) -> list[str]:
 
 def _staff_prompt(block: BookingBlock, d: dict | None = None):
     allowed = _allowed_staff(block, d or {})
-    return send("با چه کسی؟", [_btn(n, f"f:{i}") for i, n in enumerate(block.schedule.staff) if n in allowed])
+    return send("با چه کسی؟", [_btn(n, f"f:{i}") for i, n in enumerate(block.schedule.staff) if n in allowed] + [_btn("بازگشت به منو", "/menu")])
 
 
 def _appt_start(spec, session, block, store, now):
@@ -1074,7 +1102,7 @@ def _appt_day_prompt(spec, session, block, store, now, head=()):
         return [*head, send("در حال حاضر نوبت خالی وجود ندارد. لطفاً بعداً دوباره سر بزنید."), menu_actions(spec)]
     session["step"] = "day"
     buttons = [_btn(f"{_appt_label(d)} ({n} نوبت خالی)", f"d:{d:%Y%m%d}") for d, n in days]
-    return [*head, send("روز مورد نظر را انتخاب کنید:", buttons)]
+    return [*head, send("روز مورد نظر را انتخاب کنید:", buttons + [_btn("بازگشت به منو", "/menu")])]
 
 
 def _appt_time_prompt(block, store, session, now, page=0, edit=False):
@@ -1089,6 +1117,7 @@ def _appt_time_prompt(block, store, session, now, page=0, edit=False):
     if page + 1 < pages:
         buttons.append(_btn("بعدی ›", f"tp:{page + 1}"))
     buttons.append(_btn("بازگشت به انتخاب روز", "back"))
+    buttons.append(_btn("بازگشت به منو", "/menu"))
     session["step"] = "time"
     head = f"ساعت مورد نظر برای {_appt_label(day, None, d.get('staff', ''))}" + (f" — صفحه {page + 1} از {pages}" if pages > 1 else "") + ":"
     return send(head, buttons, edit)

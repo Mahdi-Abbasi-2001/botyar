@@ -28,7 +28,7 @@ class Chat:
 
 
 def btns(out):
-    return [b["text"] for a in out for b in a.get("buttons", [])]
+    return [b["text"] for a in out for b in a.get("buttons", []) if b["data"] != "/menu"]
 
 
 def txt(out):

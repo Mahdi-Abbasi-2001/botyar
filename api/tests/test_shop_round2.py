@@ -41,7 +41,7 @@ def txt(out):
 
 
 def btns(out):
-    return [(b["text"], b["data"]) for a in out for b in a.get("buttons", [])]
+    return [(b["text"], b["data"]) for a in out for b in a.get("buttons", []) if b["data"] != "/menu"]
 
 
 # ---------- card-to-card ----------

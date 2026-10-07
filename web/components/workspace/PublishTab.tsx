@@ -7,7 +7,7 @@ import { RecordActions } from "@/components/workspace/RecordActions";
 import { PaymentCard } from "@/components/workspace/PaymentCard";
 import { TelegramCard } from "@/components/workspace/TelegramCard";
 import { ShareLink } from "@/components/workspace/ShareLink";
-import { BrandButton, ModeTile, PlatformCard, StatusPill } from "@/components/workspace/Messengers";
+import { BrandButton, ModeTile, OwnBotSetup, PlatformCard, StatusPill, SwitchToOwn } from "@/components/workspace/Messengers";
 
 type Pub = {
   published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string; webhooks_enabled: boolean; listed: boolean;
@@ -105,18 +105,12 @@ export function PublishTab({ botId, onImport }: { botId: string; onImport: () =>
         <PlatformCard p="bale" title="انتشار در بله" lead="ربات شما همین‌جا آزمایش شده است. پس از انتشار، مشتریان در بله با آن گفت‌وگو می‌کنند و ثبت‌ها به‌صورت واقعی ذخیره می‌شوند." status={<StatusPill on={false}>منتشر نشده</StatusPill>}>
           {!pub.tests_ok && <p className="mb-3 rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-bad">همه‌ی تست‌های نسخه‌ی فعلی هنوز موفق نشده‌اند. ابتدا در «گفت‌وگوی ساخت» ربات را اصلاح کنید.</p>}
           <div className="mb-4 grid gap-3 sm:grid-cols-2">
-            <ModeTile selected={mode === "shared"} onClick={() => setMode("shared")} title="ربات بات‌یار"
-              text={<>سریع‌ترین راه، بدون ساخت ربات جداگانه. یک لینک و کد QR می‌گیرید که مشتری را مستقیم به ربات شما در <span dir="ltr">@{pub.shared_bot_username || "botyar"}</span> می‌برد.</>} />
-            <ModeTile selected={mode === "own"} onClick={() => setMode("own")} title="ربات اختصاصی شما" badge="پیشنهادی"
-              text={<>با نام و تصویر خودتان. توکن را از <span dir="ltr">@botfather</span> در بله دریافت می‌کنید.</>} />
+            <ModeTile selected={mode === "shared"} onClick={() => setMode("shared")} title="شروع سریع" badge="آزمایشی"
+              text={<>بدون ساخت ربات جداگانه. یک لینک و کد QR می‌گیرید که مشتری را به ربات شما در <span dir="ltr">@{pub.shared_bot_username || "botyar"}</span> می‌برد. برای امتحان کردن ربات با چند مشتری مناسب است.</>} />
+            <ModeTile selected={mode === "own"} onClick={() => setMode("own")} title="ربات اختصاصی شما" badge="برای کسب‌وکار واقعی"
+              text="با نام و تصویر خودتان. ساختنش حدود یک دقیقه طول می‌کشد و راهنمای قدم‌به‌قدم همین‌جاست."  />
           </div>
-          {mode === "own" && (
-            <label className="mb-4 block text-sm">
-              <span className="mb-1 block text-mute">توکن ربات (محرمانه است و به‌صورت رمزنگاری‌شده ذخیره می‌شود)</span>
-              <input dir="ltr" value={token} onChange={(e) => setToken(e.target.value)} placeholder="123456789:ABC…" autoComplete="off"
-                className="min-h-11 w-full rounded-xl border border-line-2 bg-ink px-3 text-left outline-none focus:border-[var(--brand)]" />
-            </label>
-          )}
+          {mode === "own" && <OwnBotSetup p="bale" token={token} setToken={setToken} />}
           {!pub.webhooks_enabled && <p className="mb-3 text-sm text-mute">انتشار فقط در نسخه‌ی آنلاین بات‌یار کار می‌کند.</p>}
           <BrandButton disabled={busy || samplesBlock || !pub.tests_ok || !pub.webhooks_enabled || (mode === "own" && token.trim().length < 10)} onClick={() => publish(mode)}>
             {busy ? "در حال انتشار…" : "انتشار در بله"}
@@ -146,6 +140,7 @@ export function PublishTab({ botId, onImport }: { botId: string; onImport: () =>
             ) : (
               <ShareLink brand url={`https://ble.ir/${handle}`} fileName={`bale-${handle}`} hint="ربات اختصاصی شما فعال است. این لینک را در اختیار مشتریان قرار دهید." />
             )}
+            {pub.mode === "shared" && <SwitchToOwn p="bale" busy={busy} token={token} setToken={setToken} minToken={10} onSwitch={() => publish("own")} />}
           </PlatformCard>
           <TelegramCard botId={botId} allowSamples={allowSamples} />
 

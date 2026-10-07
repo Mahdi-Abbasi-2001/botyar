@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
 /** Each messenger keeps its own look in the publish tab: logo tile, accent colour and tinted header. */
@@ -78,4 +79,53 @@ export function ModeTile({ selected, onClick, title, text, badge }: { selected: 
 /** The main action in the messenger's own colour. */
 export function BrandButton({ className = "", ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return <button {...rest} className={`min-h-11 rounded-xl bg-[var(--brand-deep)] px-5 font-bold text-white hover:brightness-110 disabled:opacity-50 ${className}`} />;
+}
+
+/** Three steps to a bot of one's own, with the token field: the same for both messengers. */
+export function OwnBotSetup({ p, token, setToken }: { p: Platform; token: string; setToken: (v: string) => void }) {
+  const father = p === "bale" ? "@botfather" : "@BotFather";
+  const steps: ReactNode[] = [
+    <>در {BRAND[p].name} به <b dir="ltr">{father}</b> پیام بدهید و <b dir="ltr">/newbot</b> را بفرستید.</>,
+    <>یک نام برای ربات و یک نام کاربری انتخاب کنید (نام کاربری باید به <span dir="ltr">bot</span> ختم شود).</>,
+    <>توکنی که <span dir="ltr">{father}</span> می‌فرستد را کپی کنید و در کادر زیر بگذارید.</>,
+  ];
+  return (
+    <div className="mb-4 rounded-xl border border-line-2 bg-ink-2 p-4" style={vars(p)}>
+      <ol className="mb-3 flex flex-col gap-2 text-sm leading-7">
+        {steps.map((t, i) => (
+          <li key={i} className="flex items-start gap-3">
+            <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-[var(--brand-deep)] text-xs font-black text-white">{"۱۲۳"[i]}</span>
+            <span>{t}</span>
+          </li>
+        ))}
+      </ol>
+      <label className="block text-sm">
+        <span className="mb-1 block text-mute">توکن ربات (محرمانه است و به‌صورت رمزنگاری‌شده ذخیره می‌شود)</span>
+        <input dir="ltr" value={token} onChange={(e) => setToken(e.target.value)} placeholder={p === "bale" ? "123456789:ABC…" : "123456789:AA…"} autoComplete="off"
+          className="min-h-11 w-full rounded-xl border border-line-2 bg-ink px-3 text-left outline-none focus:border-[var(--brand)]" />
+      </label>
+    </div>
+  );
+}
+
+/** Published with the shared Bot-yar bot (a trial): move to a bot of one's own, keeping every record and customer. */
+export function SwitchToOwn({ p, busy, token, setToken, onSwitch, minToken }: { p: Platform; busy: boolean; token: string; setToken: (v: string) => void; onSwitch: () => void; minToken: number }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-4 rounded-xl border border-dashed border-line-3 p-4 text-sm leading-7" style={vars(p)}>
+      <p className="m-0 font-bold">این ربات هنوز با ربات مشترک بات‌یار منتشر شده است (نسخه‌ی آزمایشی)</p>
+      <p className="m-0 mb-3 text-mute">برای کسب‌وکار واقعی ربات اختصاصی خودتان را بسازید تا مشتری نام و تصویر شما را ببیند. سفارش‌ها، ثبت‌ها و فهرست محصولات همین‌طور می‌مانند؛ فقط لینک ربات عوض می‌شود و لینک تازه را باید به مشتریان بدهید.</p>
+      {!open ? (
+        <button type="button" onClick={() => setOpen(true)} className="min-h-11 rounded-xl border border-[var(--brand)] px-4 font-bold hover:bg-[var(--brand)]/10">تبدیل به ربات اختصاصی</button>
+      ) : (
+        <>
+          <OwnBotSetup p={p} token={token} setToken={setToken} />
+          <div className="flex flex-wrap items-center gap-3">
+            <BrandButton disabled={busy || token.trim().length < minToken} onClick={onSwitch}>{busy ? "در حال انتقال…" : `انتقال به ربات اختصاصی در ${BRAND[p].name}`}</BrandButton>
+            <button type="button" onClick={() => setOpen(false)} className="text-mute underline">بعداً</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }

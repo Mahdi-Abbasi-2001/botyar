@@ -21,7 +21,7 @@ def at(y, m, d, hh=12, mm=0):
 
 
 def labels(actions):
-    return [b["text"] for a in actions for b in a["buttons"]]
+    return [b["text"] for a in actions for b in a["buttons"] if b["data"] != "/menu"]
 
 
 def say(spec, st, now, *texts, sess=None):
@@ -40,7 +40,7 @@ def book(spec, st, now, data, name="علی", phone="09123456789"):
 def test_next_two_dates_are_offered_with_real_jalali_dates():
     out, _ = say(make(), MemoryStore(), TEST_NOW, "/start", "m:0")
     assert labels(out) == ["پنجشنبه ساعت ۱۰ صبح — 1405/07/16 (2 جای خالی)", "پنجشنبه ساعت ۱۰ صبح — 1405/07/23 (2 جای خالی)", "کارگاه ویژه ۲۵ مهر (1 جای خالی)"]
-    assert [b["data"] for a in out for b in a["buttons"]] == ["s:thu@20261008", "s:thu@20261015", "s:once"]
+    assert [b["data"] for a in out for b in a["buttons"] if b["data"] != "/menu"] == ["s:thu@20261008", "s:thu@20261015", "s:once"]
 
 
 def test_capacity_is_per_date_and_the_record_carries_the_date():

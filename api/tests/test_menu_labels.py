@@ -97,3 +97,19 @@ def test_no_codes_entry_without_visible_codes_and_the_flag_is_part_of_the_spec()
     out = handle(sp, s, "m:2", st)
     assert "متوجه نشدم" in out[0]["text"]
     assert BotSpec.model_validate({"name": "x", "welcome": "س", "menu": [{"label": "a", "block": "o"}], "blocks": [SHOP]}).blocks[0].discount_codes[0].visible is True
+
+
+def test_fixed_slot_bot_called_a_nobat_is_named_nobat():
+    dentist = {"type": "booking", "id": "d", "title": "رزرو نوبت", "allow_cancel": True, "slots": [{"id": "s", "label": "شنبه ساعت ۹ صبح", "capacity": 8}]}
+    assert my_label(spec(dentist, menu=[{"label": "رزرو نوبت", "block": "d"}])) == "نوبت‌های من"
+    assert my_label(spec(CLASS)) == "ثبت‌نام‌های من"          # a class stays «ثبت‌نام»
+
+
+def test_every_booking_step_can_go_back_to_the_menu():
+    dentist = {"type": "booking", "id": "d", "title": "رزرو نوبت", "slots": [{"id": "s", "label": "شنبه", "capacity": 8}]}
+    sp, (s, st) = spec(dentist), chat(None)
+    from datetime import datetime
+    out = handle(sp, s, "m:0", st, datetime(2026, 10, 7, 10, 0))
+    assert ("بازگشت به منو", "/menu") in buttons(out)
+    out = handle(sp, s, "/menu", st, datetime(2026, 10, 7, 10, 0))
+    assert s["block"] is None and ("ثبت سفارش", "m:0") in buttons(out)
