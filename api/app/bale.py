@@ -149,7 +149,7 @@ def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_
     mine = f"{ch.name}:"
     for n, a in enumerate(actions):
         try:
-            if a["type"] == "send" and n == 0 and a.get("edit") and edit_message_id:
+            if a["type"] == "send" and a.get("edit") and edit_message_id:
                 # in-place navigation (e.g. next page): edit the clicked message; fall back to a new message if refused
                 payload = {"chat_id": chat_id, "message_id": edit_message_id, "text": engine.fa_digits(a["text"])[:4096] or "…"}
                 if a.get("buttons"):
@@ -158,9 +158,11 @@ def deliver(token: str, chat_id: str, actions: list[dict], session: dict, admin_
                     ch.call(token, "editMessageText", payload)
                     continue
                 except Exception as e:  # noqa: BLE001
+                    if "not modified" in str(e).lower():
+                        continue  # the same screen again (a double tap): nothing to change, nothing to resend
                     log.warning("edit failed, sending a new message: %s", e)
                     payload.pop("message_id")
-                    ch.call(token, "sendMessage", payload)
+                    outbox.send(ch, token, "sendMessage", payload, bot_id, db)
                     continue
             if a["type"] == "send":
                 payload = {"chat_id": chat_id, "text": engine.fa_digits(a["text"])[:4096] or "…"}
@@ -606,7 +608,7 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
         wallet = wallet_token(db, pub) if ch.payments else ""
         state["pay_ok"], state["pay_sim"] = bool(wallet), False  # pay_sim (the fake pay button) must never be on in a real chat
         store = SqlStore(db, pub.bot_id, sandbox=False)
-        actions = engine.handle(spec, state, t, store, matcher=faq_index.matcher_for(db, pub.bot_id, spec))
+        actions = engine.handle(spec, state, t, store, matcher=faq_index.matcher_for(db, pub.bot_id, spec), clicked=clicked_message_id is not None)
         anon_others: list[dict] = []
         if any(a["type"].startswith("anon_") for a in actions):
             actions, anon_others = anon.run(db, bot, spec, state, skey, actions)

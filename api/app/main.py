@@ -207,6 +207,7 @@ def get_bot(bot_id: int, user: User = Depends(current_user), db: Session = Depen
 class SimMessage(BaseModel):
     session_id: str = Field(min_length=1, max_length=64)
     text: str = Field(max_length=2000)
+    clicked: bool = False  # a button was pressed (the phone replaces that message), as opposed to typed text
 
 
 @app.post("/api/bots/{bot_id}/simulate")
@@ -223,7 +224,7 @@ def simulate(bot_id: int, body: SimMessage, user: User = Depends(current_user), 
     state = copy.deepcopy(row.state)  # a shallow copy would hide in-place edits from SQLAlchemy's change detection
     state["cust"] = "sim:" + body.session_id
     state["pay_ok"] = state["pay_sim"] = True  # the simulator shows a fake "pay" button; real invoices exist only in Bale
-    actions = bot_engine.handle(spec, state, body.text, SqlStore(db, bot.id, sandbox=True), matcher=faq_index.matcher_for(db, bot.id, spec))
+    actions = bot_engine.handle(spec, state, body.text, SqlStore(db, bot.id, sandbox=True), matcher=faq_index.matcher_for(db, bot.id, spec), clicked=body.clicked)
     row.state = state
     db.commit()
     from . import media

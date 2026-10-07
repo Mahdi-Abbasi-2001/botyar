@@ -106,7 +106,7 @@ export function PublishTab({ botId, onImport }: { botId: string; onImport: () =>
           {!pub.tests_ok && <p className="mb-3 rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-bad">همه‌ی تست‌های نسخه‌ی فعلی هنوز موفق نشده‌اند. ابتدا در «گفت‌وگوی ساخت» ربات را اصلاح کنید.</p>}
           <div className="mb-4 grid gap-3 sm:grid-cols-2">
             <ModeTile selected={mode === "shared"} onClick={() => setMode("shared")} title="شروع سریع" badge="آزمایشی"
-              text={<>بدون ساخت ربات جداگانه. یک لینک و کد QR می‌گیرید که مشتری را به ربات شما در <span dir="ltr">@{pub.shared_bot_username || "botyar"}</span> می‌برد. برای امتحان کردن ربات با چند مشتری مناسب است.</>} />
+              text={<>بدون ساخت ربات جداگانه. یک لینک و کد QR می‌گیرید که مشتری را به ربات شما در <span dir="ltr">@{pub.shared_bot_username || "botyar"}</span> می‌برد. فقط برای آزمایش ربات است.</>} />
             <ModeTile selected={mode === "own"} onClick={() => setMode("own")} title="ربات اختصاصی شما" badge="برای کسب‌وکار واقعی"
               text="با نام و تصویر خودتان. ساختنش حدود یک دقیقه طول می‌کشد و راهنمای قدم‌به‌قدم همین‌جاست."  />
           </div>

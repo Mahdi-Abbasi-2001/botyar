@@ -202,7 +202,7 @@ def test_customers_see_persian_digits_but_callback_data_stays_ascii(env):
     last = sent(calls, 333)[-1]
     buttons = [b[0] for b in last["reply_markup"]["inline_keyboard"]]
     assert any("۱۲ جای خالی" in b["text"] for b in buttons) and not any(ch in b["text"] for b in buttons for ch in "0123456789")
-    assert [b["callback_data"] for b in buttons] == ["s:thu1", "s:thu2"]  # engine input is untouched
+    assert [b["callback_data"] for b in buttons if b["callback_data"] != "/menu"] == ["s:thu1", "s:thu2"]  # engine input is untouched
     c.post(url, json=cb(333, "s:thu1"))
     c.post(url, json=msg(333, "علی"))
     c.post(url, json=msg(333, "09123456789"))              # the customer's own typing is stored as typed
@@ -270,3 +270,25 @@ def test_cancel_on_bale_promotes_the_waiting_customer_and_messages_them(env):
     live = {r["data"]["phone"]: r["data"]["status"] for r in c.get(f"/api/bots/{bid}/records?sandbox=false", headers=H).json()}
     assert live == {"09120000001": "cancelled", "09120000002": "confirmed"}
     assert not any("_cust" in r["data"] for r in c.get(f"/api/bots/{bid}/records?sandbox=false", headers=H).json())   # identity never reaches the owner UI
+
+
+def test_a_pressed_menu_button_replaces_its_message(env):
+    c, calls = env
+    tok = c.post("/api/auth/register", json={"username": "ip_x.com", "password": "123456"}).json()["token"]
+    H = {"Authorization": f"Bearer {tok}"}
+    bot = c.post("/api/bots", json={"template": "workshop"}, headers=H).json()["id"]
+    code = c.post(f"/api/bots/{bot}/publish", json={"mode": "shared"}, headers=H).json()["code"]
+    url = f"/api/hook/shared/{bale.shared_hook_secret()}"
+    c.post(url, json=msg(444, f"/start {code}"))
+    calls.clear()
+    click = cb(444, "m:0")
+    click["callback_query"]["message"]["message_id"] = 901
+    c.post(url, json=click)
+    edits = [p for m, p in calls if m == "editMessageText"]
+    assert len(edits) == 1 and edits[0]["message_id"] == 901 and "reply_markup" in edits[0]
+    assert not [p for m, p in calls if m == "sendMessage" and str(p["chat_id"]) == "444"]
+    calls.clear()
+    back = cb(444, "/menu")
+    back["callback_query"]["message"]["message_id"] = 901
+    c.post(url, json=back)
+    assert [m for m, _ in calls if m in ("editMessageText", "sendMessage")] == ["editMessageText"]

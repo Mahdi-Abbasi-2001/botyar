@@ -92,7 +92,7 @@ export function TelegramCard({ botId, allowSamples }: { botId: string; allowSamp
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
           {tg.shared_bot_username && (
             <ModeTile selected={mode === "shared"} onClick={() => setMode("shared")} title="شروع سریع" badge="آزمایشی"
-              text={<>بدون ساخت ربات جداگانه. یک لینک و کد QR می‌گیرید که مشتری را به ربات شما در <span dir="ltr">@{tg.shared_bot_username}</span> می‌برد. برای امتحان کردن ربات با چند مشتری مناسب است.</>} />
+              text={<>بدون ساخت ربات جداگانه. یک لینک و کد QR می‌گیرید که مشتری را به ربات شما در <span dir="ltr">@{tg.shared_bot_username}</span> می‌برد. فقط برای آزمایش ربات است.</>} />
           )}
           <ModeTile selected={mode === "own"} onClick={() => setMode("own")} title="ربات اختصاصی شما" badge="برای کسب‌وکار واقعی"
             text="با نام و تصویر خودتان. ساختنش حدود یک دقیقه طول می‌کشد و راهنمای قدم‌به‌قدم همین‌جاست." />

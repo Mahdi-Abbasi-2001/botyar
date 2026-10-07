@@ -464,8 +464,33 @@ def _with_exit(actions: list[dict]) -> list[dict]:
     return actions
 
 
-def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matcher=None, rng=None) -> list[dict]:
-    return _with_exit(_handle(spec, session, text, store, now, matcher, rng))
+def _in_place(actions: list[dict], session: dict) -> list[dict]:
+    """A button press answers by REPLACING the message it was on, so the chat holds one living screen instead of a pile of old menus.
+    Kept as new messages (the good reasons not to edit): a reply that finishes something (a confirmation followed by the menu is a record
+    the customer keeps), and anything with a photo / location / contact / invoice, which cannot replace a text message.
+    A step that is still going (a title and the question under it) is merged into the one edited message."""
+    visible = [a for a in actions if a["type"] in ("send", "media", "location", "contact", "invoice")]
+    if any(a["type"] != "send" for a in visible):
+        return actions
+    if len(visible) >= 2 and session.get("block") is not None and not any(a.get("buttons") for a in visible[:-1]):
+        last = visible[-1]  # a title / notice and the question under it become one message
+        last["text"] = "\n\n".join(a["text"] for a in visible)[:4000]
+        for a in visible[:-1]:
+            actions.remove(a)
+        visible = [last]
+    if len(visible) == 1:
+        visible[0]["edit"] = True
+    return actions
+
+
+def handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matcher=None, rng=None, clicked: bool = False) -> list[dict]:
+    """`clicked`: the customer pressed a button (so there is a message to replace); typed text always gets a new message."""
+    if clicked and norm(text) in MENU_WORDS:
+        leave = _leave_anon(spec, session)  # «بازگشت به منو» turns the screen back into the main menu in place
+        _reset(session)
+        return _in_place(_with_exit([*leave, menu_actions(spec)]), session)
+    out = _with_exit(_handle(spec, session, text, store, now, matcher, rng))
+    return _in_place(out, session) if clicked else out
 
 
 def _handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, matcher=None, rng=None) -> list[dict]:

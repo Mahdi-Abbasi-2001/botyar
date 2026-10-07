@@ -38,12 +38,12 @@ export function PhoneSim({ botId, version, labels, onActivity, className = "" }:
   const scroller = useRef<HTMLDivElement>(null);
   const started = useRef("");
 
-  const send = useCallback(async (t: string, shown?: string | null) => {
+  const send = useCallback(async (t: string, shown?: string | null, clicked = false) => {
     setBusy(true);
     setError("");
     if (shown !== null) setMsgs((m) => [...m.map((x) => ({ ...x, buttons: undefined })), { from: "me", text: shown ?? t }]);
     try {
-      const r = await api<{ actions: Action[] }>(`/bots/${botId}/simulate`, { body: { session_id: session, text: t } });
+      const r = await api<{ actions: Action[] }>(`/bots/${botId}/simulate`, { body: { session_id: session, text: t, clicked } });
       setMsgs((m) => {
         const mapped = r.actions.map((a): Msg => {
           if (a.type === "send") return { from: "bot", text: a.text, buttons: a.buttons };
@@ -121,7 +121,7 @@ export function PhoneSim({ botId, version, labels, onActivity, className = "" }:
                 {m.buttons.map((b) => {
                   const full = /\(تکمیل\)$/.test(b.text);
                   return (
-                    <button key={b.data} disabled={busy} onClick={() => (b.data.startsWith("url:") ? window.open(b.data.slice(4), "_blank", "noopener") : send(b.data, b.text))}
+                    <button key={b.data} disabled={busy} onClick={() => (b.data.startsWith("url:") ? window.open(b.data.slice(4), "_blank", "noopener") : send(b.data, b.text, true))}
                       className={`min-h-10 rounded-[10px] border px-2.5 py-1.5 text-[13px] disabled:opacity-50 ${full ? "border-line-2 text-dim" : "border-line-3 hover:border-saffron hover:text-saffron"}`}>
                       {fa(b.text)}
                     </button>
