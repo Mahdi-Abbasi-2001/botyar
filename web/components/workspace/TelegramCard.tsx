@@ -87,19 +87,20 @@ export function TelegramCard({ botId, allowSamples }: { botId: string; allowSamp
 
   if (!tg.published) {
     return (
-      <PlatformCard p="telegram" title="انتشار در تلگرام" lead="همین ربات با همین تست‌ها، برای مشتریانی که از تلگرام استفاده می‌کنند. ثبت‌ها و اعلان‌ها کنار ثبت‌های بله نمایش داده می‌شوند. پرداخت آنلاین فقط در بله فعال است." status={<StatusPill on={false}>منتشر نشده</StatusPill>}>
+      <PlatformCard p="telegram" title="انتشار در تلگرام" lead="ربات شما همین‌جا آزمایش شده است. پس از انتشار، مشتریان در تلگرام با آن گفت‌وگو می‌کنند و ثبت‌ها به‌صورت واقعی ذخیره می‌شوند." status={<StatusPill on={false}>منتشر نشده</StatusPill>}>
         {err}
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
           {tg.shared_bot_username && (
-            <ModeTile selected={mode === "shared"} onClick={() => setMode("shared")} title="ربات بات‌یار در تلگرام"
-              text={<>سریع‌ترین راه، بدون ساخت ربات جداگانه. یک لینک و کد QR برای ربات شما در <span dir="ltr">@{tg.shared_bot_username}</span> می‌گیرید.</>} />
+            <ModeTile selected={mode === "shared"} onClick={() => setMode("shared")} title="ربات بات‌یار"
+              text={<>سریع‌ترین راه، بدون ساخت ربات جداگانه. یک لینک و کد QR می‌گیرید که مشتری را مستقیم به ربات شما در <span dir="ltr">@{tg.shared_bot_username}</span> می‌برد.</>} />
           )}
-          <ModeTile selected={mode === "own"} onClick={() => setMode("own")} title="ربات تلگرام خودتان"
+          <ModeTile selected={mode === "own"} onClick={() => setMode("own")} title="ربات اختصاصی شما" badge="پیشنهادی"
             text={<>با نام و تصویر خودتان. توکن را از <span dir="ltr">@BotFather</span> در تلگرام دریافت می‌کنید.</>} />
         </div>
+        <p className="mb-4 text-sm leading-7 text-mute">ثبت‌ها و اعلان‌های تلگرام کنار ثبت‌های بله نمایش داده می‌شوند. پرداخت آنلاین فقط در بله فعال است.</p>
         {mode === "own" && (
           <label className="mb-4 block text-sm">
-            <span className="mb-1 block text-mute">توکن ربات تلگرام (محرمانه است و به‌صورت رمزنگاری‌شده ذخیره می‌شود)</span>
+            <span className="mb-1 block text-mute">توکن ربات (محرمانه است و به‌صورت رمزنگاری‌شده ذخیره می‌شود)</span>
             <input dir="ltr" value={token} onChange={(e) => setToken(e.target.value)} placeholder="123456789:AA…" autoComplete="off"
               className="min-h-11 w-full rounded-xl border border-line-2 bg-ink px-3 text-left outline-none focus:border-[var(--brand)]" />
           </label>
@@ -112,7 +113,7 @@ export function TelegramCard({ botId, allowSamples }: { botId: string; allowSamp
   }
 
   return (
-    <PlatformCard p="telegram" title="تلگرام" lead={tg.mode === "own" ? "ربات تلگرام خودتان" : "ربات بات‌یار"} status={<StatusPill on>منتشرشده · نسخه‌ی {fa(tg.version ?? 0)}</StatusPill>}
+    <PlatformCard p="telegram" title="تلگرام" lead={tg.mode === "own" ? "ربات اختصاصی شما" : "ربات بات‌یار"} status={<StatusPill on>منتشرشده · نسخه‌ی {fa(tg.version ?? 0)}</StatusPill>}
       action={<button onClick={unpublish} disabled={busy} className="text-sm text-mute hover:text-bad">توقف انتشار</button>}>
       {err}
       {!tg.up_to_date && (
@@ -124,14 +125,14 @@ export function TelegramCard({ botId, allowSamples }: { botId: string; allowSamp
       {tg.mode === "shared" ? (
         <div className="flex flex-col gap-4">
           <ShareLink brand url={`https://t.me/${handle}?start=${tg.code}`} fileName={`telegram-${tg.code}`}
-            hint="مشتریان تلگرام با این لینک یا کد QR مستقیم وارد ربات شما می‌شوند." />
+            hint="این لینک را در اینستاگرام، واتس‌اپ یا کنار صندوق قرار دهید؛ مشتری با باز کردن آن مستقیم وارد ربات شما می‌شود." />
           <label className="flex items-start gap-3 rounded-xl border border-line-2 p-3 text-sm leading-7">
             <input type="checkbox" checked={tg.listed} onChange={(e) => setListed(e.target.checked)} disabled={busy} className="mt-1.5 h-5 w-5 accent-[var(--brand)]" />
             <span>نمایش در فهرست <span dir="ltr">@{handle}</span><span className="block text-mute">این تنظیم برای فهرست ربات بات‌یار در بله هم اعمال می‌شود.</span></span>
           </label>
         </div>
       ) : (
-        <ShareLink brand url={`https://t.me/${handle}`} fileName={`telegram-${handle}`} hint="ربات تلگرام شما فعال است. این لینک را در اختیار مشتریان قرار دهید." />
+        <ShareLink brand url={`https://t.me/${handle}`} fileName={`telegram-${handle}`} hint="ربات اختصاصی شما فعال است. این لینک را در اختیار مشتریان قرار دهید." />
       )}
       <div className="mt-3 border-t border-line pt-3 text-sm leading-7">
         {tg.admin_linked ? (
