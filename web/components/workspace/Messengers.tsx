@@ -5,18 +5,17 @@ import type { CSSProperties, ReactNode } from "react";
 export type Platform = "bale" | "telegram";
 
 export const BRAND: Record<Platform, { name: string; accent: string; deep: string }> = {
-  bale: { name: "بله", accent: "#2DBE7E", deep: "#13895A" },
+  bale: { name: "بله", accent: "#44D9AB", deep: "#2A8C80" },
   telegram: { name: "تلگرام", accent: "#2AABEE", deep: "#1C8ACB" },
 };
 
-/** Bale: a green tile with a white speech bubble (a simplified mark, not the official artwork). */
+/** Bale: the speech-bubble check mark, mint to indigo gradient. */
 export function BaleLogo({ size = 44 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 48 48" role="img" aria-label="بله" className="shrink-0">
-      <defs><linearGradient id="bale-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#47D694" /><stop offset="1" stopColor="#13895A" /></linearGradient></defs>
-      <rect width="48" height="48" rx="13" fill="url(#bale-g)" />
-      <path d="M24 12c-7.2 0-13 4.9-13 11 0 3.3 1.7 6.3 4.4 8.3-.2 1.5-.9 3.2-2.2 4.6 2.7-.1 5-1 6.6-2.1 1.3.3 2.8.5 4.2.5 7.2 0 13-4.9 13-11S31.200 12 24 12z" fill="#fff" />
-      <circle cx="18.500" cy="23" r="1.800" fill="#1FA46C" /><circle cx="24" cy="23" r="1.800" fill="#1FA46C" /><circle cx="29.500" cy="23" r="1.800" fill="#1FA46C" />
+    <svg width={size} height={size} viewBox="0 0 512 512" role="img" aria-label="بله" className="shrink-0">
+      <defs><linearGradient id="bale-g" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#4EEBB4" /><stop offset="1" stopColor="#2A2468" /></linearGradient></defs>
+      <path d="M0 256V34Q0 -2 30 6L105 48A256 256 0 1 1 0 256Z" fill="url(#bale-g)" />
+      <path d="M140 248 222 326 376 176" fill="none" stroke="#fff" strokeWidth="88" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
