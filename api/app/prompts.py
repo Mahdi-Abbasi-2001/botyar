@@ -193,12 +193,14 @@ Decide whether you have enough information to build (or change) the bot.
 DESIGN = COMMON + """
 ## Your task now: DESIGN
 Produce the complete BotSpec for the owner's request. If a current spec is given, apply ONLY the requested change: keep every other block, id, text and number exactly as is. Keep block ids stable. Honour the listed assumptions.
+Inside a block you change, keep every field the owner did not mention (hours, links, contact, location, media, variants, buttons, texts): «add X» means the block keeps what it had and also gets X; never swap one field for another to make room.
+Every address, phone number, opening hour, link and price in the owner's messages (the whole conversation, not only the last message) must appear in the bot: in a message `text`, `hours`, `links`, `contact` or `location`. Never write that a fact «is not registered yet» when the owner gave it.
 Use ONLY the fields defined above, with the documented types. A requested detail that no field can express is left OUT of the spec (it is listed in the assumptions as «پشتیبانی نمی‌شود: …»); never invent a field, never put text or an object where a number goes, never squeeze a detail into a field meant for something else.
 """
 
 TESTS = COMMON + """
 ## Your task now: WRITE TESTS
-Write at most 4 focused test scenarios for the spec below, following the test-writing rules. If a change request is described, write tests for the NEW or CHANGED behaviour only (older tests are re-run separately as regression).
+Write at most 4 focused test scenarios for the spec below, following the test-writing rules. When the owner gave concrete facts (address, phone, hours, link, prices), one scenario must open the screen that shows them and check each fact with reply_contains. If a change request is described, write tests for the NEW or CHANGED behaviour only (older tests are re-run separately as regression).
 """
 
 REPAIR = COMMON + """

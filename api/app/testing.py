@@ -57,7 +57,10 @@ def _texts(actions):
         if a["type"] == "location":
             parts.append(f"📍 {a['latitude']}, {a['longitude']}")
             continue
-        parts.append(a["text"])
+        if a["type"] == "contact":  # a contact card: what the customer sees is the name and the number
+            parts.append(f"👤 {a['name']}\n📞 {a['phone']}")
+            continue
+        parts.append(a.get("text", ""))
         parts.extend(b["text"] for b in a.get("buttons", []))
     return "\n".join(parts)
 

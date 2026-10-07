@@ -60,3 +60,16 @@ def test_typed_menu_word_still_sends_welcome_and_menu():
     s, st = chat()
     out = run("/start", s, st, False)
     assert len([a for a in out if a["type"] == "send"]) == 2 and not any(edits(out))
+
+
+def test_a_contact_card_is_part_of_the_reply_text_the_tests_read():
+    from app import testing
+    assert "۰۲۱۱۲۳۴۵۶۷۸" in testing._texts([{"type": "send", "text": "نشانی", "buttons": []}, {"type": "contact", "phone": "۰۲۱۱۲۳۴۵۶۷۸", "name": "کافه"}])
+
+
+def test_dropped_fields_are_found_unless_the_owner_asked():
+    from app.agent import dropped_fields
+    old = {"blocks": [{"id": "info", "type": "message", "hours": [{"weekday": 0}], "links": [{"label": "a", "url": "https://x.y"}], "contact": None}]}
+    new = {"blocks": [{"id": "info", "type": "message", "hours": [], "links": [], "contact": {"phone": "1", "name": "k"}}]}
+    assert dropped_fields(old, new, "نشانی را هم اضافه کن") == ["block «info» lost its hours", "block «info» lost its links"]
+    assert dropped_fields(old, new, "ساعت کاری را حذف کن") == []

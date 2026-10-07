@@ -54,6 +54,26 @@ DECLINE_MARK = "🚧 "  # starts a message that declines the request, or the lin
 
 RESERVED_LABELS = {x.replace(" ", "") for x in ("ثبتهای من", "سفارشهای من", "نوبتهای من", "ثبتنامهای من", "کدهای تخفیف")}
 
+KEPT_FIELDS = ("hours", "links", "contact", "location", "media", "variants")
+REMOVAL_WORDS = ("حذف", "بردار", "پاک", "نمی‌خوام", "نمی‌خواهم", "نمیخوام", "نمی‌خواهیم", "دیگر نیاز", "نیازی ندارم", "جایگزین", "عوض", "تغییر بده")
+
+
+def dropped_fields(old: dict, new: dict, request: str) -> list[str]:
+    """What the new spec lost from blocks that existed before (a field that was filled and is now empty), unless the owner asked for removal or replacement."""
+    if any(w in request for w in REMOVAL_WORDS):
+        return []
+    now = {b.get("id"): b for b in new.get("blocks", [])}
+    out = []
+    for b in old.get("blocks", []):
+        n = now.get(b.get("id"))
+        if not n or n.get("type") != b.get("type"):
+            continue
+        for k in KEPT_FIELDS:
+            if b.get(k) and not n.get(k):
+                out.append(f"block «{b['id']}» lost its {k}")
+    return out
+
+
 class ClarifyResult(BaseModel):
     ready: bool
     questions: list[str]
@@ -141,6 +161,10 @@ class Builder:
                     "design_attempts": n}
         try:
             spec = BotSpec.model_validate(r.model_dump())
+            if n == 1 and s.get("current"):  # a change request must not quietly lose what a block already had
+                lost = dropped_fields(s["current"], spec.model_dump(), s["request"])
+                if lost:
+                    raise ValueError("you removed things the owner did not ask to remove: " + "; ".join(lost) + ". Put them back exactly as they were and apply only the requested change.")
             taken = [m.label for m in spec.menu if m.label.replace("\u200c", "").replace(" ", "") in RESERVED_LABELS]
             if taken:
                 raise ValueError(f"menu item «{taken[0]}» is a name the engine already gives its own built-in button: remove that menu item (customers get it automatically when allow_cancel is true)")
