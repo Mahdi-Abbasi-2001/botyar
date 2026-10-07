@@ -212,7 +212,7 @@ SUGGEST_CASES = [
     ("suggest-salon", "یه ربات نوبت دهی برای سالن زیبایی میخوام", "needs_input",
      lambda s, m: None if ("یادآوری" in m or "مهلت لغو" in m or "بیعانه" in m) and "نیازی نیست" in m else "a salon should be offered reminders / cancel deadline / deposit: " + m[:300]),
     ("suggest-job-application", "ربات برای استخدام که رزومه بگیره", "needs_input",
-     lambda s, m: None if ("قبول" in m or "بازبینی" in m or "پرسش‌نامه" in m) and "نیازی نیست" in m else "an application bot should be offered review / accept-reject: " + m[:300]),
+     lambda s, m: None if ("قبول" in m or "پذیرش" in m or "بازبینی" in m or "بررسی اطلاعات" in m or "پرسش‌نامه" in m) and "نیازی نیست" in m else "an application bot should be offered review / accept-reject: " + m[:300]),
     ("suggest-cafe", "ربات برای کافه‌ام میخوام", "needs_input",
      lambda s, m: None if ("ساعت" in m or "منو" in m or "تخفیف" in m) and "نیازی نیست" in m else "a café should be offered menu options / hours / discount: " + m[:300]),
 ]
@@ -222,8 +222,19 @@ GROWTH_CASES = [
      lambda s, m: None if ("@" in m or "کانال" in m) and "وانمود" not in m else "should ask for the channel name and build invite + join, not decline: " + m[:300]),
 ]
 
+SUGGEST2_CASES = [
+    ("suggest-repair-form", "یه فرم ثبت درخواست تعمیر موبایل می‌خوام", "needs_input",
+     lambda s, m: None if ("عکس" in m or "بازبینی" in m or "قبول" in m or "فایل" in m) and "نیازی نیست" in m else "a request form should be offered photo/review/answers: " + m[:300]),
+    ("suggest-referral", "ربات دعوت دوستان برای باشگاه من", "needs_input",
+     lambda s, m: None if "نیازی نیست" in m else "an invite program should still get one suggestion question: " + m[:300]),
+    ("suggest-anon-chat", "ربات چت ناشناس برای دانشجوها", "needs_input",
+     lambda s, m: None if "نیازی نیست" in m and ("اتاق" in m or "گزارش" in m or "مدت" in m) else "anonymous chat should be offered rooms / reports / duration: " + m[:300]),
+    ("suggest-quiz", "ربات آزمون آنلاین برای مدرسه", "needs_input",
+     lambda s, m: None if "نیازی نیست" in m and ("نمره" in m or "قبولی" in m or "کد تخفیف" in m or "ترتیب" in m or "یک بار" in m) else "a quiz should be offered pass mark / random order / one attempt: " + m[:300]),
+]
+
 # appended by later features (appointment calendars, FAQ, owner chat, delivery/discounts) — see EXTRA_CASES below
-EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES, *RANDOM_CASES, *MENU_QUIZ_CASES, *MEDIA_CASES, *GATE_CASES, *REFERRAL_CASES, *ANON_CASES, *EXTRAS_CASES, *SUGGEST_CASES, *GROWTH_CASES]
+EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES, *RANDOM_CASES, *MENU_QUIZ_CASES, *MEDIA_CASES, *GATE_CASES, *REFERRAL_CASES, *ANON_CASES, *EXTRAS_CASES, *SUGGEST_CASES, *GROWTH_CASES, *SUGGEST2_CASES]
 
 
 def run_case(c, i, name, text, want_status, check):
