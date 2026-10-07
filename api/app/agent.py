@@ -52,6 +52,8 @@ def spec_errors(e: ValidationError) -> list[str]:
 DECLINE_MARK = "🚧 "  # starts a message that declines the request, or the line of a finished build listing what was left out
 
 
+RESERVED_LABELS = {x.replace(" ", "") for x in ("ثبتهای من", "سفارشهای من", "نوبتهای من", "ثبتنامهای من", "کدهای تخفیف")}
+
 class ClarifyResult(BaseModel):
     ready: bool
     questions: list[str]
@@ -139,6 +141,9 @@ class Builder:
                     "design_attempts": n}
         try:
             spec = BotSpec.model_validate(r.model_dump())
+            taken = [m.label for m in spec.menu if m.label.replace("\u200c", "").replace(" ", "") in RESERVED_LABELS]
+            if taken:
+                raise ValueError(f"menu item «{taken[0]}» is a name the engine already gives its own built-in button: remove that menu item (customers get it automatically when allow_cancel is true)")
             has_table = any(b.type == "catalog_order" and b.source == "table" for b in spec.blocks)
             fixture: list[dict] = []
             if has_table:

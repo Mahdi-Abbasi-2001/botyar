@@ -63,6 +63,48 @@ function PhotoCell({ botId, p, onChange, onError }: { botId: string; p: Prod; on
 
 const optSummary = (o: Opt[]) => o.map((g) => `${g.name}: ${g.choices.slice(0, 5).join("، ")}${g.choices.length > 5 ? "…" : ""}`).join(" · ");
 
+
+const field = "min-h-11 w-full rounded-xl border border-line-2 bg-ink px-3 disabled:opacity-50";
+
+/** One product at a time: the same «append» save the import uses, so sample rows are replaced by the first real product. */
+function AddProduct({ botId, block, categories, onDone, onError }: { botId: string; block: string; categories: string[]; onDone: () => void; onError: (m: string) => void }) {
+  const [f, setF] = useState({ name: "", category: "", price: "", stock: "", options: "", description: "" });
+  const [busy, setBusy] = useState(false);
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
+  async function add() {
+    const price = Number(f.price.replace(/[,،٬\s]/g, "").replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))));
+    if (!f.name.trim()) return onError("نام محصول را بنویسید.");
+    if (!Number.isFinite(price) || price < 0 || f.price.trim() === "") return onError("قیمت را به تومان و با عدد بنویسید.");
+    const stock = f.stock.trim() === "" ? null : Number(f.stock.replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))));
+    if (stock !== null && (!Number.isInteger(stock) || stock < 0)) return onError("موجودی باید یک عدد صحیح باشد، یا خالی بماند تا نامحدود شود.");
+    // «سایز: S، M، L» per line
+    const options = f.options.split("\n").map((l) => l.split(":")).filter((x) => x.length > 1 && x[0].trim()).map(([n, ...r]) => ({ name: n.trim(), choices: r.join(":").split(/[،,]/).map((c) => c.trim()).filter(Boolean), prices: [] as number[] })).filter((o) => o.choices.length);
+    setBusy(true);
+    onError("");
+    try {
+      await api(`/bots/${botId}/catalog/commit`, { body: { block, mode: "append", products: [{ name: f.name.trim(), category: f.category.trim(), price, stock, options, description: f.description.trim() }] } });
+      setF({ ...f, name: "", price: "", stock: "", options: "", description: "" });
+      onDone();
+    } catch (e: any) { onError(e.message); } finally { setBusy(false); }
+  }
+  return (
+    <div className={card}>
+      <h3 className="mb-1 font-bold">افزودن یک محصول</h3>
+      <p className="mb-3 text-sm text-mute">محصولات را یکی‌یکی اضافه کنید. با اولین محصول، محصولات نمونه حذف می‌شوند. عکس را بعد از افزودن، از جدول پایین می‌توانید بگذارید.</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-sm">نام محصول<input value={f.name} onChange={set("name")} maxLength={300} className={field + " mt-1"} /></label>
+        <label className="text-sm">دسته<input value={f.category} onChange={set("category")} list="catalog-cats" maxLength={120} placeholder="مثلاً تی‌شرت" className={field + " mt-1"} /></label>
+        <label className="text-sm">قیمت (تومان)<input value={f.price} onChange={set("price")} inputMode="numeric" className={field + " mt-1"} /></label>
+        <label className="text-sm">موجودی<input value={f.stock} onChange={set("stock")} inputMode="numeric" placeholder="خالی = نامحدود" className={field + " mt-1"} /></label>
+        <label className="text-sm sm:col-span-2">گزینه‌ها (هر گروه در یک خط)<textarea value={f.options} onChange={set("options")} rows={2} placeholder={"سایز: S، M، L\nرنگ: مشکی، سفید"} className={field + " mt-1 py-2"} /></label>
+        <label className="text-sm sm:col-span-2">توضیح (اختیاری)<input value={f.description} onChange={set("description")} maxLength={1000} className={field + " mt-1"} /></label>
+      </div>
+      <datalist id="catalog-cats">{categories.map((c) => <option key={c} value={c} />)}</datalist>
+      <button onClick={add} disabled={busy} className={btn + " mt-3"}>{busy ? "در حال افزودن…" : "افزودن محصول"}</button>
+    </div>
+  );
+}
+
 export function CatalogTab({ botId }: { botId: string }) {
   const [cat, setCat] = useState<Cat | null>(null);
   const [text, setText] = useState("");
@@ -182,6 +224,7 @@ export function CatalogTab({ botId }: { botId: string }) {
         </div>
       )}
 
+      <AddProduct botId={botId} block={cat.block} categories={cat.categories} onDone={load} onError={setError} />
       <div className={card}>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-bold">محصولات ({fa(cat.total)}){cat.total > cat.products.length && <span className="text-sm font-normal text-mute"> · {fa(cat.products.length)} مورد اول در این جدول</span>}</h3>
@@ -195,7 +238,7 @@ export function CatalogTab({ botId }: { botId: string }) {
                 {cat.products.map((p) => (
                   <tr key={p.id} className="border-t border-line-2">
                     <td className="p-2"><PhotoCell botId={botId} p={p} onChange={load} onError={setError} /></td>
-                    <td className="p-2">{p.name}{p.is_sample && <span className="mr-2 rounded bg-saffron/20 px-1.5 text-xs text-saffron">نمونه</span>}</td>
+                    <td className="p-2"><div className="flex flex-wrap items-center gap-x-2 gap-y-1"><span>{p.name}</span>{p.is_sample && <span className="shrink-0 rounded bg-saffron/20 px-1.5 text-xs text-saffron">نمونه</span>}</div></td>
                     <td className="p-2 text-mute">{p.category || "—"}</td>
                     <td className="p-2"><input type="number" defaultValue={p.price} min={0} onBlur={(e) => +e.target.value !== p.price && patch(p, { price: +e.target.value })} className="w-28 rounded-lg border border-line-2 bg-ink px-2 py-1" /></td>
                     <td className="p-2"><input type="number" defaultValue={p.stock ?? ""} min={0} placeholder="نامحدود" onBlur={(e) => {

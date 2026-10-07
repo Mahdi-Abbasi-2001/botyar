@@ -120,3 +120,14 @@ def test_bale_location_and_photo_messages_reach_the_engine(world, monkeypatch):
     post(location={"latitude": 35.7, "longitude": 51.4})
     post(photo=[{"file_id": "small"}, {"file_id": "BIG"}])
     assert "loc:35.7,51.4" in seen and "photo:BIG" in seen
+
+
+def test_add_products_one_by_one_keeps_earlier_ones(world):
+    c, H, bid, pid, _ = world
+    one = lambda n, **kw: c.post(f"/api/bots/{bid}/catalog/commit", headers=H, json={"block": "shop", "mode": "append", "products": [
+        {"name": n, "category": "کفش", "price": 250000, "stock": None, "description": "", "options": [{"name": "سایز", "choices": ["۴۰", "۴۱"]}], **kw}]})
+    assert one("کتانی").status_code == 200
+    assert one("چکمه").status_code == 200
+    names = [p["name"] for p in c.get(f"/api/bots/{bid}/catalog", headers=H).json()["products"]]
+    assert names == ["کفش", "کتانی", "چکمه"]                      # the owner's own product is not replaced
+    assert one("  ", price=1).status_code == 422                      # a blank name is refused
