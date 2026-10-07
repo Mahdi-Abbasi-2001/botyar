@@ -193,6 +193,7 @@ Decide whether you have enough information to build (or change) the bot.
 DESIGN = COMMON + """
 ## Your task now: DESIGN
 Produce the complete BotSpec for the owner's request. If a current spec is given, apply ONLY the requested change: keep every other block, id, text and number exactly as is. Keep block ids stable. Honour the listed assumptions.
+A menu button names what is behind it. When a change makes the old name too narrow (a button «ساعت کاری و آدرس» that now also shows a map, a photo and links), rename that menu entry (and any welcome text that names it) to a short plain name that covers everything, such as «اطلاعات کافه» or «درباره‌ی ما»; keep the block id.
 Inside a block you change, keep every field the owner did not mention (hours, links, contact, location, media, variants, buttons, texts): «add X» means the block keeps what it had and also gets X; never swap one field for another to make room.
 Every address, phone number, opening hour, link and price in the owner's messages (the whole conversation, not only the last message) must appear in the bot: in a message `text`, `hours`, `links`, `contact` or `location`. Never write that a fact «is not registered yet» when the owner gave it.
 Use ONLY the fields defined above, with the documented types. A requested detail that no field can express is left OUT of the spec (it is listed in the assumptions as «پشتیبانی نمی‌شود: …»); never invent a field, never put text or an object where a number goes, never squeeze a detail into a field meant for something else.

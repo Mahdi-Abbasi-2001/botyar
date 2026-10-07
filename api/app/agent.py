@@ -74,6 +74,19 @@ def dropped_fields(old: dict, new: dict, request: str) -> list[str]:
     return out
 
 
+def restore_dropped(old: dict, new: dict, request: str) -> dict | None:
+    """The new spec with every dropped field copied back from the old block (None when nothing was lost)."""
+    if not dropped_fields(old, new, request):
+        return None
+    before = {b.get("id"): b for b in old.get("blocks", [])}
+    blocks = []
+    for b in new.get("blocks", []):
+        o = before.get(b.get("id"))
+        if o and o.get("type") == b.get("type"):
+            b = {**b, **{k: o[k] for k in KEPT_FIELDS if o.get(k) and not b.get(k)}}
+        blocks.append(b)
+    return {**new, "blocks": blocks}
+
 class ClarifyResult(BaseModel):
     ready: bool
     questions: list[str]
@@ -168,10 +181,10 @@ class Builder:
                     "design_attempts": n}
         try:
             spec = BotSpec.model_validate(r.model_dump())
-            if n == 1 and s.get("current"):  # a change request must not quietly lose what a block already had
-                lost = dropped_fields(s["current"], spec.model_dump(), s["request"])
-                if lost:
-                    raise ValueError("you removed things the owner did not ask to remove: " + "; ".join(lost) + ". Put them back exactly as they were and apply only the requested change.")
+            if s.get("current"):  # a change request must not quietly lose what a block already had: put it back ourselves
+                restored = restore_dropped(s["current"], spec.model_dump(), s["request"])
+                if restored:
+                    spec = BotSpec.model_validate(restored)
             taken = [m.label for m in spec.menu if m.label.replace("\u200c", "").replace(" ", "") in RESERVED_LABELS]
             if taken:
                 raise ValueError(f"menu item «{taken[0]}» is a name the engine already gives its own built-in button: remove that menu item (customers get it automatically when allow_cancel is true)")

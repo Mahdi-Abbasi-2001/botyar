@@ -73,3 +73,12 @@ def test_dropped_fields_are_found_unless_the_owner_asked():
     new = {"blocks": [{"id": "info", "type": "message", "hours": [], "links": [], "contact": {"phone": "1", "name": "k"}}]}
     assert dropped_fields(old, new, "نشانی را هم اضافه کن") == ["block «info» lost its hours", "block «info» lost its links"]
     assert dropped_fields(old, new, "ساعت کاری را حذف کن") == []
+
+
+def test_dropped_fields_are_copied_back():
+    from app.agent import restore_dropped
+    old = {"blocks": [{"id": "info", "type": "message", "media": "image", "hours": [{"weekday": 0}]}]}
+    new = {"blocks": [{"id": "info", "type": "message", "media": None, "hours": [{"weekday": 0}], "location": {"latitude": 1, "longitude": 2}}], "name": "x"}
+    fixed = restore_dropped(old, new, "موقعیت روی نقشه را اضافه کن")
+    assert fixed["blocks"][0]["media"] == "image" and fixed["blocks"][0]["location"] == {"latitude": 1, "longitude": 2}
+    assert restore_dropped(old, new, "عکس را حذف کن") is None
