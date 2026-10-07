@@ -217,8 +217,13 @@ SUGGEST_CASES = [
      lambda s, m: None if ("ساعت" in m or "منو" in m or "تخفیف" in m) and "نیازی نیست" in m else "a café should be offered menu options / hours / discount: " + m[:300]),
 ]
 
+GROWTH_CASES = [
+    ("channel-growth-not-declined", "ربات برای کانال بله من که اعضا رو زیاد کنه", "needs_input",
+     lambda s, m: None if ("@" in m or "کانال" in m) and "وانمود" not in m else "should ask for the channel name and build invite + join, not decline: " + m[:300]),
+]
+
 # appended by later features (appointment calendars, FAQ, owner chat, delivery/discounts) — see EXTRA_CASES below
-EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES, *RANDOM_CASES, *MENU_QUIZ_CASES, *MEDIA_CASES, *GATE_CASES, *REFERRAL_CASES, *ANON_CASES, *EXTRAS_CASES, *SUGGEST_CASES]
+EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES, *RANDOM_CASES, *MENU_QUIZ_CASES, *MEDIA_CASES, *GATE_CASES, *REFERRAL_CASES, *ANON_CASES, *EXTRAS_CASES, *SUGGEST_CASES, *GROWTH_CASES]
 
 
 def run_case(c, i, name, text, want_status, check):
