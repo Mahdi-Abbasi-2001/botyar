@@ -126,6 +126,11 @@ class Builder:
     def cost(self) -> float:
         return float(self.db.scalar(select(func.coalesce(func.sum(LlmCall.cost_usd), 0.0)).where(LlmCall.run_id == self.run_id)))
 
+    def _just_asked(self) -> bool:
+        last = self.db.scalars(select(BuilderMessage).where(BuilderMessage.bot_id == self.bot_id, BuilderMessage.role == "assistant")
+                               .order_by(BuilderMessage.id.desc())).first()
+        return bool(last and last.content.startswith("❓"))
+
     # ---- nodes ----
     def clarify(self, s: S) -> dict:
         self.emit("در حال بررسی درخواست شما…")
@@ -135,7 +140,9 @@ class Builder:
         r: ClarifyResult = self.ask("clarify", prompts.CLARIFY, payload, ClarifyResult, effort="low")
         if r.out_of_scope.strip():
             return {"outcome": "declined", "decline_message": r.out_of_scope.strip()}
-        if not r.ready and not s.get("current") and rounds < MAX_CLARIFY_ROUNDS and r.questions:
+        if not r.ready and r.questions and (
+                (not s.get("current") and rounds < MAX_CLARIFY_ROUNDS)
+                or (s.get("current") and not self._just_asked())):  # a change may ask for a missing fact, but never twice in a row
             return {"outcome": "needs_input", "questions": r.questions[:3]}
         return {"outcome": "build", "assumptions": r.assumptions, "summary": r.summary}
 
