@@ -41,5 +41,5 @@ echo "env vars set${TG_ENV:+ (with Telegram)}"
 STAGE="$(mktemp -d)"
 cp -r api/app api/static api/Dockerfile api/requirements.txt api/liara.json "$STAGE"/
 find "$STAGE" -name __pycache__ -type d -prune -exec rm -rf {} +
-liara deploy --path "$STAGE" --app "$APP" --team-id "$TEAM" --platform docker --port 8000 --detach -m "deploy $(date +%F-%H%M)"
+liara deploy --path "$STAGE" --app "$APP" --team-id "$TEAM" --platform docker --port 8000 -m "deploy $(date +%F-%H%M)"
 rm -rf "$STAGE"
