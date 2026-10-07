@@ -233,8 +233,15 @@ SUGGEST2_CASES = [
      lambda s, m: None if "نیازی نیست" in m and ("نمره" in m or "قبولی" in m or "کد تخفیف" in m or "ترتیب" in m or "یک بار" in m) else "a quiz should be offered pass mark / random order / one attempt: " + m[:300]),
 ]
 
+SUGGEST3_CASES = [
+    ("suggest-skips-specified-shop", "ربات فروشگاه لباس با پرداخت کارت به کارت، هزینه ارسال ۵۰ هزار تومان و کد تخفیف YALDA ده درصد", "needs_input",
+     lambda s, m: None if "کد تخفیف" not in m and "هزینه‌ی ارسال" not in m and "رایگان" not in m else "offered something the owner already specified: " + m[:400]),
+    ("suggest-skips-specified-salon", "ربات نوبت‌دهی سالن با یادآوری ۲۴ ساعت قبل و بیعانه ۱۰۰ هزار تومان و انتخاب آرایشگر", "needs_input",
+     lambda s, m: None if "یادآوری" not in m and "انتخاب آرایشگر" not in m else "offered something the owner already specified: " + m[:400]),
+]
+
 # appended by later features (appointment calendars, FAQ, owner chat, delivery/discounts) — see EXTRA_CASES below
-EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES, *RANDOM_CASES, *MENU_QUIZ_CASES, *MEDIA_CASES, *GATE_CASES, *REFERRAL_CASES, *ANON_CASES, *EXTRAS_CASES, *SUGGEST_CASES, *GROWTH_CASES, *SUGGEST2_CASES]
+EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES, *RANDOM_CASES, *MENU_QUIZ_CASES, *MEDIA_CASES, *GATE_CASES, *REFERRAL_CASES, *ANON_CASES, *EXTRAS_CASES, *SUGGEST_CASES, *GROWTH_CASES, *SUGGEST2_CASES, *SUGGEST3_CASES]
 
 
 def run_case(c, i, name, text, want_status, check):
