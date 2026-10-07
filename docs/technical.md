@@ -104,7 +104,7 @@ LangGraph: `clarify → design → validate → write_tests → run_tests → re
 - **write_tests** produces ≤4 scenarios (steps with expected/forbidden substrings, setup runs for capacity, record checks). Tests are LLM-written and executed by the deterministic runner (`testing.py`).
 - **repair** decides whether the spec or the test is wrong and fixes it; publishing stays locked while any test fails.
 - **Change requests** receive the current spec, produce a readable diff, and re-run old and new tests.
-- **Cost control**: per-user 40 runs/day, global 300 runs/day, plan limit on agent requests per 30 days, every call logged in `llm_calls` with tokens and cost; the UI shows cost per request.
+- **Cost control**: per-user 40 runs/day, global 300 runs/day, plan limit on agent requests per 30 days, every call logged in `llm_calls` with tokens and cost; the owner UI does not show them.
 - **Interrupted runs** (server restart) are failed at startup or after 6 minutes so a bot is never locked.
 - **Quality harness**: `api/scripts/eval_agent.py` runs 54 real-model cases (supported builds with content checks, honest declines, no-invention rules, regression cases for every past failure). It is run only for the affected cases after a prompt change and once in full before a deploy.
 
@@ -197,7 +197,7 @@ Owner panel `…/records` (+`PATCH` cancel/status), `…/inbox` (+reply), `…/b
 - `./deploy.sh` builds the frontend into `api/static`, sets the environment on the Liara app from `api/.env` (never printing secrets) and deploys the Docker image. Liara allows 20 deployments per day.
 - Environment: `DATABASE_URL`, `JWT_SECRET`, `OPENAI_API_KEY`, `BALE_SHARED_BOT_TOKEN`, `PUBLIC_BASE_URL`, `TELEGRAM_RELAY_URL`, `TELEGRAM_RELAY_KEY`, `TELEGRAM_SHARED_BOT_TOKEN`, `BILLING_DEMO`, `ADMIN_USERNAMES`, `CORS_ORIGINS` (see `README.md`).
 - Telegram relay: `relay/main.ts` on Deno Deploy (`relay/README.md`).
-- Cost evidence: per-call LLM log; UI shows cost per request and per bot.
+- Cost evidence: per-call LLM log (not shown to owners; available through `/api/bots/{id}/cost`).
 
 ## 16. Known limits (honest list)
 

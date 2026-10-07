@@ -98,7 +98,7 @@ export function PhoneSim({ botId, version, labels, onActivity, className = "" }:
   }
 
   return (
-    <section aria-label="پیش‌نمایش ربات" className={`flex h-[640px] w-[320px] max-w-full flex-col gap-2.5 rounded-[40px] border-8 border-line bg-panel px-3 py-4 ${className}`}>
+    <section aria-label="پیش‌نمایش ربات" className={`flex h-[min(640px,calc(100dvh-14.5rem))] min-h-[440px] w-[320px] max-w-full flex-col gap-2.5 rounded-[40px] border-8 border-line bg-panel px-3 py-4 ${className}`}>
       <div className="flex items-center justify-between border-b border-line px-1.5 pb-2.5 text-[13px]">
         <span className="font-bold">امتحان ربات <span className="font-normal text-mint">· نسخه‌ی {version.toLocaleString("fa-IR")}</span></span>
         <button onClick={restart} className="flex min-h-8 items-center gap-1 rounded-lg border border-line-2 px-2.5 text-xs text-mute hover:text-fg">

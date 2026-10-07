@@ -39,7 +39,10 @@ BATCH2 = [
     "ربات که لیست قیمت خدمات آرایشگاه رو نشون بده: کوتاهی ۲۰۰ هزار، رنگ ۹۰۰ هزار، کراتینه ۲ میلیون",
     "ربات که شماره موبایل بگیره و بعد کد تأیید پیامکی بفرسته",
 ]
-if len(sys.argv) > 1 and sys.argv[1] == "batch2":
+if len(sys.argv) > 2 and sys.argv[1] == "say":  # odd_requests.py say "<one request>"
+    REQUESTS = [sys.argv[2]]
+    del sys.argv[1:3]
+elif len(sys.argv) > 1 and sys.argv[1] == "batch2":
     REQUESTS = BATCH2
     sys.argv.pop(1)
 
@@ -49,7 +52,7 @@ def main(only):
         for i, text in enumerate(REQUESTS):
             if only and not any(w in str(i + 1) for w in only):
                 continue
-            tok = c.post("/api/auth/register", json={"email": f"odd{i}@example.com", "password": "123456"}).json()["token"]
+            tok = c.post("/api/auth/register", json={"username": f"odd{i}", "password": "123456"}).json()["token"]
             H = {"Authorization": f"Bearer {tok}"}
             bot = c.post("/api/bots/draft", headers=H).json()["id"]
             rid = c.post(f"/api/bots/{bot}/builder", headers=H, json={"text": text}).json()["run_id"]

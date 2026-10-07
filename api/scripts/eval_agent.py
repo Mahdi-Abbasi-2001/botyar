@@ -201,12 +201,19 @@ ANON_CASES = [
      lambda s, m: None if blocks(s, "anon_chat") and ("ناشناس" in m) else "expected an anon_chat block with an honest note"),
 ]
 
+EXTRAS_CASES = [
+    ("shop-asks-about-extras", "یه ربات برای فروشگاه لباسم میخوام", "needs_input",
+     lambda s, m: None if ("پرداخت" in m and ("تخفیف" in m or "ارسال" in m)) else "a clothing shop request should ask about payment / delivery / discount extras: " + m[:300]),
+    ("no-unrequested-unsupported-note", "ربات فروشگاه لباس: تی‌شرت ۳۵۰ هزار تومان و شلوار ۵۰۰ هزار تومان. مشتری سفارش بده و نام و آدرسش رو بگیر و به من خبر بده.", "done",
+     lambda s, m: None if "پشتیبانی نمی" not in m else "mentioned an unsupported feature nobody asked for: " + m[:300]),
+]
+
 # appended by later features (appointment calendars, FAQ, owner chat, delivery/discounts) — see EXTRA_CASES below
-EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES, *RANDOM_CASES, *MENU_QUIZ_CASES, *MEDIA_CASES, *GATE_CASES, *REFERRAL_CASES, *ANON_CASES]
+EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES, *RANDOM_CASES, *MENU_QUIZ_CASES, *MEDIA_CASES, *GATE_CASES, *REFERRAL_CASES, *ANON_CASES, *EXTRAS_CASES]
 
 
 def run_case(c, i, name, text, want_status, check):
-    tok = c.post("/api/auth/register", json={"email": f"eval{i}@example.com", "password": "123456"}).json()["token"]
+    tok = c.post("/api/auth/register", json={"username": f"eval{i}", "password": "123456"}).json()["token"]
     H = {"Authorization": f"Bearer {tok}"}
     bot = c.post("/api/bots/draft", headers=H).json()["id"]
     t0, cost, repairs, status, msg = time.time(), 0.0, 0, "?", ""
@@ -224,6 +231,10 @@ def run_case(c, i, name, text, want_status, check):
         errors.append(f"status {status!r}, wanted {want_status!r}")
     spec = (c.get(f"/api/bots/{bot}", headers=H).json().get("spec")) or {"blocks": []}
     tests = c.get(f"/api/bots/{bot}/tests", headers=H).json()["results"]
+    if want_status == "needs_input" and status == "needs_input":
+        err = check(spec, msg)
+        if err:
+            errors.append(err)
     if want_status == "done":
         for t in tests:
             if not t["passed"] and os.environ.get("EVAL_VERBOSE"):

@@ -17,7 +17,6 @@ type Props = {
   chat: ChatMsg[];
   events: string[];
   running: boolean;
-  lastCost: number | null;
   stamped: boolean;
   input: string;
   setInput: (s: string) => void;
@@ -29,7 +28,7 @@ type Props = {
 };
 
 // Height left for the chat once the header, tab bar and page padding are drawn.
-const PANEL_H = "h-[calc(100dvh-11rem)] min-h-[480px]";
+const PANEL_H = "h-[calc(100dvh-14.5rem)] min-h-[480px]"; // the page header, the two tab rows and the page padding sit above the panel
 
 export function BuilderTab(p: Props) {
   const lastQ = !p.running && p.chat.length ? parseQuestions(p.chat[p.chat.length - 1].content) : null;
@@ -132,7 +131,6 @@ export function BuilderTab(p: Props) {
         })}
 
         {(p.running || (p.events.length > 0 && !lastQ)) && <Timeline events={p.events} running={p.running} />}
-        {p.lastCost !== null && !p.running && <span className="text-xs text-dim">هزینه‌ی هوش مصنوعی این درخواست: <span dir="ltr">${p.lastCost.toFixed(4)}</span></span>}
         {/* the shop was built with invented demo products (so it can be tested): the owner's real list is the next step */}
         {p.catalog?.sample && !p.running && !lastQ && (
           <div className="anim-rise flex flex-col gap-2.5 rounded-2xl border border-amber-line bg-amber-bg p-4 text-sm leading-7">
@@ -245,7 +243,7 @@ function PastQuestions({ questions }: { questions: string[] }) {
 function MiniMap({ spec, tests, running, stamped, catalog }: { spec: Spec | null; tests: TestRes[]; running: boolean; stamped: boolean; catalog: Props["catalog"] }) {
   const passed = tests.filter((t) => t.passed).length;
   return (
-    <section className={`bp relative flex min-w-0 flex-[1.3_1_420px] flex-col gap-3.5 overflow-y-auto overscroll-contain rounded-[20px] border border-line bg-ink-2 p-5 lg:max-h-[calc(100dvh-11rem)]`}>
+    <section className={`bp relative flex min-w-0 flex-[1.3_1_420px] flex-col gap-3.5 overflow-y-auto overscroll-contain rounded-[20px] border border-line bg-ink-2 p-5 lg:max-h-[calc(100dvh-14.5rem)]`}>
       <div className="flex justify-between text-[13px] text-mute">
         <span>نقشه‌ی ربات</span>
         {running && spec && <span className="text-saffron">در حال اعمال تغییر…</span>}

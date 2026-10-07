@@ -77,7 +77,6 @@ function Workspace() {
   const [input, setInput] = useState("");
   const [events, setEvents] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
-  const [lastCost, setLastCost] = useState<number | null>(null);
   const [stamped, setStamped] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const alive = useRef(true);
@@ -88,7 +87,6 @@ function Workspace() {
   const [records, setRecords] = useState<Rec[]>([]);
   const [tests, setTests] = useState<TestRes[]>([]);
   const [versions, setVersions] = useState<Ver[]>([]);
-  const [cost, setCost] = useState<number | null>(null);
   // the product table (shops with many products): its size, and whether it still holds only the build-time demo products
   const [catalog, setCatalog] = useState<{ total: number; sample: boolean } | null>(null);
 
@@ -103,7 +101,6 @@ function Workspace() {
       api<ChatMsg[]>(`/bots/${id}/builder/messages`).then((m) => { setChat(m); return m; }).catch(() => [] as ChatMsg[]),
       api<{ results: TestRes[] }>(`/bots/${id}/tests`).then((t) => setTests(t.results)).catch(() => {}),
       api<Ver[]>(`/bots/${id}/versions`).then(setVersions).catch(() => {}),
-      api<{ total_usd: number }>(`/bots/${id}/cost`).then((c) => setCost(c.total_usd)).catch(() => {}),
     ]);
     loadRecords();
     return { b, msgs };
@@ -130,7 +127,6 @@ function Workspace() {
         setEvents(r.events);
         if (r.status !== "running") {
           setChat((c) => [...c, { role: "assistant", content: r.result.message }]);
-          setLastCost(r.result.cost_usd ?? null);
           await loadAll();
           const res = r.result.tests ?? [];
           if (r.status === "done" && res.length && res.every((x) => x.passed)) setStamped(true);
@@ -249,7 +245,6 @@ function Workspace() {
           {running ? (spec ? `نسخه‌ی ${fa(bot.version)} · در حال ساخت نسخه‌ی بعدی` : "در حال ساخت اولین نسخه") : spec ? `نسخه‌ی ${fa(bot.version)}${tests.length ? ` · ${fa(passed)} از ${fa(tests.length)} تست موفق` : ""}` : "پیش‌نویس"}
         </span>
       </>}>
-        {cost !== null && cost > 0 && <span className="hidden rounded-lg border border-line px-2.5 py-1.5 text-xs text-mute xl:inline" dir="ltr" title="هزینه‌ی هوش مصنوعی این ربات تا این لحظه">هزینه‌ی هوش مصنوعی: <span dir="ltr">${cost.toFixed(4)}</span></span>}
         {/* where the bot stands with customers, and the one-click way forward */}
         {spec && live === "live" && (
           <button onClick={goPublish} className="hidden min-h-11 items-center gap-2 rounded-xl bg-mint-bg px-3.5 text-sm text-mint-fg hover:bg-mint-bg/70 sm:flex">
@@ -324,7 +319,7 @@ function Workspace() {
           {limit && tab === "build" && <PlanLimitNote text={limit} />}
           {spec && tab !== "build" && <DeliveryBanner botId={id!} />}
           {tab === "build" && (
-            <BuilderTab spec={spec} tests={tests} chat={chat} events={events} running={running} lastCost={lastCost} stamped={stamped}
+            <BuilderTab spec={spec} tests={tests} chat={chat} events={events} running={running} stamped={stamped}
               input={input} setInput={setInput} inputRef={inputRef} onSend={sendBuild} botId={id!} catalog={catalog} onImport={() => setTab("catalog")} />
           )}
           {tab === "spec" && spec && <StructureTab spec={spec} records={records} onEdit={editPart} />}

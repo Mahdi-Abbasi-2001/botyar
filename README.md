@@ -41,7 +41,7 @@
    produces a readable diff and re-runs all earlier tests.
 
 Models: `gpt-6-luna` for every agent step (owner decision, cost), `text-embedding-3-small` for FAQ matching. Every call
-is logged with its token count and cost; the UI shows the cost per request and per bot.
+is logged with its token count and cost (kept for the operator; the UI does not show prices to owners; `GET /api/bots/{id}/cost` still exists).
 
 ## Repository layout
 
