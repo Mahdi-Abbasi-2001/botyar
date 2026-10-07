@@ -6,13 +6,14 @@ import { ExportButtons } from "@/components/workspace/ExportButtons";
 import { RecordActions } from "@/components/workspace/RecordActions";
 import { PaymentCard } from "@/components/workspace/PaymentCard";
 import { TelegramCard } from "@/components/workspace/TelegramCard";
-import { ShareLink } from "@/components/workspace/ShareLink";
+import { ContentLinks, ShareLink } from "@/components/workspace/ShareLink";
 import { BrandButton, ModeTile, OwnBotSetup, PlatformCard, StatusPill, SwitchToOwn } from "@/components/workspace/Messengers";
 
 type Pub = {
   published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string; webhooks_enabled: boolean; listed: boolean;
   sample_products: boolean;  // the product table still holds only the demo products made at build time
   daily_summary: boolean;    // the owner's 8:00 summary in their linked chat
+  contents?: { id: string; title: string; channels: string[] }[];  // content behind a channel join: one link each
   mode?: "shared" | "own"; version?: number; code?: string; admin_code?: string; bot_username?: string; admin_linked?: boolean; up_to_date?: boolean;
 };
 type Live = { id: number; collection: string; data: Record<string, any>; created_at: string };
@@ -140,6 +141,7 @@ export function PublishTab({ botId, onImport }: { botId: string; onImport: () =>
             ) : (
               <ShareLink brand url={`https://ble.ir/${handle}`} fileName={`bale-${handle}`} hint="ربات اختصاصی شما فعال است. این لینک را در اختیار مشتریان قرار دهید." />
             )}
+            <ContentLinks items={pub.contents ?? []} link={(id) => `https://ble.ir/${handle}?start=${pub.mode === "shared" ? `${pub.code}-${id}` : `go-${id}`}`} />
             {pub.mode === "shared" && <SwitchToOwn p="bale" busy={busy} token={token} setToken={setToken} minToken={10} onSwitch={() => publish("own")} />}
           </PlatformCard>
           <TelegramCard botId={botId} allowSamples={allowSamples} />

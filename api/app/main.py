@@ -387,9 +387,11 @@ from .communities import router as communities_router  # noqa: E402
 
 app.include_router(communities_router)
 
+from .quiz_bank import router as quiz_router  # noqa: E402
 from .referral import router as referral_router  # noqa: E402
 
 app.include_router(referral_router)
+app.include_router(quiz_router)
 
 from .outreach import router as outreach_router  # noqa: E402
 

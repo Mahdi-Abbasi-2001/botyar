@@ -171,6 +171,18 @@ class Product(Base):
     has_photo: Mapped[bool] = mapped_column(Boolean, default=False)  # the photo itself is a BotFile with block_id "product:<id>"
 
 
+class QuizQuestionRow(Base):
+    """One question of a quiz's imported bank (the owner's «سؤال‌ها» tab). While a quiz has rows here, they replace the spec's own questions."""
+    __tablename__ = "quiz_questions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(ForeignKey("bots.id"), index=True)
+    block_id: Mapped[str] = mapped_column(String(64), index=True)
+    question: Mapped[str] = mapped_column(String(300))
+    options: Mapped[list] = mapped_column(JSON, default=list)
+    correct: Mapped[int] = mapped_column(Integer, default=0)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class VersionFixture(Base):
     """Frozen product list the version's tests run against (tests stay hermetic when the live catalog changes)."""
     __tablename__ = "version_fixtures"

@@ -86,6 +86,20 @@ class JoinGate(BaseModel):
         return self
 
 
+class JoinChannel(BaseModel):
+    """A channel the customer must have joined before receiving a message block's content."""
+    channel: str  # "@username"
+    title: str = Field(default="", max_length=40)  # the button label (default: the @username)
+
+    @model_validator(mode="after")
+    def _channel(self):
+        c = self.channel.strip()
+        if not re.fullmatch(r"@[A-Za-z0-9_]{4,64}", c):
+            raise ValueError("a join channel must be an @username (letters, digits, underscore)")
+        self.channel = c
+        return self
+
+
 class MenuItem(BaseModel):
     label: str
     block: str
@@ -120,6 +134,16 @@ class MessageBlock(BaseModel):
     location: MapPoint | None = None  # a map pin sent after the text
     variants: list[Annotated[str, Field(min_length=1, max_length=1500)]] = Field(default_factory=list, max_length=30)  # non-empty: each tap shows one of these at random (never the same twice in a row)
     links: list[LinkButton] = Field(default_factory=list, max_length=6)  # link buttons under the text
+    # content behind a join: the text/file/links above are delivered only after the customer is a member of EVERY channel here
+    join: list[JoinChannel] = Field(default_factory=list, max_length=5)
+    join_text: str = Field(default="", max_length=300)  # shown with the channel buttons (default text when empty)
+
+    @model_validator(mode="after")
+    def _join(self):
+        names = [c.channel.lower() for c in self.join]
+        if len(set(names)) != len(names):
+            raise ValueError("the same channel is listed twice in join")
+        return self
 
     @model_validator(mode="after")
     def _album(self):
@@ -546,6 +570,7 @@ class QuizBlock(BaseModel):
     pass_text: str = "🎉 قبول شدید!"
     fail_text: str = "متأسفانه نمره‌ی قبولی را کسب نکردید."
     one_attempt: bool = False  # a customer who already took the quiz sees their result instead of a new attempt
+    show_history: bool = False  # a built-in «نتیجه‌های من» menu button lists the customer's own recent results (every quiz that has this on)
     pass_code: str = ""  # a discount code (of a catalog_order block) given to those who pass (needs pass_percent)
     personality: list[QuizOutcome] = Field(default_factory=list, max_length=8)  # non-empty = personality quiz: no right answers
 
@@ -563,8 +588,6 @@ class QuizBlock(BaseModel):
                 raise ValueError("a personality quiz has no pass mark (no pass_percent / pass_code)")
         if self.pass_code and not self.pass_percent:
             raise ValueError("pass_code needs pass_percent")
-        if self.pick > len(self.questions):
-            raise ValueError("pick is larger than the number of questions")
         return self
 
 

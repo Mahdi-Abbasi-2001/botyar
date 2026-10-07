@@ -15,11 +15,12 @@ from typing import Any, Protocol
 from . import dates
 from .engine_text import fa_digits, fa_norm, norm  # noqa: F401  (re-exported: engine.norm / engine.fa_norm / engine.fa_digits)
 from .faq_match import LexicalMatcher, MatcherUnavailable, RateLimited, decide
-from .spec import PLACEHOLDER, jalali_date, norm_code, BotSpec, BookingBlock, CatalogOrderBlock, ContactBlock, FaqBlock, FeedbackBlock, MenuBlock, QuizBlock, ReferralBlock, AnonChatBlock, FormBlock, FormField, MessageBlock
+from .spec import PLACEHOLDER, jalali_date, norm_code, BotSpec, BookingBlock, CatalogOrderBlock, ContactBlock, FaqBlock, FeedbackBlock, MenuBlock, QuizBlock, ReferralBlock, AnonChatBlock, FormBlock, FormField, MessageBlock, QuizQuestion
 
 log = logging.getLogger("botyar.engine")
 STALE_RESETS = {"count": 0}  # tests assert this stays 0 unless a bot really changed under a conversation
 MY_LABEL = "ثبت‌های من"  # fallback only: the real label is my_label(spec), named after what the bot takes (orders, appointments, sign-ups)
+RESULTS_LABEL = "نتیجه‌های من"  # built-in entry of quizzes with show_history
 CODES_LABEL = "کدهای تخفیف"  # built-in menu entry, present when a shop has discount codes that are visible to customers
 MY_BLOCK = "__my__"
 STATUS_FA = {"confirmed": "تأیید شده", "waitlisted": "در لیست انتظار", "new": "سفارش جدید", "preparing": "در حال آماده‌سازی", "ready": "آماده", "done": "تحویل داده شد", "cancelled": "لغو شده", "unanswered": "بدون پاسخ", "awaiting_payment": "در انتظار پرداخت", "handled": "رسیدگی شد", "no_show": "حاضر نشد", "awaiting_transfer": "منتظر واریز", "transfer_sent": "واریز شد، منتظر تأیید",
@@ -71,6 +72,8 @@ class Store(Protocol):
     def find(self, collection: str, **where: Any) -> list[dict]: ...
     def update(self, collection: str, row_id: int, **fields: Any) -> None: ...
     def time_off(self, block_id: str) -> list[dict]: ...  # [{date, start, end, staff}] closed by the owner
+    def quiz_questions(self, block_id: str) -> list[dict]: ...  # the owner's imported question bank ([] = use the questions written in the spec)
+    def member(self, channel: str, cust: str, session: dict) -> bool | None: ...  # is the customer in the channel? None = could not be checked
 
 
 class MemoryStore:
@@ -78,12 +81,20 @@ class MemoryStore:
         self.rows: dict[str, list[dict]] = {}
         self.catalog: dict[str, list[dict]] = {}
         self.closed: dict[str, list[dict]] = {}  # block id -> hours the owner closed
+        self.bank: dict[str, list[dict]] = {}    # quiz block id -> imported questions {question, options, correct}
 
     def load_catalog(self, block_id: str, products: list[dict]):
         self.catalog[block_id] = [{**p, "id": i} for i, p in enumerate(products, 1)]
 
     def time_off(self, block_id):
         return self.closed.get(block_id, [])
+
+    def quiz_questions(self, block_id):
+        return self.bank.get(block_id, [])
+
+    def member(self, channel, cust, session):
+        """Tests and the simulator cannot join a channel: the customer counts as a member once they have pressed «عضو شدم»."""
+        return bool((session.get("data") or {}).get("_pressed"))
 
     def add(self, collection, data):
         row = {"id": len(self.rows.setdefault(collection, [])) + 1, **data}
@@ -384,6 +395,8 @@ def builtin_entries(spec: BotSpec) -> list[tuple[str, str]]:
         out.append(("mine", my_label(spec)))
     if _visible_codes(spec):
         out.append(("codes", CODES_LABEL))
+    if any(b.type == "quiz" and b.show_history for b in spec.blocks):
+        out.append(("results", RESULTS_LABEL))
     return out
 
 
@@ -559,6 +572,8 @@ def _handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, mat
         if session["block"] == MY_BLOCK:
             return _mine(spec, session, text, store, now)
         block = spec.block(session["block"])
+        if block.type == "message":
+            return _message_join(spec, session, block, text, store, now, rng)
         if block.type == "form":
             return _form(spec, session, block, text, store, now)
         if block.type == "booking":
@@ -618,7 +633,9 @@ def quiz_media_key(block_id: str, i: int) -> str:
 def _from_menu(spec, session, text_n, store, now, rng=_RNG):
     for pos, (key, label) in enumerate(builtin_entries(spec)):
         if text_n in (f"m:{len(spec.menu) + pos}", label):
-            return _my_start(spec, session, store, now) if key == "mine" else _codes_view(spec, session, store)
+            if key == "mine":
+                return _my_start(spec, session, store, now)
+            return _results_view(spec, session, store) if key == "results" else _codes_view(spec, session, store)
     item = None
     m = re.fullmatch(r"m:(\d+)", text_n)
     if m and int(m.group(1)) < len(spec.menu):
@@ -630,8 +647,46 @@ def _from_menu(spec, session, text_n, store, now, rng=_RNG):
     return _start_block(spec, session, spec.block(item.block), store, now, rng)
 
 
+def _missing_channels(block, store, session) -> list:
+    """The join channels the customer is NOT in (a check that could not be made counts as joined: a setup mistake never locks customers out)."""
+    cust = session.get("cust") or ""
+    return [c for c in block.join if store.member(c.channel, cust, session) is False]
+
+
+def _join_prompt(block, session, missing, still: bool = False):
+    host = "https://t.me/" if str(session.get("cust", "")).startswith("tg:") else "https://ble.ir/"
+    buttons = [_btn("📢 " + (c.title or c.channel), "url:" + host + c.channel[1:]) for c in missing]
+    buttons.append(_btn("✅ عضو شدم، بررسی کن", "cj"))
+    if still:
+        text = "هنوز در این کانال‌ها عضو نشده‌اید: " + "، ".join(c.channel for c in missing) + "\nپس از عضویت، دوباره «عضو شدم، بررسی کن» را بزنید."
+    else:
+        text = block.join_text or "برای دریافت این محتوا ابتدا در کانال‌های زیر عضو شوید، سپس «عضو شدم، بررسی کن» را بزنید."
+    return send(text, buttons)
+
+
+def _message_join(spec, session, block, text, store, now, rng):
+    """A message block behind a join: «عضو شدم» re-checks every channel and delivers the content once nothing is missing."""
+    missing = _missing_channels(block, store, session) if text != "cj" else None
+    if text == "cj":
+        session["data"]["_pressed"] = True
+        missing = _missing_channels(block, store, session)
+        if not missing:
+            _reset(session)
+            return message_actions(block, session, rng, menu_actions(spec), now)
+        return [_join_prompt(block, session, missing, still=True)]
+    if not missing:  # joined in the meantime and typed something: give the content anyway
+        _reset(session)
+        return message_actions(block, session, rng, menu_actions(spec), now)
+    return [_join_prompt(block, session, missing)]
+
+
 def _start_block(spec, session, block, store, now, rng):
     """Begin a block (reached from the main menu or from a sub-menu)."""
+    if block.type == "message" and block.join:
+        missing = _missing_channels(block, store, session)
+        if missing:
+            session.update(block=block.id, step="join", data={})
+            return [_join_prompt(block, session, missing)]
     if block.type == "message":
         return message_actions(block, session, rng, menu_actions(spec), now)
     session.update(block=block.id, step=0, data={})
@@ -651,13 +706,14 @@ def _start_block(spec, session, block, store, now, rng):
                 _reset(session)
                 was = f"نتیجه‌ی شما: {prev[0].get('result', '')}" if block.personality else _fill(block.result_text, prev[0])
                 return [send("شما قبلاً در این آزمون شرکت کرده‌اید.\n" + was), menu_actions(spec)]
-        order = list(range(len(block.questions)))
+        qs = _qs(block, store)
+        order = list(range(len(qs)))
         if block.shuffle or block.pick:  # Fisher-Yates with the injectable generator (deterministic in the agent's tests)
             for k in range(len(order) - 1, 0, -1):
                 j = rng.randrange(k + 1)
                 order[k], order[j] = order[j], order[k]
         session["data"] = {"score": 0, "order": order[:block.pick] if block.pick else order}
-        return [send(block.title), *_quiz_ask(block, session["data"], 0)]
+        return [send(block.title), *_quiz_ask(block, qs, session["data"], 0)]
     if block.type == "form":
         why = _form_closed(block, session, store, now)
         if why:
@@ -1398,6 +1454,26 @@ def _code_line(block, code, store) -> str | None:
     cond = f" · برای سفارش بالای {code.min_total:,} تومان" if code.min_total else ""
     rest = f" · {left} بار دیگر قابل استفاده است" if left is not None else ""
     return f"• {code.code} — {what}{cond}{rest}"
+
+
+def _results_view(spec, session, store):
+    """The built-in «نتیجه‌های من» entry: this customer's latest results in every quiz that keeps a history."""
+    _reset(session)
+    cust, lines = session.get("cust"), []
+    for b in spec.blocks:
+        if b.type != "quiz" or not b.show_history or not cust:
+            continue
+        for r in sorted(store.find(b.id, _cust=cust), key=lambda r: (str(r.get("_at", "")), r.get("id", 0)), reverse=True)[:5]:
+            when = ""
+            try:
+                when = " — " + dates.jalali_str(datetime.fromisoformat(r["_at"]).date())
+            except (KeyError, ValueError):
+                pass
+            what = r.get("result") if b.personality else f"{r.get('score', 0)} از {r.get('total', 0)} ({r.get('percent', 0)}٪)"
+            lines.append(f"• {b.title}: {what}{when}")
+    if not lines:
+        return [send("هنوز در آزمونی شرکت نکرده‌اید."), menu_actions(spec)]
+    return [send("📊 نتیجه‌های اخیر شما:\n" + "\n".join(lines)), menu_actions(spec)]
 
 
 def _codes_view(spec, session, store):
@@ -2189,21 +2265,29 @@ def _referral(spec, session, block: ReferralBlock):
 
 
 # ---------- quiz ----------
-def _quiz_order(block: QuizBlock, d: dict) -> list[int]:
-    return d.get("order") or list(range(len(block.questions)))  # sessions started before shuffle/pick existed
+def _qs(block: QuizBlock, store) -> list:
+    """The questions in play: the owner's imported bank when there is one, otherwise the ones written in the spec."""
+    if block.personality:
+        return block.questions
+    bank = store.quiz_questions(block.id)
+    return [QuizQuestion.model_construct(question=q["question"], options=q["options"], correct=q.get("correct", 0), outcomes=[], media="none") for q in bank] or block.questions
 
 
-def _quiz_question(block: QuizBlock, d: dict, i: int):
-    order = _quiz_order(block, d)
-    q = block.questions[order[i]]
+def _quiz_order(qs: list, d: dict) -> list[int]:
+    return d.get("order") or list(range(len(qs)))  # sessions started before shuffle/pick existed
+
+
+def _quiz_question(qs: list, d: dict, i: int):
+    order = _quiz_order(qs, d)
+    q = qs[order[i]]
     return send(f"سؤال {i + 1} از {len(order)}:\n{q.question}", [_btn(o, f"qa:{j}") for j, o in enumerate(q.options)] + [_btn("بازگشت به منو", "/menu")])
 
 
-def _quiz_ask(block: QuizBlock, d: dict, i: int) -> list:
+def _quiz_ask(block: QuizBlock, qs: list, d: dict, i: int) -> list:
     """The question, after its photo when it has one (so the answer buttons stay at the bottom)."""
-    k = _quiz_order(block, d)[i]
-    photo = [{"type": "media", "block": quiz_media_key(block.id, k), "kind": "image"}] if block.questions[k].media == "image" else []
-    return [*photo, _quiz_question(block, d, i)]
+    k = _quiz_order(qs, d)[i]
+    photo = [{"type": "media", "block": quiz_media_key(block.id, k), "kind": "image"}] if qs[k].media == "image" else []
+    return [*photo, _quiz_question(qs, d, i)]
 
 
 def _personality(block: QuizBlock, d: dict):
@@ -2214,12 +2298,13 @@ def _personality(block: QuizBlock, d: dict):
 
 def _quiz(spec, session, block: QuizBlock, text, store, now):
     text_n, d, i = norm(text), session["data"], session["step"]
-    order = _quiz_order(block, d)
-    q = block.questions[order[i]]  # IndexError here = the quiz changed under a running customer: the stale-state guard resets
+    qs = _qs(block, store)
+    order = _quiz_order(qs, d)
+    q = qs[order[i]]  # IndexError here = the quiz changed under a running customer: the stale-state guard resets
     m = re.fullmatch(r"qa:(\d+)", text_n)
     idx = int(m.group(1)) if m else next((j for j, o in enumerate(q.options) if fa_norm(o) == fa_norm(text_n)), -1)
     if not 0 <= idx < len(q.options):
-        return [send("لطفاً یکی از گزینه‌ها را انتخاب کنید."), *_quiz_ask(block, d, i)]
+        return [send("لطفاً یکی از گزینه‌ها را انتخاب کنید."), *_quiz_ask(block, qs, d, i)]
     actions = []
     if block.personality:  # no right answers: each option counts toward an outcome
         tally = d.setdefault("tally", {})
@@ -2231,7 +2316,7 @@ def _quiz(spec, session, block: QuizBlock, text, store, now):
             actions.append(send("✅ درست!" if right else f"❌ نادرست. پاسخ درست: {q.options[q.correct]}"))
     if i + 1 < len(order):
         session["step"] = i + 1
-        return [*actions, *_quiz_ask(block, d, i + 1)]
+        return [*actions, *_quiz_ask(block, qs, d, i + 1)]
     total, score = len(order), d["score"]
     who = session.get("cust_name") or "مشتری"
     if block.personality:

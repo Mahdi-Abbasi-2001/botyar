@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import engine
-from .models import Product, Record, TimeOff
+from .models import QuizQuestionRow, Product, Record, TimeOff
 
 
 class SqlStore:
@@ -10,6 +10,17 @@ class SqlStore:
 
     def __init__(self, db: Session, bot_id: int, sandbox: bool):
         self.db, self.bot_id, self.sandbox = db, bot_id, sandbox
+        self.member_fn = None  # set by the channel (live chats only): (channel, cust) -> True / False / None
+
+    def quiz_questions(self, block_id):
+        q = select(QuizQuestionRow).where(QuizQuestionRow.bot_id == self.bot_id, QuizQuestionRow.block_id == block_id).order_by(QuizQuestionRow.position, QuizQuestionRow.id)
+        return [{"question": r.question, "options": r.options, "correct": r.correct} for r in self.db.scalars(q)]
+
+    def member(self, channel, cust, session):
+        """Live chats ask the messenger; the simulator cannot join a channel, so the customer counts as a member after pressing «عضو شدم»."""
+        if self.sandbox or self.member_fn is None:
+            return bool((session.get("data") or {}).get("_pressed"))
+        return self.member_fn(channel, cust)
 
     def _rows(self, collection):
         q = select(Record).where(Record.bot_id == self.bot_id, Record.collection == collection, Record.sandbox == self.sandbox)

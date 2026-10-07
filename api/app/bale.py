@@ -490,8 +490,11 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
     pub = own_pub
     welcome_now = False
     refrow = None
+    deep = None  # a link to ONE piece of content: the customer lands on that block (and its channel join) instead of the menu
     if kind == "own" and t.startswith("/start"):
         refrow = referral.resolve(db, t[6:].strip())
+        mdeep = re.fullmatch(r"/start go-([a-z0-9_]{1,40})", t)
+        deep = mdeep.group(1) if mdeep else None
     if kind == "shared":
         # A customer reaches a business's bot through its link (ble.ir/<bot>?start=CODE, t.me/<bot>?start=CODE: the
         # messenger sends "/start CODE") or by picking it from the directory. A code typed as a message is NOT accepted.
@@ -509,6 +512,9 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
         found = None
         payload = t[6:].strip() if t.startswith("/start") else ""
         picked = re.fullmatch(r"bdir:(\d{1,12})", t)
+        mdeep = re.fullmatch(r"([A-Za-z0-9]{4,12})-([a-z0-9_]{1,40})", payload)  # CODE-<block id>
+        if mdeep:
+            payload, deep = mdeep.group(1), mdeep.group(2)
         refrow = referral.resolve(db, payload)
         if refrow is not None:  # an invite link: it names the business through the inviter
             found = db.scalars(select(Pub).where(Pub.bot_id == refrow.bot_id, Pub.mode == "shared")).first()
@@ -552,11 +558,13 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
             return
         if welcome_now:
             muted = state.get("muted")
-            state, t = engine.new_session(), "/start"
+            state, t = engine.new_session(), (f"go:{deep}" if deep else "/start")
             if muted:
                 state["muted"] = True
         elif kind == "shared" and t.startswith("/start"):
-            t = "/start"
+            t = f"go:{deep}" if deep else "/start"
+        elif deep and t.startswith("/start"):
+            t = f"go:{deep}"
         frm = (msg or cq or {}).get("from") or {}
         if frm.get("first_name"):
             state["cust_name"] = str(frm["first_name"])[:40]
@@ -608,6 +616,7 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
         wallet = wallet_token(db, pub) if ch.payments else ""
         state["pay_ok"], state["pay_sim"] = bool(wallet), False  # pay_sim (the fake pay button) must never be on in a real chat
         store = SqlStore(db, pub.bot_id, sandbox=False)
+        store.member_fn = lambda channel, cust: gate.is_member(ch, token, channel, cust)
         actions = engine.handle(spec, state, t, store, matcher=faq_index.matcher_for(db, pub.bot_id, spec), clicked=clicked_message_id is not None)
         anon_others: list[dict] = []
         if any(a["type"].startswith("anon_") for a in actions):

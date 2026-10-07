@@ -95,6 +95,11 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
   if (b.type === "message")
     return (
       <>
+        {b.join?.length ? (
+          <span className="rounded-[10px] border border-saffron/40 bg-saffron/10 px-3 py-2 text-xs leading-6">
+            🔒 این محتوا فقط پس از عضویت در <span dir="ltr">{b.join.map((c) => c.channel).join("، ")}</span> ارسال می‌شود. ربات باید مدیر این کانال‌ها باشد.
+          </span>
+        ) : null}
         <p className="m-0 whitespace-pre-line text-sm leading-7 text-fg-2">{b.text}</p>
         {b.media && b.media !== "none" && <span className="text-xs text-mute">📎 {b.media === "image" ? "عکس" : "فایل"} پیوست می‌شود؛ آن را از بخش «فایل‌ها» بارگذاری کنید.</span>}
         {b.location && <span className="text-xs text-mute">📍 موقعیت روی نقشه ({b.location.latitude}, {b.location.longitude})</span>}

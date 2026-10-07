@@ -80,6 +80,12 @@ Publish with **your own bot**, add the wallet token in «پرداخت آنلای
 **Expect:** score at the end, pass/fail text; one attempt option works when requested.
 **Edge:** answer by typing instead of pressing; leave halfway and return with «منو» then restart → a clean restart; shuffle on → each question once.
 
+## 11b. Question bank for quizzes («سؤال‌ها» tab)
+**Prompt:** «یک آزمون ۳۰ سؤالی از تاریخ ایران بساز، هر بار ۱۰ سؤال تصادفی نشان بده، نمره‌ی قبولی ۷۰٪.» → the bot is built with a few sample questions and the agent says the rest is added from «سؤال‌ها».
+**In the tab:** add one question by hand (the circle marks the right option); paste a table with columns «سؤال / گزینه ۱..۴ / پاسخ» (answer as 1-4 or الف/ب/ج/د) → preview, then save; paste plain text and upload a photo or PDF of questions → read by the model, check every answer; «ساخت سؤال از روی موضوع» with 10 questions → review, drop the wrong ones with ✕, save; edit and delete saved questions; «بازگشت به سؤال‌های داخل ربات».
+**Customer:** take the quiz in the phone preview: 10 random questions each time, different on the next attempt; result and pass/fail text; the same question never appears twice in one attempt.
+**Edge:** a table row with a missing answer or only one option (reported and skipped); the same question imported twice (reported as duplicate); a pass mark with fewer questions in the bank than `pick`; delete a question while a customer is mid-quiz (the customer is reset politely); another owner's bot (404); more than 500 questions (refused); the daily import cap.
+
 ## 12. Referral / invite (growth)
 **Prompt:** «برنامه‌ی دعوت دوستان بساز: هر کس ۳ نفر را دعوت کند یک قهوه‌ی رایگان بگیرد.»
 **Customer:** get the personal link; open it from a second account.
@@ -93,6 +99,13 @@ Publish with **your own bot**, add the wallet token in «پرداخت آنلای
 ## 14. Anonymous chat ★ (Bale/Telegram only)
 **Prompt:** «چت ناشناس بین مشتری‌ها بساز.»
 **Edge:** one person alone in the queue (waits, can cancel), two people matched, links/phone numbers blocked by the filter, more than 20 messages a minute, report → conversation ends and the owner gets the last messages, banned customer cannot re-enter.
+
+## 15b. Content behind a channel join ★ (real Bale/Telegram only)
+**Prompt:** «ربات جوین اجباری بساز: مشتری با لینک بیاید، برای گرفتن فایل آموزش PDF باید در کانال‌های @channel_one و @channel_two عضو شود و بعد فایل و لینک دانلود را بگیرد.»
+Then upload the PDF in «فایل‌ها», make the bot **admin of both channels**, publish, and copy the per-content link from «انتشار».
+**Customer:** open the content link → locked message with one button per channel and «✅ عضو شدم، بررسی کن» → press it before joining → still-missing list → join one → press → only the other is listed → join both → press → file + link arrive, then the menu.
+**Edge:** open the link from a second account that is already in both channels (content at once); bot not admin of a channel (customer is let through: fix by making the bot admin); a channel name typo (let through); another content block stays free; typing text while locked repeats the lock message; Telegram uses `t.me/<channel>` buttons; the shared bot's link has the form `?start=CODE-<block id>`, an own bot's `?start=go-<block id>`.
+Unconfirmed on real Bale: what `getChatMember` returns for someone who is NOT a member (a «left» status, or an error). If it is an error, the customer would be let through: tell me.
 
 ## 15. Channel / group tools ★ (real Bale only)
 Forced join (customers must join a channel first), post forwarding, group moderation. See `docs/real-bale-checklist.md` section C first: this only works if Bale delivers channel/group messages to bots.

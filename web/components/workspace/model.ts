@@ -14,7 +14,8 @@ export type Slot = { id: string; label: string; capacity: number; price?: number
 export type Item = { id: string; name: string; price: number; options: { name: string; choices: string[]; prices?: number[] }[] };
 export type Block =
   | { type: "message"; id: string; text: string; variants?: string[]; media?: "none" | "image" | "document" | "album"; album_size?: number; location?: { latitude: number; longitude: number } | null; links?: { label: string; url: string }[];
-      contact?: { phone: string; name: string } | null; hours?: { weekday: number; start: string; end: string }[] }
+      contact?: { phone: string; name: string } | null; hours?: { weekday: number; start: string; end: string }[];
+      join?: { channel: string; title?: string }[]; join_text?: string }
   | { type: "form"; id: string; title: string; fields: Field[]; done_text: string; confirm_before_submit?: boolean; one_per_customer?: boolean; max_submissions?: number; closes_on?: string; review?: boolean; hot_score?: number }
   | { type: "booking"; id: string; title: string; reminder_hours?: number; slots: Slot[]; waitlist: boolean; schedule?: Schedule | null; allow_cancel?: boolean; cancel_deadline_hours?: number; occurrences?: number; fields: Field[]; confirm_text: string; full_text: string; waitlist_text: string;
       closed_dates?: string[]; min_notice_hours?: number; max_active_per_customer?: number; max_party?: number;
@@ -25,7 +26,7 @@ export type Block =
       restock_alerts?: boolean; low_stock_alert?: number; repeat_order?: boolean }
   | { type: "menu"; id: string; title: string; items: { label: string; block: string }[] }
   | { type: "quiz"; id: string; title: string; questions: { question: string; options: string[]; correct: number; outcomes?: string[]; media?: "none" | "image" }[]; result_text?: string; show_answers?: boolean; shuffle?: boolean; pick?: number; pass_percent?: number; one_attempt?: boolean;
-      pass_code?: string; personality?: { id: string; title: string; text: string }[] }
+      pass_code?: string; show_history?: boolean; personality?: { id: string; title: string; text: string }[] }
   | { type: "referral"; id: string; title: string; text?: string; goal: number; reward_text?: string; reward_code?: string; tiers?: { goal: number; reward_text: string; reward_code?: string }[]; count_after?: "join" | "order" }
   | { type: "anon_chat"; id: string; title: string; intro_text?: string; topics?: string[]; max_minutes?: number }
   | { type: "feedback"; id: string; title: string; prompt_text?: string; comment_text?: string; thanks_text?: string; aspects?: string[]; follow_up_below?: number; after?: string; after_hours?: number }
@@ -97,6 +98,7 @@ export function blockExtras(b: Block): string[] {
   const hours = (d: { weekday: number; start: string; end: string }[]) =>
     d.map((w) => `${WEEKDAYS[w.weekday]} ${w.start} تا ${w.end}`).join("؛ ").replace(/\d/g, (x) => "۰۱۲۳۴۵۶۷۸۹"[+x]);
   if (b.type === "message") {
+    if (b.join?.length) out.push("قفل عضویت: محتوا فقط پس از عضویت در " + b.join.map((c) => c.channel).join("، ") + " ارسال می‌شود");
     if (b.links?.length) out.push("دکمه‌ی لینک: " + b.links.map((l) => l.label).join("، "));
     if (b.hours?.length) out.push(`«الان باز / بسته» از روی ساعت کاری: ${hours(b.hours)}`);
     if (b.contact) out.push(`کارت تماس: ${b.contact.name} (${b.contact.phone})`);

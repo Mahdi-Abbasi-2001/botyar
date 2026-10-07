@@ -113,3 +113,20 @@ def test_every_booking_step_can_go_back_to_the_menu():
     assert ("بازگشت به منو", "/menu") in buttons(out)
     out = handle(sp, s, "/menu", st, datetime(2026, 10, 7, 10, 0))
     assert s["block"] is None and ("ثبت سفارش", "m:0") in buttons(out)
+
+
+def test_quiz_history_is_a_builtin_entry_and_lists_only_my_results():
+    quiz = {"type": "quiz", "id": "q", "title": "آزمون", "show_history": True,
+            "questions": [{"question": f"سؤال شماره {i}", "options": ["درست", "غلط"], "correct": 0} for i in range(2)]}
+    sp = spec(quiz, menu=[{"label": "آزمون", "block": "q"}])
+    assert ("نتیجه‌های من", "m:1") in buttons([{"buttons": [{"text": b["text"], "data": b["data"]} for b in handle(sp, new_session(), "/start", MemoryStore())[-1]["buttons"]]}])
+    st = MemoryStore()
+    mine, other = chat(sp, st, "bale:1")[0], chat(sp, st, "bale:2")[0]
+    for s in (mine, other):
+        handle(sp, s, "m:0", st)
+        handle(sp, s, "qa:0", st)
+        handle(sp, s, "qa:0", st)
+    first = handle(sp, mine, "m:1", st)
+    assert "آزمون: 2 از 2 (100٪)" in first[0]["text"] and first[0]["text"].count("•") == 1   # only this customer's attempt
+    empty = handle(sp, chat(sp, st, "bale:3")[0], "m:1", st)
+    assert "هنوز در آزمونی شرکت نکرده‌اید" in empty[0]["text"]

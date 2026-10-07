@@ -2,11 +2,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, isPlanLimit } from "@/lib/api";
 import { PlanLimitNote, fa } from "@/components/ui";
-import { ShareLink } from "@/components/workspace/ShareLink";
+import { ContentLinks, ShareLink } from "@/components/workspace/ShareLink";
 import { BrandButton, ModeTile, OwnBotSetup, PlatformCard, StatusPill, SwitchToOwn } from "@/components/workspace/Messengers";
 
 type Tg = {
   enabled: boolean; published: boolean; latest_version: number; tests_ok: boolean; shared_bot_username: string; listed: boolean; sample_products: boolean;
+  contents?: { id: string; title: string; channels: string[] }[];
   mode?: "shared" | "own"; version?: number; code?: string; admin_code?: string; bot_username?: string; admin_linked?: boolean; up_to_date?: boolean;
 };
 
@@ -128,6 +129,7 @@ export function TelegramCard({ botId, allowSamples }: { botId: string; allowSamp
       ) : (
         <ShareLink brand url={`https://t.me/${handle}`} fileName={`telegram-${handle}`} hint="ربات اختصاصی شما فعال است. این لینک را در اختیار مشتریان قرار دهید." />
       )}
+      <ContentLinks items={tg.contents ?? []} link={(id) => `https://t.me/${handle}?start=${tg.mode === "shared" ? `${tg.code}-${id}` : `go-${id}`}`} />
       {tg.mode === "shared" && <SwitchToOwn p="telegram" busy={busy} token={token} setToken={setToken} minToken={20} onSwitch={() => publish("own")} />}
       <div className="mt-3 border-t border-line pt-3 text-sm leading-7">
         {tg.admin_linked ? (

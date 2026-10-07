@@ -62,6 +62,22 @@ def verify(ch, token: str, spec: BotSpec, state: dict, chat_id: str, now: dateti
     return "blocked"
 
 
+def is_member(ch, token: str, channel: str, cust: str) -> bool | None:
+    """True / False for one customer in one channel; None when it cannot be checked (the caller then lets the customer through)."""
+    try:
+        user_id = int(str(cust).split(":", 1)[1])
+    except (IndexError, ValueError):
+        return None
+    try:
+        res = ch.call(token, "getChatMember", {"chat_id": channel, "user_id": user_id})
+    except Exception as e:  # noqa: BLE001
+        log.warning("content join check failed for %s (%s): letting the customer through", channel, e)
+        return None
+    if not isinstance(res, dict):
+        return None
+    return res.get("status", "") in MEMBER
+
+
 def setup_status(ch, token: str, spec: BotSpec) -> dict:
     """For the owner's panel: is the bot an admin of the channel (so that membership checks work)?"""
     if spec.gate is None:

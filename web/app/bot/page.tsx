@@ -14,18 +14,19 @@ import { DeliveryBanner } from "@/components/workspace/DeliveryBanner";
 import { MediaTab } from "@/components/workspace/MediaTab";
 import { InboxTab } from "@/components/workspace/InboxTab";
 import { CatalogTab } from "@/components/workspace/CatalogTab";
+import { QuizTab } from "@/components/workspace/QuizTab";
 import { PhoneSim } from "@/components/workspace/PhoneSim";
 import { progressOf, type Bot, type ChatMsg, type Rec, type RunResult, type RunStatus, type TestRes, type Ver } from "@/components/workspace/model";
 import { PageTransition } from "@/components/PageTransition";
 import { AppHeader } from "@/components/AppHeader";
 
-type Tab = "build" | "spec" | "tests" | "versions" | "publish" | "catalog" | "inbox" | "announce" | "customers" | "media" | "channels" | "records" | "try";
-const TAB_LABEL: Record<Tab, string> = { build: "گفت‌وگوی ساخت", spec: "ساختار", tests: "تست‌ها", versions: "نسخه‌ها", publish: "انتشار", catalog: "محصولات", inbox: "پیام‌ها", announce: "اطلاعیه", customers: "مشتریان", media: "فایل‌ها", channels: "کانال و گروه", records: "ثبت‌ها", try: "امتحان ربات" };
+type Tab = "build" | "spec" | "tests" | "versions" | "publish" | "catalog" | "quiz" | "inbox" | "announce" | "customers" | "media" | "channels" | "records" | "try";
+const TAB_LABEL: Record<Tab, string> = { build: "گفت‌وگوی ساخت", spec: "ساختار", tests: "تست‌ها", versions: "نسخه‌ها", publish: "انتشار", catalog: "محصولات", quiz: "سؤال‌ها", inbox: "پیام‌ها", announce: "اطلاعیه", customers: "مشتریان", media: "فایل‌ها", channels: "کانال و گروه", records: "ثبت‌ها", try: "امتحان ربات" };
 
 // The workspace in three jobs: make the bot, put it in front of customers, run it day to day.
 type Group = "make" | "share" | "manage";
 const GROUPS: { key: Group; label: string; icon: React.ComponentProps<typeof Icon>["name"]; tabs: Tab[] }[] = [
-  { key: "make", label: "ساخت", icon: "tree", tabs: ["build", "spec", "tests", "versions", "catalog", "media"] },
+  { key: "make", label: "ساخت", icon: "tree", tabs: ["build", "spec", "tests", "versions", "catalog", "quiz", "media"] },
   { key: "share", label: "انتشار", icon: "live", tabs: ["publish", "channels"] },
   { key: "manage", label: "مدیریت", icon: "list", tabs: ["records", "customers", "inbox", "announce"] },
 ];
@@ -225,8 +226,9 @@ function Workspace() {
   const passed = tests.filter((t) => t.passed).length;
   const hasCatalog = !!spec?.blocks?.some((b: any) => b.type === "catalog_order" && b.source === "table");
   const hasMedia = !!spec?.blocks?.some((b: any) => (b.type === "message" && b.media && b.media !== "none") || (b.type === "faq" && b.entries?.some((e: any) => e.media === "image")) || (b.type === "quiz" && b.questions?.some((q: any) => q.media === "image")));
+  const hasQuiz = !!spec?.blocks?.some((b: any) => b.type === "quiz" && !b.personality?.length);
   const hasContact = !!spec?.blocks?.some((b: any) => b.type === "contact");
-  const tabs: Tab[] = spec ? (["build", "spec", "tests", "versions", ...(hasCatalog ? ["catalog"] : []), "publish", ...(hasContact ? ["inbox"] : []), ...(hasMedia ? ["media"] : []), "announce", "customers", "channels", "records", "try"] as Tab[]) : ["build"];
+  const tabs: Tab[] = spec ? (["build", "spec", "tests", "versions", ...(hasCatalog ? ["catalog"] : []), ...(hasQuiz ? ["quiz"] : []), "publish", ...(hasContact ? ["inbox"] : []), ...(hasMedia ? ["media"] : []), "announce", "customers", "channels", "records", "try"] as Tab[]) : ["build"];
   const phoneTabs = tab === "build" || tab === "spec";
   const group = groupOf(tab);
   if (group) lastInGroup.current[group] = tab;
@@ -326,6 +328,7 @@ function Workspace() {
           {tab === "tests" && <TestsTab tests={tests} spec={spec} version={bot.version} />}
           {tab === "versions" && <VersionsTab versions={versions} spec={spec} />}
           {tab === "catalog" && spec && <CatalogTab botId={id!} />}
+          {tab === "quiz" && spec && <QuizTab botId={id!} />}
           {live === "off" && AFTER_PUBLISH[tab] && <AfterPublish tab={tab} onPublish={goPublish} testsOk={pub?.bale?.tests_ok !== false} />}
           {tab === "channels" && spec && live !== "off" && <ChannelsTab botId={id!} />}
           {tab === "media" && spec && <MediaTab botId={id!} />}

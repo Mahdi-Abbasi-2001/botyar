@@ -57,6 +57,20 @@ def check_samples(bot_id: int, allow: bool, db: Session):
         raise HTTPException(409, SAMPLE_MSG)
 
 
+def content_blocks(bot_id: int, db: Session) -> list[dict]:
+    """The blocks that hand out content behind a channel join: each gets its own link (so a post or a story can point straight at it)."""
+    latest = _latest(bot_id, db)
+    if latest is None:
+        return []
+    spec = BotSpec.model_validate(latest.spec)
+    out = []
+    for b in spec.blocks:
+        if b.type == "message" and b.join:
+            label = next((m.label for m in spec.menu if m.block == b.id), b.id)
+            out.append({"id": b.id, "title": label, "channels": [c.channel for c in b.join]})
+    return out
+
+
 def _status(bot_id: int, db: Session) -> dict:
     latest = _latest(bot_id, db)
     pub = db.scalars(select(Publication).where(Publication.bot_id == bot_id)).first()
@@ -69,6 +83,7 @@ def _status(bot_id: int, db: Session) -> dict:
         "listed": not bale._hidden(db, bot_id),
         "sample_products": sample_catalog(bot_id, db),
         "daily_summary": _digest_on(db, bot_id),
+        "contents": content_blocks(bot_id, db),
     }
     if pub:
         out |= {"mode": pub.mode, "version": pub.version, "code": pub.code, "admin_code": pub.admin_code,

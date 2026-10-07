@@ -52,7 +52,7 @@ def spec_errors(e: ValidationError) -> list[str]:
 DECLINE_MARK = "🚧 "  # starts a message that declines the request, or the line of a finished build listing what was left out
 
 
-RESERVED_LABELS = {x.replace(" ", "") for x in ("ثبتهای من", "سفارشهای من", "نوبتهای من", "ثبتنامهای من", "کدهای تخفیف")}
+RESERVED_LABELS = {x.replace(" ", "") for x in ("ثبتهای من", "سفارشهای من", "نوبتهای من", "ثبتنامهای من", "کدهای تخفیف", "نتیجههای من")}
 
 KEPT_FIELDS = ("hours", "links", "contact", "location", "media", "variants")
 REMOVAL_WORDS = ("حذف", "بردار", "پاک", "نمی‌خوام", "نمی‌خواهم", "نمیخوام", "نمی‌خواهیم", "دیگر نیاز", "نیازی ندارم", "جایگزین", "عوض", "تغییر بده")

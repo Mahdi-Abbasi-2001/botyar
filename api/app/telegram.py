@@ -26,7 +26,7 @@ from .auth import current_user
 from .config import settings
 from .db import get_db
 from .models import Publication, TgChatLink, TgPublication, User
-from .publish import _json, _latest, _own, _tests_ok, check_samples, sample_catalog
+from .publish import _json, _latest, _own, _tests_ok, check_samples, content_blocks, sample_catalog
 from .spec import BotSpec
 
 log = logging.getLogger("botyar.telegram")
@@ -102,6 +102,7 @@ def _status(bot_id: int, db: Session) -> dict:
         "shared_bot_username": shared_username() if settings.telegram_shared_bot_token else "",
         "listed": not bale._hidden(db, bot_id),
         "sample_products": sample_catalog(bot_id, db),
+        "contents": content_blocks(bot_id, db),
     }
     if pub:
         out |= {"mode": pub.mode, "version": pub.version, "code": pub.code, "admin_code": pub.admin_code,

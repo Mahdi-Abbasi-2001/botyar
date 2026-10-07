@@ -48,3 +48,35 @@ export function ShareLink({ url, fileName, hint, brand }: { url: string; fileNam
     </div>
   );
 }
+
+
+/** One link per piece of content that sits behind a channel join: a post, story or ad can send people straight to it. */
+export function ContentLinks({ items, link }: { items: { id: string; title: string; channels: string[] }[]; link: (id: string) => string }) {
+  const [copied, setCopied] = useState("");
+  if (!items.length) return null;
+  async function copy(id: string) {
+    try {
+      await navigator.clipboard.writeText(link(id));
+      setCopied(id);
+      setTimeout(() => setCopied(""), 1800);
+    } catch {
+      /* clipboard blocked: the link is still selectable */
+    }
+  }
+  return (
+    <div className="mt-4 rounded-xl border border-line-2 p-4 text-sm leading-7">
+      <p className="m-0 font-bold">لینک اختصاصی هر محتوا</p>
+      <p className="m-0 mb-2 text-mute">مشتری با این لینک مستقیم به همان محتوا می‌رسد و ربات اول عضویت او را در کانال‌ها بررسی می‌کند. ربات را مدیر هر کانال کنید، وگرنه عضویت قابل بررسی نیست.</p>
+      <div className="flex flex-col gap-2">
+        {items.map((c) => (
+          <div key={c.id} className="flex flex-wrap items-center gap-2 rounded-xl bg-raised px-3 py-2">
+            <span className="font-bold">{c.title}</span>
+            <span dir="ltr" className="text-xs text-mute">{c.channels.join("  ")}</span>
+            <span dir="ltr" className="min-w-0 flex-1 truncate text-left text-xs text-fg-2">{link(c.id).replace(/^https:\/\//, "")}</span>
+            <button type="button" onClick={() => copy(c.id)} className="min-h-9 rounded-lg border border-line-3 px-3 hover:border-saffron">{copied === c.id ? "کپی شد ✓" : "کپی لینک"}</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

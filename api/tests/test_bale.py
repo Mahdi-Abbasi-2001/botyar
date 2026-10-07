@@ -292,3 +292,47 @@ def test_a_pressed_menu_button_replaces_its_message(env):
     back["callback_query"]["message"]["message_id"] = 901
     c.post(url, json=back)
     assert [m for m, _ in calls if m in ("editMessageText", "sendMessage")] == ["editMessageText"]
+
+
+def test_a_content_link_opens_the_locked_content_and_check_delivers_it(env, monkeypatch):
+    from app.db import SessionLocal
+    from app.models import Bot, BotVersion, User
+
+    c, calls = env
+    status = {"v": "left"}
+
+    def fake(token, method, payload=None, timeout=15):
+        calls.append((method, payload or {}))
+        if method == "getMe":
+            return {"username": "botyar_test_bot"}
+        if method == "getChatMember":
+            return {"status": status["v"]}
+        return True
+
+    monkeypatch.setattr(bale, "api_call", fake)
+    tok = c.post("/api/auth/register", json={"username": "cj_x.com", "password": "123456"}).json()["token"]
+    H = {"Authorization": f"Bearer {tok}"}
+    spec = {"name": "g", "welcome": "سلام", "menu": [{"label": "هدیه", "block": "gift"}],
+            "blocks": [{"type": "message", "id": "gift", "text": "این هم هدیه", "join": [{"channel": "@news_fa", "title": "اخبار"}]}]}
+    with SessionLocal() as db:
+        uid = db.query(User).filter(User.username == "cj_x.com").one().id
+        bot = Bot(user_id=uid, name="g")
+        db.add(bot)
+        db.flush()
+        db.add(BotVersion(bot_id=bot.id, version=1, spec=spec, note=""))
+        db.commit()
+        bid = bot.id
+    st = c.post(f"/api/bots/{bid}/publish", json={"mode": "shared"}, headers=H).json()
+    assert st["contents"] == [{"id": "gift", "title": "هدیه", "channels": ["@news_fa"]}]
+    url = f"/api/hook/shared/{bale.shared_hook_secret()}"
+    calls.clear()
+    c.post(url, json=msg(555, f"/start {st['code']}-gift"))
+    out = sent(calls, 555)
+    assert out and "هدیه" not in out[-1]["text"] and any(b.get("callback_data") == "cj" for r in out[-1]["reply_markup"]["inline_keyboard"] for b in r)
+    calls.clear()
+    c.post(url, json=cb(555, "cj"))                                  # still not a member
+    assert not any("این هم هدیه" in p.get("text", "") for m, p in calls)
+    status["v"] = "member"
+    calls.clear()
+    c.post(url, json=cb(555, "cj"))
+    assert any("این هم هدیه" in p.get("text", "") for m, p in calls if m in ("sendMessage", "editMessageText"))

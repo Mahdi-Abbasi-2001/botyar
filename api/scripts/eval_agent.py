@@ -42,7 +42,7 @@ def label_problems(spec: dict) -> list[str]:
             out.append(f"filler word in label: «{lab}»")
         if lab.startswith("فروشگاه و ") or " و ثبت سفارش" in lab:
             out.append(f"redundant label: «{lab}»")
-        if lab in ("ثبت‌های من", "سفارش‌های من", "نوبت‌های من", "کدهای تخفیف"):
+        if lab in ("ثبت‌های من", "سفارش‌های من", "نوبت‌های من", "کدهای تخفیف", "نتیجه‌های من"):
             out.append(f"label collides with a built-in entry: «{lab}»")
     return out
 
