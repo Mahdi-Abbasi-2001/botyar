@@ -123,7 +123,7 @@ Try each in a fresh bot (describe it to the agent in Persian, one sentence each)
 
 1. **Talk to the owner.** «ربات فروشگاه گل که مشتری‌ها بتوانند برای من پیام بفرستند». In the simulator pick «پیام به مدیر», type a message → you get «پیام شما ارسال شد». Open the **پیام‌ها** tab (check «فقط آزمایشی») → reply. On Bale (after publishing): the reply arrives in the customer's chat as «✉️ پاسخ مدیر».
 2. **Ratings.** «بخش ثبت نظر مشتری با ستاره ۱ تا ۵». Tap ⭐⭐⭐⭐, write a comment (or «رد کردن»). The structure tab shows the average; the same customer can rate at most 5 times a day.
-3. **Reschedule.** In a bot with appointments: book, open «ثبت‌های من», pick the booking → «🔄 تغییر زمان», choose another time. The old place is freed only after the new one is confirmed; a full date is refused (you keep the old one).
+3. **Reschedule.** In a bot with appointments: book, open «نوبت‌های من», pick the booking → «🔄 تغییر زمان», choose another time. The old place is freed only after the new one is confirmed; a full date is refused (you keep the old one).
 4. **Reminders.** Ask for «۲۴ ساعت قبل از نوبت یادآوری بده». Can't be seen in the simulator (it needs a real clock and a Bale chat); check the booking card says «یادآوری ۲۴ ساعت قبل». The server sends one message per booking; a booking made inside the window gets none.
 5. **Announcements.** Tab **اطلاعیه** (bot must be published): write text → preview → send. Customers who sent /stop are skipped; max 3 per day; every announcement ends with the /stop hint.
 6. **Delivery fee + discount codes.** «هزینه ارسال ۳۰ هزار تومان، رایگان بالای ۲۰۰ هزار، کد YALDA ده درصد، حداکثر ۵ بار». At checkout the bot asks «کد تخفیف دارید؟»; try a wrong code, the right code in lowercase, and cancel an order to see the use come back.
@@ -150,7 +150,7 @@ All of these need a real messenger; use `docs/real-bale-checklist.md` (sections 
 5. **Outages**: if Bale/Telegram is unreachable the workspace shows an amber banner (messenger down, messages queued, messages lost in 24 h). Unreachable messenger → messages wait in a queue for up to 30 minutes.
 6. **Plans (demo)**: `/pricing/` and `/account/` — upgrading simulates a payment and activates the plan at once.
 
-### Station 4c — Customers cancelling («ثبت‌های من») (new)
+### Station 4c — Customers cancelling («سفارش‌های من» / «نوبت‌های من») (new)
 
 **What it is:** when a booking or order block allows it (the agent turns it on by default; say «مشتری نتونه لغو کنه» to turn it off), the bot's menu gets a built-in last button **«ثبت‌های من»**. The customer sees only their OWN active bookings/orders, taps one, confirms, and it is cancelled.
 **Rules to check:** a cancelled booking frees its place; **the first person waiting for the SAME date is promoted and gets a message** (and the owner gets ❌ and ✅ notifications); a deadline («تا ۲۴ ساعت قبل») blocks late cancels; an order can only be cancelled for a short window after it is placed (default 30 min) and its stock goes back on the shelf; past classes are not listed.

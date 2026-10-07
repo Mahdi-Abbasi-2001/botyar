@@ -44,7 +44,7 @@ def test_no_cancel_entry_unless_a_block_allows_it():
     out = Chat(spec, MemoryStore(), "bale:1").say("/start")
     assert [b["text"] for b in out[-1]["buttons"]] == ["ثبت‌نام"]
     out = Chat(booking_spec(), MemoryStore(), "bale:1").say("/start")
-    assert [b["text"] for b in out[-1]["buttons"]] == ["ثبت‌نام", "ثبت‌های من"] and out[-1]["buttons"][-1]["data"] == "m:1"
+    assert [b["text"] for b in out[-1]["buttons"]] == ["ثبت‌نام", "ثبت‌نام‌های من"] and out[-1]["buttons"][-1]["data"] == "m:1"
 
 
 def test_with_nothing_booked_the_list_is_empty():

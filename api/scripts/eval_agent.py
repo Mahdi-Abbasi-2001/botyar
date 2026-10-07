@@ -27,6 +27,26 @@ INSIST = "همین الان بساز، هر چی خودت صلاح می‌دون
 MAX_COST, MAX_SECONDS = 0.02, 150
 
 
+BAD_LABEL_WORDS = ("مشاهده", "بخش", "امکانات", "سرویس")
+
+
+def label_problems(spec: dict) -> list[str]:
+    """Menu labels the owner's customers read: short, one idea, no filler (see «BUTTON LABELS» in prompts.py)."""
+    out = []
+    for m in spec.get("menu", []):
+        lab = m["label"]
+        words = lab.replace("‌", " ").split()
+        if len(words) > 4:
+            out.append(f"label too long: «{lab}»")
+        if any(w in lab for w in BAD_LABEL_WORDS):
+            out.append(f"filler word in label: «{lab}»")
+        if lab.startswith("فروشگاه و ") or " و ثبت سفارش" in lab:
+            out.append(f"redundant label: «{lab}»")
+        if lab in ("ثبت‌های من", "سفارش‌های من", "نوبت‌های من", "کدهای تخفیف"):
+            out.append(f"label collides with a built-in entry: «{lab}»")
+    return out
+
+
 def kinds(spec):
     return [(b["type"], b.get("source", "")) for b in spec["blocks"] if b["type"] != "admin_notify"]
 
@@ -240,8 +260,15 @@ SUGGEST3_CASES = [
      lambda s, m: None if "یادآوری" not in m and "انتخاب آرایشگر" not in m else "offered something the owner already specified: " + m[:400]),
 ]
 
+CODES_VISIBLE_CASES = [
+    ("codes-visible-by-default", "ربات فروشگاه لباس: تی‌شرت ۳۵۰ هزار تومان و شلوار ۵۰۰ هزار تومان. کد تخفیف YALDA ده درصد برای همه. نام و آدرس بگیر.", "done",
+     lambda s, m: None if _orders(s) and all(c.get("visible", True) for c in _orders(s)[0]["discount_codes"]) and _orders(s)[0]["discount_codes"] and "کدهای تخفیف" in m else "visible code and a note about the «کدهای تخفیف» button expected: " + m[:300]),
+    ("codes-private-when-asked", "ربات فروشگاه لباس: تی‌شرت ۳۵۰ هزار تومان. یک کد تخفیف خصوصی VIP50 پنجاه هزار تومان فقط برای مشتری‌های ویژه‌ام که خودم بهشون می‌دم، نباید برای بقیه نمایش داده بشه. نام و آدرس بگیر.", "done",
+     lambda s, m: None if _orders(s) and [c for c in _orders(s)[0]["discount_codes"] if c["code"].upper() == "VIP50" and c.get("visible") is False] else "the private code must have visible=false"),
+]
+
 # appended by later features (appointment calendars, FAQ, owner chat, delivery/discounts) — see EXTRA_CASES below
-EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES, *RANDOM_CASES, *MENU_QUIZ_CASES, *MEDIA_CASES, *GATE_CASES, *REFERRAL_CASES, *ANON_CASES, *EXTRAS_CASES, *SUGGEST_CASES, *GROWTH_CASES, *SUGGEST2_CASES, *SUGGEST3_CASES]
+EXTRA_CASES: list = [*APPOINTMENT_CASES, *FAQ_CASES, *CONTACT_CASES, *PRICING_CASES, *FEEDBACK_CASES, *PERSONALIZE_CASES, *PARTIAL_CASES, *RANDOM_CASES, *MENU_QUIZ_CASES, *MEDIA_CASES, *GATE_CASES, *REFERRAL_CASES, *ANON_CASES, *EXTRAS_CASES, *SUGGEST_CASES, *GROWTH_CASES, *SUGGEST2_CASES, *SUGGEST3_CASES, *CODES_VISIBLE_CASES]
 
 
 def run_case(c, i, name, text, want_status, check):
@@ -276,6 +303,9 @@ def run_case(c, i, name, text, want_status, check):
         err = check(spec, msg)
         if err:
             errors.append(err)
+        errors.extend(label_problems(spec))
+    if os.environ.get("EVAL_LABELS"):
+        print(f"   LABELS {name}: {[m['label'] for m in spec.get('menu', [])]}")
     if cost > MAX_COST:
         errors.append(f"cost ${cost:.4f} over ${MAX_COST}")
     if secs > MAX_SECONDS:

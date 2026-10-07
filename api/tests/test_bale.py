@@ -251,10 +251,10 @@ def test_cancel_on_bale_promotes_the_waiting_customer_and_messages_them(env):
         for step in (cb(chat, "m:0"), cb(chat, "s:once"), msg(chat, "مشتری"), msg(chat, phone)):
             c.post(url, json=step)
     assert "لیست انتظار" in sent(calls, 902)[-2]["text"]
-    # the menu now has the built-in «ثبت‌های من» button, with an ASCII callback
+    # the menu now has the built-in «ثبت‌نام‌های من» button, with an ASCII callback
     c.post(url, json=msg(901, "/start"))
     last_menu = sent(calls, 901)[-1]["reply_markup"]["inline_keyboard"]
-    assert last_menu[-1][0]["callback_data"] == "m:1" and "ثبت‌های من" in last_menu[-1][0]["text"]
+    assert last_menu[-1][0]["callback_data"] == "m:1" and "ثبت‌نام‌های من" in last_menu[-1][0]["text"]
     c.post(url, json=cb(901, "m:1"))
     listing = sent(calls, 901)[-1]
     rid = next(r["data"] for r in c.get(f"/api/bots/{bid}/records?sandbox=false", headers=H).json() if r["data"]["status"] == "confirmed") and 1

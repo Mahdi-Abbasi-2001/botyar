@@ -42,8 +42,9 @@ def _is_messenger_customer(cust: str) -> bool:
 
 
 # ---------- reminders ----------
-def reminder_text(b, r: dict, start) -> str:
-    tail = "\nلطفاً با دکمه‌های زیر اعلام کنید می‌آیید یا نه." if b.reminder_confirm else "\nبرای لغو یا تغییر زمان، از «ثبت‌های من» در منو استفاده کنید."
+def reminder_text(b, r: dict, start, spec=None) -> str:
+    mine = engine.my_label(spec) if spec is not None else engine.MY_LABEL
+    tail = "\nلطفاً با دکمه‌های زیر اعلام کنید می‌آیید یا نه." if b.reminder_confirm else f"\nبرای لغو یا تغییر زمان، از «{mine}» در منو استفاده کنید."
     return f"⏰ یادآوری: {r.get('slot_label', b.title)} — {jalali_str(start.date())} ساعت {start:%H:%M}." + tail
 
 
@@ -73,7 +74,7 @@ def due_reminders(db: Session, now) -> int:
                     late = booked_at and datetime.fromisoformat(booked_at) >= start - timedelta(hours=b.reminder_hours)
                     store.update(b.id, r["id"], _reminded=True)  # mark first: a crash must never cause a repeat
                     if not late:
-                        todo.append({"type": "notify_customer", "cust": r["_cust"], "text": reminder_text(b, r, start),
+                        todo.append({"type": "notify_customer", "cust": r["_cust"], "text": reminder_text(b, r, start, spec),
                                      "buttons": engine.reminder_buttons(spec, b, r)})
         db.commit()
         sent += bale.send_customer_actions(db, bot_id, todo)

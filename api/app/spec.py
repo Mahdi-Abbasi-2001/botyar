@@ -360,6 +360,7 @@ class DiscountCode(BaseModel):
     amount: int = Field(default=0, ge=0)           # fixed Toman off
     min_total: int = Field(default=0, ge=0)        # minimum goods total for the code to apply
     max_uses: int = Field(default=0, ge=0)         # 0 = unlimited; cancelled orders give their use back
+    visible: bool = True                           # listed for every customer in the built-in «کدهای تخفیف» menu button; False = a private code the owner hands out
 
     @model_validator(mode="after")
     def _one_kind(self):

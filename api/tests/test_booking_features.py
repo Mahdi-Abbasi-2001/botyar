@@ -69,7 +69,7 @@ def test_one_active_booking_per_customer_but_rescheduling_still_works():
     spec, store = salon(services=False, max_active_per_customer=1), MemoryStore()
     c = Chat(spec, store, "a")
     c.say("/start", "m:0", f"d:{SUN}", "t:0900", "سارا", "09121234567")
-    assert "۱ نوبت فعال دارید" in txt(c.say("/start", "m:0")) and "ثبت‌های من" in txt(c.say("/start", "m:0"))
+    assert "۱ نوبت فعال دارید" in txt(c.say("/start", "m:0")) and "نوبت‌های من" in txt(c.say("/start", "m:0"))
     c.say("/start", "m:1", "x:0:1", "xr", f"d:{SUN}", "t:1000")  # move it: allowed
     assert [(r["time"], r["status"]) for r in store.find("b")] == [("09:00", "cancelled"), ("10:00", "confirmed")]
 

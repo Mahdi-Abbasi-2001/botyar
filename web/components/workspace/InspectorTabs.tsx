@@ -211,7 +211,7 @@ function BlockBody({ b, spec, records }: { b: Block; spec: Spec; records: Rec[] 
               </span>
             )}
             {b.discount_codes?.map((c) => (
-              <span key={c.code}>کد <b dir="ltr">{c.code}</b>: {c.percent ? `${fa(c.percent)}٪` : toman(c.amount)} تخفیف{c.min_total ? ` · برای سفارش‌های دست‌کم ${toman(c.min_total)}` : ""}{c.max_uses ? ` · ${fa(c.max_uses)} بار` : ""}</span>
+              <span key={c.code}>کد <b dir="ltr">{c.code}</b>: {c.percent ? `${fa(c.percent)}٪` : toman(c.amount)} تخفیف{c.min_total ? ` · برای سفارش‌های دست‌کم ${toman(c.min_total)}` : ""}{c.max_uses ? ` · ${fa(c.max_uses)} بار` : ""}{c.visible === false ? " · خصوصی (در منو نمایش داده نمی‌شود)" : " · در دکمه‌ی «کدهای تخفیف» نمایش داده می‌شود"}</span>
             ))}
           </div>
         )}

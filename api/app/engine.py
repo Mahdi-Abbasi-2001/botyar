@@ -19,7 +19,8 @@ from .spec import PLACEHOLDER, jalali_date, norm_code, BotSpec, BookingBlock, Ca
 
 log = logging.getLogger("botyar.engine")
 STALE_RESETS = {"count": 0}  # tests assert this stays 0 unless a bot really changed under a conversation
-MY_LABEL = "ثبت‌های من"  # built-in menu entry, present when a block allows cancelling
+MY_LABEL = "ثبت‌های من"  # fallback only: the real label is my_label(spec), named after what the bot takes (orders, appointments, sign-ups)
+CODES_LABEL = "کدهای تخفیف"  # built-in menu entry, present when a shop has discount codes that are visible to customers
 MY_BLOCK = "__my__"
 STATUS_FA = {"confirmed": "تأیید شده", "waitlisted": "در لیست انتظار", "new": "سفارش جدید", "preparing": "در حال آماده‌سازی", "ready": "آماده", "done": "تحویل داده شد", "cancelled": "لغو شده", "unanswered": "بدون پاسخ", "awaiting_payment": "در انتظار پرداخت", "handled": "رسیدگی شد", "no_show": "حاضر نشد", "awaiting_transfer": "منتظر واریز", "transfer_sent": "واریز شد، منتظر تأیید",
              "received": "دریافت شد", "reviewing": "در حال بررسی", "accepted": "پذیرفته شد", "rejected": "رد شد"}
@@ -349,11 +350,42 @@ def _field_step(session, fields: list[FormField], text: str) -> tuple[bool, list
     return False, [_ask(fields[nxt], d)]
 
 
+def my_label(spec: BotSpec) -> str:
+    """«سفارش‌های من» for a shop, «نوبت‌های من» for appointments, «ثبت‌نام‌های من» for classes; several kinds are named together."""
+    nouns = []
+    blocks = [b for _, b in _cancel_blocks(spec)]
+    if any(b.type == "catalog_order" for b in blocks):
+        nouns.append("سفارش")
+    if any(b.type == "booking" and b.schedule for b in blocks):
+        nouns.append("نوبت")
+    if any(b.type == "booking" and not b.schedule for b in blocks):
+        nouns.append("ثبت‌نام")
+    if not nouns:
+        return MY_LABEL
+    last = nouns[-1] + "‌های من"
+    return last if len(nouns) == 1 else "، ".join(n + "‌ها" for n in nouns[:-1]) + " و " + last
+
+
+def _visible_codes(spec: BotSpec) -> list[tuple[int, int, object, object]]:
+    """(block index, code index, block, code) for every discount code customers may see."""
+    return [(bi, ci, b, c) for bi, b in enumerate(spec.blocks) if b.type == "catalog_order" for ci, c in enumerate(b.discount_codes) if c.visible]
+
+
+def builtin_entries(spec: BotSpec) -> list[tuple[str, str]]:
+    """The menu entries the engine adds after the owner's own: (key, label), in order. Their data is m:<len(menu)+position>."""
+    out = []
+    if _cancel_blocks(spec):
+        out.append(("mine", my_label(spec)))
+    if _visible_codes(spec):
+        out.append(("codes", CODES_LABEL))
+    return out
+
+
 def menu_actions(spec: BotSpec, prefix: str | None = None):
     text = prefix if prefix is not None else "از منوی زیر یکی را انتخاب کنید:"
     buttons = [_btn(m.label, f"m:{i}") for i, m in enumerate(spec.menu)]
-    if _cancel_blocks(spec):
-        buttons.append(_btn(MY_LABEL, f"m:{len(spec.menu)}"))
+    for pos, (_, label) in enumerate(builtin_entries(spec)):
+        buttons.append(_btn(label, f"m:{len(spec.menu) + pos}"))
     return send(text, buttons)
 
 
@@ -531,8 +563,9 @@ def quiz_media_key(block_id: str, i: int) -> str:
 
 
 def _from_menu(spec, session, text_n, store, now, rng=_RNG):
-    if _cancel_blocks(spec) and (text_n == f"m:{len(spec.menu)}" or text_n == MY_LABEL):
-        return _my_start(spec, session, store, now)
+    for pos, (key, label) in enumerate(builtin_entries(spec)):
+        if text_n in (f"m:{len(spec.menu) + pos}", label):
+            return _my_start(spec, session, store, now) if key == "mine" else _codes_view(spec, session, store)
     item = None
     m = re.fullmatch(r"m:(\d+)", text_n)
     if m and int(m.group(1)) < len(spec.menu):
@@ -599,7 +632,7 @@ def _start_block(spec, session, block, store, now, rng):
         n = sum(1 for r in store.find(block.id, _cust=session["cust"]) if _active(block, r, now))
         if n >= block.max_active_per_customer:
             _reset(session)
-            hint = " برای نوبت تازه، ابتدا یکی را از «ثبت‌های من» لغو کنید." if block.allow_cancel else ""
+            hint = f" برای نوبت تازه، ابتدا یکی را از «{my_label(spec)}» لغو کنید." if block.allow_cancel else ""
             return [send(fa_digits(f"شما در حال حاضر {n} نوبت فعال دارید و بیش از این ممکن نیست.") + hint), menu_actions(spec)]
     if block.type == "booking" and block.schedule:
         return _appt_start(spec, session, block, store, now)
@@ -1296,8 +1329,42 @@ def _after_zone(spec, session, block: CatalogOrderBlock, store, now=None):
     return _after_window(spec, session, block, store)
 
 
-def _code_prompt():
-    return send("کد تخفیف دارید؟ آن را بنویسید، وگرنه «ندارم» را بزنید.", [_btn("ندارم", "dc:no")])
+def _code_uses(store, block: CatalogOrderBlock, code) -> int:
+    return sum(1 for r in store.find(block.id) if norm_code(fa_norm(str(r.get("discount_code") or ""))) == norm_code(fa_norm(code.code)) and r.get("status") != "cancelled")
+
+
+def _code_line(block, code, store) -> str | None:
+    """One line describing a code for customers, or None when it can no longer be used."""
+    left = None
+    if code.max_uses:
+        left = code.max_uses - _code_uses(store, block, code)
+        if left <= 0:
+            return None
+    what = f"{code.percent}٪ تخفیف" if code.percent else f"{code.amount:,} تومان تخفیف"
+    cond = f" · برای سفارش بالای {code.min_total:,} تومان" if code.min_total else ""
+    rest = f" · {left} بار دیگر قابل استفاده است" if left is not None else ""
+    return f"• {code.code} — {what}{cond}{rest}"
+
+
+def _codes_view(spec, session, store):
+    """The built-in «کدهای تخفیف» entry: every visible code that still works, and a way to start an order."""
+    _reset(session)
+    lines, jump = [], []
+    for bi, ci, b, c in _visible_codes(spec):
+        line = _code_line(b, c, store)
+        if line:
+            lines.append(line)
+            if b.id not in [j[0] for j in jump]:
+                jump.append((b.id, b.title))
+    if not lines:
+        return [send("فعلاً کد تخفیف فعالی نداریم."), menu_actions(spec)]
+    text = "🎁 کدهای تخفیف فعال:\n" + "\n".join(lines) + "\n\nهنگام ثبت سفارش، کد را وارد کنید."
+    return [send(text, [_btn("ثبت سفارش", f"go:{jump[0][0]}"), _btn("بازگشت به منو", "/menu")])]
+
+
+def _code_prompt(block: CatalogOrderBlock | None = None):
+    buttons = [_btn(f"🎁 {c.code}", f"dc:{i}") for i, c in enumerate(block.discount_codes) if c.visible][:6] if block is not None else []
+    return send("کد تخفیف دارید؟ آن را بنویسید یا از کدهای زیر یکی را بزنید؛ وگرنه «ندارم» را بزنید." if buttons else "کد تخفیف دارید؟ آن را بنویسید، وگرنه «ندارم» را بزنید.", [*buttons, _btn("ندارم", "dc:no")])
 
 
 def _more_prompt():
@@ -1524,7 +1591,7 @@ def _no_window(block):
 def _after_window(spec, session, block, store):
     if block.discount_codes:
         session["step"] = "code"
-        return [_code_prompt()]
+        return [_code_prompt(block)]
     return _first_question(spec, session, store, block.fields)
 
 
@@ -1686,10 +1753,11 @@ def _order(spec, session, block: CatalogOrderBlock, text, store, now):
             d["_code"] = None
             return _first_question(spec, session, store, block.fields)
         subtotal = _cart_total(d["_cart"])
-        code = _find_code(block, text)
+        pick = re.fullmatch(r"dc:(\d+)", text_n)
+        code = block.discount_codes[int(pick.group(1))] if pick and int(pick.group(1)) < len(block.discount_codes) and block.discount_codes[int(pick.group(1))].visible else _find_code(block, text)
         err = _code_error(block, store, subtotal, code)
         if err:
-            return [send(err), _code_prompt()]
+            return [send(err), _code_prompt(block)]
         d["_code"] = code.code
         saved = _price(block, subtotal, code)["discount"]
         return [send(f"✅ کد تخفیف اعمال شد؛ {saved:,} تومان کمتر می‌پردازید."), *_first_question(spec, session, store, block.fields)]
