@@ -259,13 +259,15 @@ def records(bot_id: int, sandbox: bool = False, user: User = Depends(current_use
 from fastapi import BackgroundTasks  # noqa: E402
 
 from .agent import run_builder  # noqa: E402
+from . import datasets  # noqa: E402
 from .models import BuilderMessage, BuilderRun, LlmCall, VersionTests  # noqa: E402
 
 DAILY_RUN_LIMIT = 40  # per user per 24h: protects the OpenAI budget while the demo is public
 
 
 class BuilderIn(BaseModel):
-    text: str = Field(min_length=2, max_length=3000)
+    text: str = Field(default="", max_length=3000)
+    datasets: dict[str, list[dict]] | None = None  # tables the owner filled in (menu, quiz questions, sessions, FAQ, services)
 
 
 @app.post("/api/bots/draft")
@@ -293,10 +295,19 @@ def builder_send(bot_id: int, body: BuilderIn, tasks: BackgroundTasks, user: Use
         raise HTTPException(429, "سقف درخواست‌های روزانه پر شده است؛ فردا دوباره تلاش کنید")
     if db.scalar(select(func.count()).select_from(BuilderRun).where(BuilderRun.created_at >= since)) >= settings.global_daily_runs:
         raise HTTPException(503, "ظرفیت امروز ساخت ربات تکمیل شده است؛ لطفاً فردا دوباره تلاش کنید")
+    try:
+        tables = datasets.parse(body.datasets)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    text = body.text.strip()
+    if tables:
+        text = (text + "\n\n" if text else "جدول‌ها را پر کردم.\n\n") + datasets.to_text(tables)
+    if len(text) < 2:
+        raise HTTPException(422, "پیام خالی است")
     run = BuilderRun(bot_id=bot.id, status="running", events=[], result={})
     db.add(run)
     db.commit()
-    tasks.add_task(run_builder, run.id, bot.id, body.text)
+    tasks.add_task(run_builder, run.id, bot.id, text[:6000], tables)
     return {"run_id": run.id}
 
 
@@ -387,11 +398,13 @@ from .communities import router as communities_router  # noqa: E402
 
 app.include_router(communities_router)
 
+from .datasets_api import router as datasets_router  # noqa: E402
 from .quiz_bank import router as quiz_router  # noqa: E402
 from .referral import router as referral_router  # noqa: E402
 
 app.include_router(referral_router)
 app.include_router(quiz_router)
+app.include_router(datasets_router)
 
 from .outreach import router as outreach_router  # noqa: E402
 

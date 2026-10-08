@@ -3,7 +3,8 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { Icon, Stamp, fa } from "../ui";
-import { BLOCK_KIND, blockTitle, parseQuestions, toSteps, type ChatMsg, type Spec, type TestRes } from "./model";
+import { DatasetCard, initialTable, settled, toPayload, type Payload, type TableState } from "./DatasetCard";
+import { BLOCK_KIND, blockTitle, parseDatasets, parseQuestions, toSteps, type ChatMsg, type Spec, type TestRes } from "./model";
 
 const NEW_EXAMPLES = [
   "برای کلینیک دندانپزشکی‌ام یک ربات نوبت‌دهی می‌خواهم. شنبه ساعت ۹ صبح و دوشنبه ساعت ۵ عصر، هر کدام با ظرفیت ۸ نفر. نام و شماره‌ی موبایل بیمار را بگیرد و هر نوبت که ثبت شد به من خبر بدهد.",
@@ -21,7 +22,7 @@ type Props = {
   input: string;
   setInput: (s: string) => void;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
-  onSend: (text: string) => void;
+  onSend: (text: string, tables?: Payload) => void;
   botId: string;
   catalog: { total: number; sample: boolean } | null;  // the product table, when the bot has one
   onImport: () => void;                                 // opens «محصولات»
@@ -107,7 +108,7 @@ export function BuilderTab(p: Props) {
 
         {p.chat.map((m, i) => {
           const qs = m.role === "assistant" ? parseQuestions(m.content) : null;
-          if (qs && i === p.chat.length - 1 && lastQ) return <QuestionCards key={i} questions={qs} onSend={p.onSend} />;
+          if (qs && i === p.chat.length - 1 && lastQ) return <QuestionCards key={i} questions={qs} asks={parseDatasets(m.content)} botId={p.botId} onSend={p.onSend} />;
           if (qs) return <PastQuestions key={i} questions={qs} />;
           // something the agent can't build: the whole request (declined), or a detail a finished build left out.
           // Either way the owner can send it to the team as a support ticket.
@@ -199,19 +200,34 @@ function Timeline({ events, running }: { events: string[]; running: boolean }) {
   );
 }
 
-function QuestionCards({ questions, onSend }: { questions: string[]; onSend: (t: string) => void }) {
+function QuestionCards({ questions, asks, botId, onSend }: { questions: string[]; asks: { kind: string; title: string; note: string }[]; botId: string; onSend: (t: string, tables?: Payload) => void }) {
   const [answers, setAnswers] = useState<string[]>(() => questions.map(() => ""));
+  const [tables, setTables] = useState<TableState[]>(() => asks.map((a) => initialTable(a.kind)));
   const filled = answers.filter((a) => a.trim()).length;
+  const open = questions.length - filled + tables.filter((t, i) => !settled(asks[i].kind, t)).length;
   const submit = (fill: boolean) => {
     const a = answers.map((x) => x.trim() || (fill ? "هر طور صلاح می‌دانی" : ""));
-    onSend(questions.map((q, i) => `${fa(i + 1)}. ${q}\nجواب: ${a[i]}`).join("\n"));
+    const payload: Payload = {};
+    const later: string[] = [];
+    asks.forEach((ask, i) => {
+      if (tables[i].later) later.push(`جدول «${ask.title}» را بعداً وارد می‌کنم؛ نمونه بساز.`);
+      else payload[ask.kind] = toPayload(ask.kind, tables[i].rows);
+    });
+    const text = [...questions.map((q, i) => `${fa(i + 1)}. ${q}\nجواب: ${a[i]}`), ...later].join("\n");
+    onSend(text, Object.keys(payload).length ? payload : undefined);
   };
+  const total = questions.length + asks.length;
   return (
     <div className="anim-rise flex flex-col gap-3">
       <div className="flex gap-2 self-end">
-        <span className="rounded-[14px_14px_14px_4px] border border-line bg-panel px-3.5 py-2.5 text-sm leading-7">پیش از ساخت، {fa(questions.length)} سؤال کوتاه دارم.</span>
+        <span className="rounded-[14px_14px_14px_4px] border border-line bg-panel px-3.5 py-2.5 text-sm leading-7">
+          {asks.length && !questions.length ? `برای ساخت دقیق، ${asks.length > 1 ? "این جدول‌ها را" : "این جدول را"} پر کنید.` : `پیش از ساخت، ${fa(total)} مورد دارم.`}
+        </span>
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-saffron text-sm font-black text-ink">ب</span>
       </div>
+      {asks.map((ask, i) => (
+        <DatasetCard key={ask.kind} botId={botId} ask={ask} state={tables[i]} onChange={(s) => setTables((t) => t.map((x, j) => (j === i ? s : x)))} />
+      ))}
       {questions.map((q, i) => {
         const active = i === answers.findIndex((a) => !a.trim());
         return (
@@ -222,11 +238,11 @@ function QuestionCards({ questions, onSend }: { questions: string[]; onSend: (t:
           </label>
         );
       })}
-      <button onClick={() => submit(false)} disabled={filled < questions.length}
+      <button onClick={() => submit(false)} disabled={open > 0}
         className="min-h-[52px] rounded-2xl bg-saffron font-extrabold text-ink hover:bg-saffron-hi disabled:bg-raised disabled:text-mute">
-        {filled < questions.length ? `${fa(questions.length - filled)} سؤال باقی مانده` : "ساخت با همین پاسخ‌ها"}
+        {open > 0 ? `${fa(open)} مورد باقی مانده` : "ساخت با همین پاسخ‌ها"}
       </button>
-      <button onClick={() => submit(true)} className="min-h-11 text-[13px] text-mute hover:text-fg">بقیه را به انتخاب بات‌یار بگذار</button>
+      {questions.length > 0 && <button onClick={() => submit(true)} className="min-h-11 text-[13px] text-mute hover:text-fg">بقیه را به انتخاب بات‌یار بگذار</button>}
     </div>
   );
 }

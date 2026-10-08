@@ -15,6 +15,7 @@ import { MediaTab } from "@/components/workspace/MediaTab";
 import { InboxTab } from "@/components/workspace/InboxTab";
 import { CatalogTab } from "@/components/workspace/CatalogTab";
 import { QuizTab } from "@/components/workspace/QuizTab";
+import { type Payload } from "@/components/workspace/DatasetCard";
 import { PhoneSim } from "@/components/workspace/PhoneSim";
 import { progressOf, type Bot, type ChatMsg, type Rec, type RunResult, type RunStatus, type TestRes, type Ver } from "@/components/workspace/model";
 import { PageTransition } from "@/components/PageTransition";
@@ -141,9 +142,9 @@ function Workspace() {
     }
   }, [id, loadAll]);
 
-  const sendBuild = useCallback(async (raw: string) => {
+  const sendBuild = useCallback(async (raw: string, tables?: Payload) => {
     const t = raw.trim();
-    if (t.length < 2 || running) return;
+    if ((t.length < 2 && !tables) || running) return;
     setInput("");
     setError("");
     setLimit("");
@@ -151,10 +152,11 @@ function Workspace() {
     setStamped(false);
     setEvents([]);
     setTab("build");
-    setChat((c) => [...c, { role: "user", content: t }]);
+    const shown = tables ? [t, ...Object.entries(tables).map(([k, rows]) => `📋 ${k === "menu_items" ? "منو" : k === "quiz_questions" ? "سؤال‌ها" : k === "sessions" ? "جلسه‌ها" : k === "faq_entries" ? "پرسش‌ها" : "خدمت‌ها"}: ${fa(rows.length)} مورد`)].filter(Boolean).join("\n") : t;
+    setChat((c) => [...c, { role: "user", content: shown }]);
     let run_id: number;
     try {
-      ({ run_id } = await api<{ run_id: number }>(`/bots/${id}/builder`, { body: { text: t } }));
+      ({ run_id } = await api<{ run_id: number }>(`/bots/${id}/builder`, { body: { text: t, datasets: tables } }));
     } catch (e: any) {
       // the request never reached the agent: undo the optimistic message and give the text back
       setChat((c) => c.slice(0, -1));

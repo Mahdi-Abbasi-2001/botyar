@@ -125,6 +125,7 @@ Forced join (customers must join a channel first), post forwarding, group modera
 3. **Unsupported:** «ربات با پرداخت بیت‌کوین بساز» → says clearly what it cannot do and builds the rest; no mention of unrelated unsupported features.
 4. **Change request:** «ظرفیت کلاس شنبه را ۱۲ کن» → a diff in plain Persian, regression tests run, a new version appears; old version can be opened.
 5. **Failing test:** ask for something that makes a test fail → the agent repairs it and says so; if it cannot, the bot is not publishable.
+6a. **Tables instead of prose:** «بات ثبت سفارش برای کافه با منوی محدود» → besides the questions a 📋 table card «منو» appears; add rows by hand, paste from Excel, or upload a photo; a half-filled row is flagged and Send stays locked until each table is complete or marked «بعداً وارد می‌کنم». After the build every name and price is exactly what you typed (open the bot's products tab). Same for quiz questions (correct-answer number 1–4), workshop sessions (weekday = every week, Jalali date = one day), FAQ and appointment services.
 6. **Button names:** no «ثبت‌های من» as a menu item written by the agent (the engine adds the right one), no names longer than 3–4 words.
 7. **Persian copy:** «شما», standard written Persian, no slogans.
 

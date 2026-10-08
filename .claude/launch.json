@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "botyar",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd api && .venv/bin/uvicorn app.main:app --port 8000"],
+      "port": 8000
+    },
+    {
+      "name": "botyar-publish-preview",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd api && OPENAI_API_KEY=sk-invalid-local-no-spend ADMIN_USERNAMES=team_check BALE_SHARED_BOT_TOKEN=fake-local-token TELEGRAM_RELAY_URL= TELEGRAM_RELAY_KEY= PUBLIC_BASE_URL=http://localhost:8001 .venv/bin/uvicorn app.main:app --port 8001"],
+      "port": 8001
+    }
+  ]
+}

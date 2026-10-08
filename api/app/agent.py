@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
 
 from langgraph.graph import END, StateGraph
 from pydantic import BaseModel, ValidationError
@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 import logging
 
-from . import fidelity, faq_index, llm, prompts
+from . import datasets, fidelity, faq_index, llm, prompts
 from .llm_schema import LLMBotSpec
 from .models import Bot, BotVersion, BuilderMessage, BuilderRun, LlmCall, Product, VersionFixture, VersionTests
 from .spec import BotSpec
@@ -87,9 +87,20 @@ def restore_dropped(old: dict, new: dict, request: str) -> dict | None:
         blocks.append(b)
     return {**new, "blocks": blocks}
 
+DATASET_MARK = "📋 "  # a line of the «❓» message that asks for a table: «📋 kind|title|note» (the workspace turns it into a table card)
+
+
+class DatasetAsk(BaseModel):
+    """A LIST the owner should fill in as a table instead of typing it in chat."""
+    kind: Literal["menu_items", "quiz_questions", "sessions", "faq_entries", "services"]
+    title: str  # short Persian title shown above the table, e.g. «منوی کافه»
+    note: str   # one short Persian line of help, e.g. «نام، قیمت و در صورت نیاز گزینه‌ها»
+
+
 class ClarifyResult(BaseModel):
     ready: bool
     questions: list[str]
+    datasets: list[DatasetAsk]  # lists to fill in as tables (at most 2); empty when none is needed
     assumptions: list[str]
     summary: str
     out_of_scope: str  # "" normally; otherwise a friendly Persian explanation when the MAIN purpose is impossible with our blocks
@@ -117,6 +128,8 @@ class S(TypedDict, total=False):
     outcome: str
     decline_message: str
     questions: list[str]
+    ask_datasets: list[dict]
+    datasets: dict  # kind -> validated rows the owner filled in as tables
     version: int
     explanation: str
     fixture: list[dict]
@@ -153,10 +166,10 @@ class Builder:
         r: ClarifyResult = self.ask("clarify", prompts.CLARIFY, payload, ClarifyResult, effort="low")
         if r.out_of_scope.strip():
             return {"outcome": "declined", "decline_message": r.out_of_scope.strip()}
-        if not r.ready and r.questions and (
+        if not r.ready and (r.questions or r.datasets) and (
                 (not s.get("current") and rounds < MAX_CLARIFY_ROUNDS)
                 or (s.get("current") and not self._just_asked())):  # a change may ask for a missing fact, but never twice in a row
-            return {"outcome": "needs_input", "questions": r.questions[:3]}
+            return {"outcome": "needs_input", "questions": r.questions[:3], "ask_datasets": [d.model_dump() for d in r.datasets[:2]]}
         return {"outcome": "build", "assumptions": r.assumptions, "summary": r.summary}
 
     def design(self, s: S) -> dict:
@@ -180,7 +193,10 @@ class Builder:
             return {"spec": None, "errors": ["your reply was cut off before it was complete: write a more compact spec (shorter texts, no unnecessary blocks)"],
                     "design_attempts": n}
         try:
-            spec = BotSpec.model_validate(r.model_dump())
+            raw = r.model_dump()
+            if s.get("datasets"):  # the owner's tables are copied in exactly; the model only had to make the right blocks
+                raw = datasets.apply(raw, s["datasets"])
+            spec = BotSpec.model_validate(raw)
             if s.get("current"):  # a change request must not quietly lose what a block already had: put it back ourselves
                 restored = restore_dropped(s["current"], spec.model_dump(), s["request"])
                 if restored:
@@ -309,7 +325,7 @@ def history_text(db: Session, bot_id: int, limit=12) -> str:
     return "\n".join(f"{'OWNER' if m.role == 'user' else 'BOTYAR'}: {m.content}" for m in reversed(rows))
 
 
-def run_builder(run_id: int, bot_id: int, request: str):
+def run_builder(run_id: int, bot_id: int, request: str, tables: dict | None = None):
     """Entry point executed in a background thread; owns its own DB session."""
     from .db import SessionLocal
 
@@ -322,14 +338,16 @@ def run_builder(run_id: int, bot_id: int, request: str):
         db.add(BuilderMessage(bot_id=bot_id, role="user", content=request))
         db.commit()
         old_fix = db.scalars(select(VersionFixture).where(VersionFixture.bot_id == bot_id).order_by(VersionFixture.version.desc())).first()
-        init: S = {"request": request, "history": hist, "current": last.spec if last else None,
+        init: S = {"request": request, "history": hist, "current": last.spec if last else None, "datasets": tables or {},
                    "old_scenarios": old_tests.scenarios if (last and old_tests) else [],
                    "fixture": old_fix.catalog if (last and old_fix) else []}
         final: S = b.graph().invoke(init, {"recursion_limit": 40})
         run = db.get(BuilderRun, run_id)
         outcome = final.get("outcome")
         if outcome == "needs_input":
-            msg = "❓ برای ساخت دقیق‌تر چند سؤال دارم:\n" + "\n".join(f"{i}. {q}" for i, q in enumerate(final["questions"], 1))
+            asks = final.get("ask_datasets") or []
+            msg = "❓ " + ("برای ساخت دقیق‌تر چند سؤال دارم:" if final["questions"] else "برای ساخت دقیق‌تر، این جدول را پر کنید:") + "".join(f"\n{i}. {q}" for i, q in enumerate(final["questions"], 1))
+            msg += "".join(f"\n{DATASET_MARK}{a['kind']}|{a['title'].replace('|', ' ')}|{a['note'].replace('|', ' ')}" for a in asks)
             db.add(BuilderMessage(bot_id=bot_id, role="assistant", content=msg))
             run.status, run.result = "needs_input", {"message": msg, "cost_usd": b.cost()}
         elif outcome == "declined":

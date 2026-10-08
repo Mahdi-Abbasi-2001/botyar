@@ -232,7 +232,16 @@ export function progressOf(events: string[]): number {
 export function parseQuestions(content: string): string[] | null {
   if (!content.startsWith("❓")) return null;
   const qs = content.split("\n").map((l) => l.match(/^\s*[\d۰-۹]+[.)]\s*(.+)$/)?.[1]).filter(Boolean) as string[];
-  return qs.length ? qs : null;
+  return qs.length || parseDatasets(content).length ? qs : null;
+}
+
+/** «📋 kind|title|note» lines of the same message: lists the agent wants filled in as tables. */
+export function parseDatasets(content: string): { kind: string; title: string; note: string }[] {
+  if (!content.startsWith("❓")) return [];
+  return content.split("\n").filter((l) => l.startsWith("📋 ")).map((l) => {
+    const [kind, title, note] = l.slice(2).trim().split("|");
+    return { kind, title: title ?? "", note: note ?? "" };
+  }).filter((d) => d.kind);
 }
 
 // ---------- version diff → sentences ----------
