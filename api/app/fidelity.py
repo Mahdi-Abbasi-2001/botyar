@@ -11,7 +11,8 @@ from .engine_text import norm
 WEEKDAYS = {"شنبه": 0, "یکشنبه": 1, "دوشنبه": 2, "سه‌شنبه": 3, "سه شنبه": 3, "چهارشنبه": 4, "چهار شنبه": 4, "پنجشنبه": 5, "پنج‌شنبه": 5, "پنج شنبه": 5, "جمعه": 6}
 _DAY = "|".join(sorted((re.escape(k) for k in WEEKDAYS), key=len, reverse=True))
 RANGE = re.compile(rf"({_DAY})\s*تا\s*({_DAY})")
-PLACEHOLDER = re.compile(r"اینجا\s*(را\s*)?(وارد|بنویس|درج)|می‌توانید[^.\n]*(به‌روزرسانی|ویرایش|تغییر)|در\s+پنل|پیش\s+از\s+انتشار|جایگزین\s+کنید|تکمیل\s+می‌شود|ارائه\s+نشده|هنوز\s+(ثبت|وارد)\s+نشده")
+LIMITATION = re.compile(r"ربات[^.\n]{0,40}(نمی‌دهد|نمی‌تواند|پشتیبانی\s+نمی‌شود)")
+PLACEHOLDER = re.compile(r"اینجا\s*(را\s*)?(وارد|بنویس|درج)|می‌توانید[^.\n]*(به‌روزرسانی|ویرایش|تغییر)|در\s+پنل|پیش\s+از\s+انتشار|جایگزین\s+کنید|تکمیل\s+می‌شود|ارائه\s+نشده|درج\s+نشده|مشخص\s+نشده|هنوز\s+(ثبت|وارد)\s+نشده")
 
 
 def owner_text(history: str, request: str) -> str:
@@ -107,8 +108,44 @@ def problems(spec: dict, owner: str, assumptions: str = "") -> list[str]:
     if any(PLACEHOLDER.search(t or "") for t in visible):
         out.append("a customer-facing message contains an instruction like «اینجا وارد کنید»: leave that message/entry out and say in the assumptions which fact is missing")
 
+    # whatever customers submit must reach the owner at once: forms, bookings, orders and messages each need an admin_notify watching them
+    watched = {b.get("on") for b in spec.get("blocks", []) if b.get("type") == "admin_notify"}
+    for b in spec.get("blocks", []):
+        if b.get("type") in ("form", "booking", "catalog_order", "contact") and b.get("id") not in watched:
+            out.append(f"block «{b.get('id')}» collects customers' requests but no admin_notify watches it: add one (text like «درخواست جدید …») so the owner is told at once")
+
+    # a referral that promises a discount must hand out a real code; a customer text must not announce what the bot cannot do
+    has_shop = any(b.get("type") == "catalog_order" for b in spec.get("blocks", []))
+    for b in spec.get("blocks", []):
+        if b.get("type") == "referral" and has_shop and "تخفیف" in (b.get("reward_text") or "") and not b.get("reward_code"):
+            out.append(f"referral «{b.get('id')}» promises a discount but has no `reward_code`: add a private discount code (visible false, the percent the owner said, any code name such as INVITE10) to the catalog_order and set reward_code")
+    said_n = {int(x) for m in re.findall(r"دعوت[^.\n]{0,40}?(\d+)\s*(?:نفر|دوست)|(\d+)\s*(?:نفر|دوست)[^.\n]{0,25}?دعوت", said) for x in m if x}
+    for b in spec.get("blocks", []):
+        if b.get("type") == "referral" and said_n and b.get("goal") not in said_n:
+            out.append(f"referral «{b.get('id')}»: the owner said {sorted(said_n)} invited friends but goal is {b.get('goal')}")
+    for b in spec.get("blocks", []):
+        if b.get("type") == "message" and LIMITATION.search(b.get("text") or ""):
+            out.append(f"message «{b.get('id')}» only tells customers what the bot cannot do: remove the block and its menu entry, and say «پشتیبانی نمی‌شود: …» in the assumptions instead")
+
+    # the assumptions must not promise a feature the spec does not contain
+    claims = norm(assumptions)
+    kinds = {b.get("type") for b in spec.get("blocks", [])}
+    if re.search(r"(ثبت\s+نظر|نظرخواهی)[^.\n]*(اضافه\s+می‌کنم|اضافه\s+می‌شود|فعال)", claims) and "feedback" not in kinds:
+        out.append("the assumptions say a feedback (ثبت نظر) is added but the bot has no feedback block: add one (after the booking/order) or take the sentence out")
+    if re.search(r"یادآوری[^.\n]*(اضافه\s+می‌کنم|اضافه\s+می‌شود|فعال)", claims) and not any(b.get("reminder_hours") for b in spec.get("blocks", [])):
+        out.append("the assumptions say a reminder is added but no booking has reminder_hours: set it or take the sentence out")
+
     # a personality quiz cannot use the question bank, so `pick` must fit the questions written in the spec
     for b in spec.get("blocks", []):
         if b.get("type") == "quiz" and b.get("personality") and b.get("pick", 0) > len(b.get("questions", [])):
             out.append(f"personality quiz «{b.get('id')}»: pick={b['pick']} but only {len(b['questions'])} questions are written; write at least `pick` questions (the question bank is for right/wrong quizzes only)")
+    return out
+
+
+def notices(spec: dict, owner: str) -> list[str]:
+    """Plain facts for the owner's final message about things they asked for that the bot does not contain (the model cannot be trusted to mention them)."""
+    out: list[str] = []
+    if re.search(r"کارت[\s‌-]*به[\s‌-]*کارت", norm(owner)) and any(b.get("type") == "catalog_order" for b in spec.get("blocks", [])) \
+            and not any(b.get("type") == "catalog_order" and b.get("payment") == "card" for b in spec.get("blocks", [])):
+        out.append("پرداخت کارت‌به‌کارت اضافه نشد؛ شماره‌ی کارت ۱۶رقمی و نام صاحب کارت را بفرستید.")
     return out

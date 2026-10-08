@@ -3,7 +3,9 @@ from app import fidelity
 
 
 def spec(**blocks):
-    return {"welcome": "سلام", "menu": [], "blocks": [{"type": k, **v} for k, v in blocks.items()]}
+    out = [{"type": k, **v} for k, v in blocks.items()]
+    out += [{"type": "admin_notify", "id": "n_" + b["id"], "on": b["id"], "text": "جدید"} for b in out if b["type"] in ("form", "booking", "catalog_order", "contact")]  # as in a real bot
+    return {"welcome": "سلام", "menu": [], "blocks": out}
 
 
 def test_owner_text_keeps_only_what_the_owner_wrote():

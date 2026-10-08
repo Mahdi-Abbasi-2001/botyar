@@ -30,7 +30,7 @@ def test_impossible_request_is_declined_with_an_explanation_and_creates_nothing(
 
     def fake_call(db, **kw):
         calls.append(kw["step"])
-        return ClarifyResult(ready=False, questions=[], assumptions=[], summary="", out_of_scope=explain)
+        return ClarifyResult(ready=False, questions=[], assumptions=[], summary="", out_of_scope=explain, datasets=[])
 
     monkeypatch.setattr(llm, "call", fake_call)
     agent.run_builder(run_id, bot_id, "یک ربات تشخیص چهره بساز")

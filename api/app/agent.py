@@ -368,6 +368,8 @@ def run_builder(run_id: int, bot_id: int, request: str, tables: dict | None = No
             for blk in (final.get("spec") or {}).get("blocks", []):  # what was really built, in numbers the model cannot misstate
                 if blk.get("type") == "quiz":
                     msg += f"\nℹ️ آزمون «{blk.get('title', '')}»: {len(blk.get('questions', []))} سؤال در ربات نوشته شده است" + (f" و هر بار {blk['pick']} سؤال نمایش داده می‌شود" if blk.get("pick") else "")
+            for note in fidelity.notices(final.get("spec") or {}, fidelity.owner_text(final.get("history", ""), final.get("request", ""))):
+                msg += f"\n⚠️ {note}"
             if missing:  # its own marked line: the workspace offers to send it to the team as a ticket
                 msg += "\n" + DECLINE_MARK + "؛ ".join(a.removeprefix("پشتیبانی نمی‌شود:").strip().rstrip(".؛") for a in missing)
             db.add(BuilderMessage(bot_id=bot_id, role="assistant", content=msg))

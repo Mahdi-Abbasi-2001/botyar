@@ -617,7 +617,7 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
         state["pay_ok"], state["pay_sim"] = bool(wallet), False  # pay_sim (the fake pay button) must never be on in a real chat
         store = SqlStore(db, pub.bot_id, sandbox=False)
         store.member_fn = lambda channel, cust: gate.is_member(ch, token, channel, cust)
-        actions = engine.handle(spec, state, t, store, matcher=faq_index.matcher_for(db, pub.bot_id, spec), clicked=clicked_message_id is not None)
+        actions = engine.handle(spec, state, t, store, matcher=faq_index.matcher_for(db, pub.bot_id, spec), clicked=clicked_message_id is not None and not welcome_now)  # a directory pick starts the business fresh: it needs its welcome, not just the menu
         anon_others: list[dict] = []
         if any(a["type"].startswith("anon_") for a in actions):
             actions, anon_others = anon.run(db, bot, spec, state, skey, actions)

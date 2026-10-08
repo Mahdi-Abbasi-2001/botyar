@@ -702,6 +702,10 @@ class BotSpec(BaseModel):
             for code in [getattr(b, "pass_code", ""), getattr(b, "reward_code", ""), *(t.reward_code for t in getattr(b, "tiers", []))]:
                 if code and not any(norm_code(code) == norm_code(c.code) for x in self.blocks if x.type == "catalog_order" for c in x.discount_codes):
                     raise ValueError(f"'{b.id}': code {code!r} must be one of the discount_codes of a catalog_order block")
+                for x in self.blocks:  # a reward must be earned: listing it in the public «کدهای تخفیف» button would defeat the quiz / referral
+                    for c in (x.discount_codes if x.type == "catalog_order" else []):
+                        if code and norm_code(code) == norm_code(c.code):
+                            c.visible = False
             if b.type == "menu":
                 for it in b.items:
                     t = next((x for x in self.blocks if x.id == it.block), None)

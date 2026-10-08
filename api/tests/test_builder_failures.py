@@ -30,7 +30,7 @@ def setup_run():
 
 
 def ready(**_):
-    return ClarifyResult(ready=True, questions=[], assumptions=[], summary="فروشگاه لباس", out_of_scope="")
+    return ClarifyResult(ready=True, questions=[], assumptions=[], summary="فروشگاه لباس", out_of_scope="", datasets=[])
 
 
 def last_message(bot_id):
