@@ -82,3 +82,10 @@ def test_dropped_fields_are_copied_back():
     fixed = restore_dropped(old, new, "موقعیت روی نقشه را اضافه کن")
     assert fixed["blocks"][0]["media"] == "image" and fixed["blocks"][0]["location"] == {"latitude": 1, "longitude": 2}
     assert restore_dropped(old, new, "عکس را حذف کن") is None
+
+
+def test_a_booking_or_order_with_an_empty_question_list_still_asks_the_standard_contact_questions():
+    from app.spec import BookingBlock, CatalogOrderBlock
+    b = BookingBlock.model_validate({"type": "booking", "id": "b", "title": "x", "slots": [{"id": "s", "label": "l", "capacity": 1}], "fields": []})
+    c = CatalogOrderBlock.model_validate({"type": "catalog_order", "id": "c", "title": "x", "items": [{"id": "a", "name": "n", "price": 1000}], "fields": []})
+    assert len(b.fields) >= 1 and len(c.fields) >= 1

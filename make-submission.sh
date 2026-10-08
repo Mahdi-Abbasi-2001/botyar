@@ -18,7 +18,7 @@ cp docs/fa/submission/*.txt "$OUT"/
 # the complete source: everything but secrets, databases, dependency folders and build caches
 rsync -a --exclude='.git' --exclude='node_modules' --exclude='.venv' --exclude='.next' --exclude='web/out' --exclude='__pycache__' \
   --exclude='*.pyc' --exclude='*.db' --exclude='.env' --exclude='.claude' --exclude='.liara' --exclude='submission' \
-  --exclude='tsconfig.tsbuildinfo' --exclude='*.zip' ./ "$OUT/06-source-code/"
+  --exclude='.pytest_cache' --exclude='رویداد*' --exclude='tsconfig.tsbuildinfo' --exclude='*.zip' ./ "$OUT/06-source-code/"
 
 ( cd "$OUT" && rm -f ../botyar-buildx-submission.zip && zip -qr ../botyar-buildx-submission.zip . )
 echo "wrote botyar-buildx-submission.zip ($(du -h botyar-buildx-submission.zip | cut -f1))"

@@ -1,5 +1,5 @@
 import sys, subprocess, pathlib, markdown
-src, out_pdf, title = sys.argv[1], sys.argv[2], sys.argv[3]
+src, out_pdf, title = sys.argv[1], str(pathlib.Path(sys.argv[2]).resolve()), sys.argv[3]
 fonts = (pathlib.Path(__file__).resolve().parents[2] / "web/app/fonts/Vazirmatn.woff2").as_uri()
 body = markdown.markdown(pathlib.Path(src).read_text(), extensions=["tables", "fenced_code", "sane_lists"])
 html = f"""<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><title>{title}</title><style>

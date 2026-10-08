@@ -314,6 +314,14 @@ class BookingBlock(BaseModel):
     no_show_limit: int = Field(default=0, ge=0, le=10)  # after this many «حاضر نشد» marks the customer can't book online (0 = never)
     max_party: int = Field(default=1, ge=1, le=20)  # >1: «چند نفر هستید؟» and the group takes that many places (slots only)  # remind the customer this many hours before the start (0 = no reminder); needs a dated slot with a time
     fields: list[FormField] = Field(default_factory=lambda: [f.model_copy() for f in DEFAULT_CONTACT])
+
+    @model_validator(mode="before")
+    @classmethod
+    def _never_no_questions(cls, v):
+        """«No questions» is not a thing the engine can run (there would be nobody to contact): an empty list means the standard name + phone."""
+        if isinstance(v, dict) and not v.get("fields"):
+            v = {**v, "fields": [f.model_dump() for f in DEFAULT_CONTACT]}
+        return v
     confirm_text: str = "ثبت‌نام شما با موفقیت انجام شد."
     full_text: str = "متأسفانه ظرفیت این زمان تکمیل است."
     waitlist_text: str = "ظرفیت تکمیل است؛ شما در لیست انتظار قرار گرفتید و اگر جایی خالی شود، به شما خبر می‌دهیم."
@@ -424,6 +432,14 @@ class CatalogOrderBlock(BaseModel):
     allow_cancel: bool = False  # customers may cancel their own order shortly after placing it
     cancel_window_minutes: int = Field(default=30, ge=1, le=1440)
     fields: list[FormField] = Field(default_factory=lambda: [f.model_copy() for f in DEFAULT_CONTACT])
+
+    @model_validator(mode="before")
+    @classmethod
+    def _never_no_questions(cls, v):
+        """«No questions» is not a thing the engine can run (there would be nobody to contact): an empty list means the standard name + phone."""
+        if isinstance(v, dict) and not v.get("fields"):
+            v = {**v, "fields": [f.model_dump() for f in DEFAULT_CONTACT]}
+        return v
     confirm_text: str = "سفارش شما ثبت شد."
     ask_quantity: bool = False  # inline menus: ask «تعداد» after each item (table catalogs always ask)
     order_hours: list[WorkDay] = Field(default_factory=list, max_length=14)  # when orders are taken (empty = always)

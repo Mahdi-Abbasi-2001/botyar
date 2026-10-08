@@ -105,6 +105,8 @@ def run_scenario(spec: BotSpec, sc: TestScenario, catalog: list[dict] | None = N
                 where = ", ".join(f"{kv.key}={kv.value}" for kv in rc.where)
                 failures.append(f"ثبت‌ها: در «{rc.collection}» با شرط ({where}) تعداد {rc.count} انتظار می‌رفت، اما {n} بود")
     except Exception as e:  # engine crash is a failed test, not a server error
+        import logging
+        logging.getLogger("botyar.testing").exception("engine crash in test %r (steps: %s)", sc.name, [s.say for s in sc.steps])
         failures.append(f"خطای اجرا: {type(e).__name__}: {e}")
     return {"name": sc.name, "passed": not failures, "failures": failures, "transcript": transcript}
 

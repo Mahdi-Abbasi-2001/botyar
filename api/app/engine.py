@@ -592,7 +592,7 @@ def _handle(spec: BotSpec, session: dict, text: str, store: Store, now=None, mat
             return _quiz(spec, session, block, text, store, now)
         if block.type == "anon_chat":
             return _anon(spec, session, block, text, now)
-    except (StopIteration, IndexError, KeyError) as e:
+    except (StopIteration, IndexError, KeyError, TypeError) as e:
         # The saved state belongs to an older version of the bot (the owner republished mid-conversation:
         # a block, field, slot or option it points to is gone). Never leave the customer in silence.
         STALE_RESETS["count"] += 1
