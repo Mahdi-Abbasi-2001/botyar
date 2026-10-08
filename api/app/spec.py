@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .dates import parse_jalali
 
@@ -239,6 +239,12 @@ class WorkDay(BaseModel):
     weekday: int = Field(ge=0, le=6)  # 0 = شنبه … 6 = جمعه
     start: str  # "HH:MM"
     end: str
+
+    @field_validator("end", mode="before")
+    @classmethod
+    def _midnight(cls, v):
+        """«تا ۲۴» / «تا نیمه‌شب» is how owners say they close at midnight: the last minute of that day."""
+        return "23:59" if isinstance(v, str) and v.strip() in ("24:00", "24", "00:00", "0:00") else v
 
     @model_validator(mode="after")
     def _hours(self):

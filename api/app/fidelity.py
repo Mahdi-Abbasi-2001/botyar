@@ -127,6 +127,12 @@ def problems(spec: dict, owner: str, assumptions: str = "") -> list[str]:
         if b.get("type") == "message" and LIMITATION.search(b.get("text") or ""):
             out.append(f"message «{b.get('id')}» only tells customers what the bot cannot do: remove the block and its menu entry, and say «پشتیبانی نمی‌شود: …» in the assumptions instead")
 
+    # a phone number lives in the message text (one bubble); a separate contact card only when the owner asked for one-tap calling
+    if not re.search(r"یک\s*لمس|دکمه[‌\s]*(ی\s*)?تماس|ذخیره[‌\s]*(ی\s*)?شماره|کارت\s*تماس|زنگ\s*بزن", said):
+        for b in spec.get("blocks", []):
+            if b.get("type") == "message" and b.get("contact"):
+                out.append(f"message «{b.get('id')}» has a `contact` card the owner did not ask for: remove `contact` and keep the phone number in the text (one bubble)")
+
     # the assumptions must not promise a feature the spec does not contain
     claims = norm(assumptions)
     kinds = {b.get("type") for b in spec.get("blocks", [])}

@@ -58,3 +58,19 @@ def test_referral_goal_must_match_the_friends_the_owner_named():
     owner = "دعوت دوستان: هر کس ۳ نفر را دعوت کند ۱۰٪ تخفیف بگیرد"
     assert any("goal is 5" in p for p in fidelity.problems(_spec([order, notify, ref]), owner))
     assert not any("goal" in p for p in fidelity.problems(_spec([order, notify, {**ref, "goal": 3}]), owner))
+
+
+def test_phone_stays_in_the_text_unless_a_contact_card_was_asked_for():
+    msg = {"type": "message", "id": "m", "text": "تلفن: ۰۷۱۳۲۳۴۵۶۷۸", "contact": {"phone": "07132345678", "name": "کافه"}}
+    assert any("contact" in p for p in fidelity.problems(_spec([msg]), "تلفن ۰۷۱۳۲۳۴۵۶۷۸"))
+    assert not any("contact" in p for p in fidelity.problems(_spec([msg]), "یک دکمه بذار که با یک لمس زنگ بزنن؛ تلفن ۰۷۱۳۲۳۴۵۶۷۸"))
+    assert not any("contact" in p for p in fidelity.problems(_spec([{**msg, "contact": None}]), "تلفن ۰۷۱۳۲۳۴۵۶۷۸"))
+
+
+def test_closing_at_midnight_is_accepted():
+    from app.spec import WorkDay
+    assert WorkDay(weekday=4, start="08:00", end="24:00").end == "23:59"
+    assert WorkDay(weekday=4, start="08:00", end="00:00").end == "23:59"
+    import pytest
+    with pytest.raises(ValueError):
+        WorkDay(weekday=4, start="18:00", end="02:00")  # past midnight into the next day is not supported
