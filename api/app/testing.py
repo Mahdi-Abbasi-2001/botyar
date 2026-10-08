@@ -80,7 +80,7 @@ def run_scenario(spec: BotSpec, sc: TestScenario, catalog: list[dict] | None = N
     transcript: list[dict] = []
     try:
         for s in sc.setup:
-            for n in range(max(0, min(s.times, 60))):
+            for n in range(max(0, min(s.times, 150))):
                 sess = engine.new_session()
                 sess["cust"] = f"t:setup{n}"
                 sess["pay_ok"] = sess["pay_sim"] = sess["test"] = True  # automated test: fixed clock, so order hours never close the shop; no «same details?» shortcut

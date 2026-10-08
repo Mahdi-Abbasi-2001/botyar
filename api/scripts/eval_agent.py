@@ -157,8 +157,10 @@ PRICING_CASES = [
 FEEDBACK_CASES = [
     ("payment-online-order", "ربات کافه: لاته ۹۵ هزار تومان و کیک ۱۱۰ هزار تومان. مشتری باید سفارشش را همان‌جا آنلاین پرداخت کند.", "done",
      lambda s, m: None if _orders(s) and _orders(s)[0].get("payment") == "online" and ("توکن" in m or "کیف پول" in m or "انتشار" in m) else "payment=online and a note about the wallet token/own bot expected: " + m[:200]),
-    ("payment-for-booking-declined-honestly", "ربات نوبت‌دهی دندانپزشکی دوشنبه‌ها ۹ تا ۱۳ هر ۳۰ دقیقه، و مشتری برای رزرو نوبت بیعانه آنلاین بپردازد", "done",
-     lambda s, m: None if "پشتیبانی نمی" in m else "must say booking deposits are not supported: " + m[:200]),
+    # booking deposits ARE supported now (own bot + Bale wallet): the agent must set one, say how much it assumed (the owner gave no amount) and say where the wallet goes
+    ("deposit-for-booking-supported", "ربات نوبت‌دهی دندانپزشکی دوشنبه‌ها ۹ تا ۱۳ هر ۳۰ دقیقه، و مشتری برای رزرو نوبت بیعانه آنلاین بپردازد", "done",
+     lambda s, m: None if any(b.get("deposit", 0) > 0 for b in blocks(s, "booking")) and "بیعانه" in m and any(w in m for w in ("کیف پول", "توکن", "انتشار", "اختصاصی"))
+     else "a booking deposit must be set and the final message must say the amount assumed and where the wallet token goes: " + m[:300]),
     ("reminder-24h", "ربات آرایشگاه: نوبت‌دهی شنبه تا چهارشنبه ۹ تا ۱۷ هر ۳۰ دقیقه. ۲۴ ساعت قبل از نوبت به مشتری یادآوری بده.", "done",
      lambda s, m: None if sched(s) and all(b.get("reminder_hours") == 24 for b in blocks(s, "booking")) else "reminder_hours should be 24"),
     ("reminder-one-off-event-honest", "ربات ثبت‌نام همایش یک‌روزه ۱۵ مهر، ظرفیت ۱۰۰ نفر. یک روز قبل یادآوری بفرست.", "done",

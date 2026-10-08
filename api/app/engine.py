@@ -430,8 +430,32 @@ def _notify(spec: BotSpec, block_id: str, summary: str, actions: list, prefix: s
         actions.append({"type": "notify_admin", "text": f"{prefix or b.text}\n{summary}"})
 
 
-def _summary(data: dict) -> str:
-    return "\n".join(f"{k}: {v}" for k, v in data.items() if not k.startswith("_"))
+SUMMARY_LABELS = {"name": "نام", "phone": "شماره موبایل", "slot_label": "زمان", "staff": "کارشناس", "service": "خدمت", "party": "تعداد نفرات",
+                  "who": "نام", "email": "ایمیل", "topic": "موضوع", "message": "پیام", "score": "نمره", "total": "تعداد کل", "percent": "درصد", "result": "نتیجه",
+                  "rating": "امتیاز", "comment": "توضیح"}
+_SUMMARY_HIDDEN = {"id", "slot", "date", "time", "status", "paid", "sandbox"}
+
+
+def _summary(data: dict, block=None) -> str:
+    """The record as the OWNER reads it: Persian labels (the block's own question labels first), Jalali dates, a Persian status."""
+    labels = {f.key: f.label.rstrip("؟?:").strip() for f in getattr(block, "fields", None) or []}
+    lines = []
+    if data.get("slot_label"):
+        lines.append(f"{SUMMARY_LABELS['slot_label']}: {data['slot_label']}")
+    elif data.get("date"):
+        try:
+            day = date.fromisoformat(str(data["date"]))
+            lines.append(f"تاریخ: {dates.jalali_str(day)}" + (f" · ساعت {data['time']}" if data.get("time") else ""))
+        except ValueError:
+            lines.append(f"تاریخ: {data['date']}")
+    for k, v in data.items():
+        if k.startswith("_") or k in _SUMMARY_HIDDEN or k == "slot_label" or v in (None, "", [], {}):
+            continue
+        v = "، ".join(map(str, v)) if isinstance(v, (list, tuple)) else v
+        lines.append(f"{labels.get(k) or SUMMARY_LABELS.get(k) or k}: {v}")
+    if data.get("status") in STATUS_FA:
+        lines.append(f"وضعیت: {STATUS_FA[data['status']]}")
+    return "\n".join(lines)
 
 
 class Cycle:
@@ -812,7 +836,7 @@ def _form_save(spec, session, block: FormBlock, store, now):
     row = store.add(block.id, {**{k: v for k, v in d.items() if not k.startswith("_")}, **extra, **_ident(session, now)})
     actions = [send(_fill(block.done_text, row))]
     hot = bool(block.hot_score and score is not None and score >= block.hot_score)
-    _notify(spec, block.id, _summary(row), actions, prefix=f"🔥 مشتری داغ (امتیاز {score}) · {block.title}" if hot else None)
+    _notify(spec, block.id, _summary(row, block), actions, prefix=f"🔥 مشتری داغ (امتیاز {score}) · {block.title}" if hot else None)
     for key, f in (d.get("_files") or {}).items():  # the files themselves, straight into the owner's chat
         label = next((x.label for x in block.fields if x.key == key), key)
         actions.append({"type": "notify_admin", "text": f"📎 {label} · ثبت #{row['id']} ({row.get('name', '') or block.title})",
@@ -883,9 +907,13 @@ def _options(block: BookingBlock, now, store=None):
     A weekly session is skipped on closed days, too soon (min notice), or when it starts inside hours the owner closed."""
     out = []
     for s in block.slots:
-        days = [d for d in dates.next_occurrences(now, s.weekday, s.time, block.occurrences + 8)
-                if _starts_ok(block, d, s.time, now) and not (store is not None and _off(store, block, d, _hm(s.time), _hm(s.time) + 1))][:block.occurrences] \
-            if s.weekday is not None else [None]
+        if s.on:  # a dated session: one day, offered until it starts
+            day = jalali_date(s.on)
+            days = [day] if day and _starts_ok(block, day, s.time, now) and not (store is not None and _off(store, block, day, _hm(s.time), _hm(s.time) + 1)) else []
+        else:
+            days = [d for d in dates.next_occurrences(now, s.weekday, s.time, block.occurrences + 8)
+                    if _starts_ok(block, d, s.time, now) and not (store is not None and _off(store, block, d, _hm(s.time), _hm(s.time) + 1))][:block.occurrences] \
+                if s.weekday is not None else [None]
         for day in days:
             name = s.label + (f" — {dates.jalali_str(day)}" if day else "")
             out.append((s, day, f"s:{s.id}" + (f"@{day:%Y%m%d}" if day else ""), name))
@@ -903,6 +931,8 @@ def _slot_prompt(block: BookingBlock, store, now):
             buttons.append(_btn(f"{name} (تکمیل - لیست انتظار)", data))
         else:
             buttons.append(_btn(f"{name} (تکمیل)", data))
+    if not buttons:
+        return send("فعلاً جلسه‌ای برای ثبت‌نام باز نیست؛ بعداً دوباره سر بزنید.", [_btn("بازگشت به منو", "/menu")])
     return send("زمان مورد نظر را انتخاب کنید:", buttons + [_btn("بازگشت به منو", "/menu")])
 
 
@@ -970,7 +1000,11 @@ def _commit_slot(spec, session, block: BookingBlock, store, now):
     status = "waitlisted" if full else "confirmed"
     row = store.add(block.id, {**session["data"], "status": status, **_ident(session, now)})
     more = _series(spec, block, store, now, row)
-    return _finish_booking(spec, session, block, store, now, row, status, (block.waitlist_text if full else block.confirm_text) + more + _deposit_note(block, session["data"]))
+    place = ""
+    if full:  # where in the queue: the waiting customers of this very place, oldest first
+        waiting = [r for r in store.find(block.id, slot=row.get("slot"), date=row.get("date"), status="waitlisted") if r.get("time") == row.get("time")]
+        place = fa_digits(f"\nجایگاه شما در فهرست انتظار: {len(waiting)}") if waiting else ""
+    return _finish_booking(spec, session, block, store, now, row, status, (block.waitlist_text if full else block.confirm_text) + place + more + _deposit_note(block, session["data"]))
 
 
 def _finish_booking(spec, session, block, store, now, row, status, text):
@@ -983,8 +1017,8 @@ def _finish_booking(spec, session, block, store, now, row, status, text):
             more, _ = cancel_record(spec, store, now, block, old, by="customer")
             actions += more
             actions.append(send(f"✅ زمان شما تغییر کرد؛ ثبت قبلی ({old.get('slot_label', block.title)}) لغو شد."))
-    _notify(spec, block.id, f"[{status}] " + _summary(row) + ("\n(تغییر زمان توسط مشتری)" if old_id else ""), actions)
-    actions += _staff_notice(row, f"📅 نوبت تازه برای شما · {block.title}\n{_summary(row)}")
+    _notify(spec, block.id, _summary(row, block) + ("\n(تغییر زمان توسط مشتری)" if old_id else ""), actions)
+    actions += _staff_notice(row, f"📅 نوبت تازه برای شما · {block.title}\n{_summary(row, block)}")
     _reset(session)
     actions.append(menu_actions(spec))
     return actions
@@ -2507,14 +2541,15 @@ def _contact(spec, session, block: ContactBlock, text, store, now):
             return [send("تعداد پیام‌های این ساعت زیاد شده است؛ کمی بعد دوباره بنویسید.", _faq_nav())]
     who = session.get("cust_name") or "مشتری"
     topic = session["data"].get("topic")
-    store.add(block.id, {"text": body, "from": "customer", "thread": thread_id(cust), "who": who, "status": "open",
-                         **({"topic": topic} if topic else {}), **_ident(session, now)})
+    row = store.add(block.id, {"text": body, "from": "customer", "thread": thread_id(cust), "who": who, "status": "open",
+                               **({"topic": topic} if topic else {}), **_ident(session, now)})
+    ticket = fa_digits(f"\nشماره‌ی پیگیری شما: {row['id']}")  # the customer can quote it; the owner sees the same number
     away = ""
     if block.hours and not _within(block.hours, now) and not session["data"].get("_away"):  # once per visit, not after every message
         away = f"\n\n🕒 {block.away_text}\nساعت پاسخ‌گویی: {_hours_text(block.hours)}"
         session["data"]["_away"] = True
-    actions = [send(block.sent_text + away, _faq_nav())]
-    _notify(spec, block.id, f"{who}{f' ({topic})' if topic else ''}: {body}\n(برای پاسخ، بخش «پیام‌ها» در پنل بات‌یار را باز کنید)", actions,
+    actions = [send(block.sent_text + ticket + away, _faq_nav())]
+    _notify(spec, block.id, f"{who}{f' ({topic})' if topic else ''}: {body}\nشماره‌ی پیگیری: {fa_digits(str(row['id']))}\n(برای پاسخ، بخش «پیام‌ها» در پنل بات‌یار را باز کنید)", actions,
             prefix=f"📩 پیام جدید از مشتری · {block.title}")
     return actions  # the customer stays in this step: a follow-up message goes to the owner as well
 
@@ -2661,8 +2696,8 @@ def mark_paid(spec: BotSpec, store, now, block, row: dict, charge: str = "") -> 
         store.update(block.id, row["id"], status="confirmed", paid=True, _paid_at=now.isoformat(), _charge=charge)
         row = {**row, "status": "confirmed", "paid": True}
         actions = [send(f"✅ بیعانه پرداخت شد. {_fill(block.confirm_text, row)}")]
-        _notify(spec, block.id, f"[confirmed · بیعانه پرداخت‌شده ✅] " + _summary(row), actions)
-        actions += _staff_notice(row, f"📅 نوبت تازه برای شما · {block.title}\n{_summary(row)}")
+        _notify(spec, block.id, "بیعانه پرداخت‌شده ✅\n" + _summary(row, block), actions)
+        actions += _staff_notice(row, f"📅 نوبت تازه برای شما · {block.title}\n{_summary(row, block)}")
         return actions
     store.update(block.id, row["id"], status="new", paid=True, _paid_at=now.isoformat(), _charge=charge)
     actions = [send(f"✅ پرداخت انجام شد. {block.confirm_text}\nشماره‌ی سفارش: {row['id']}")]
@@ -2739,7 +2774,7 @@ def _attendance(spec: BotSpec, session, store, now, coming: bool, bi: int, rid: 
     why = _why_not(b, r, now)
     if why:
         actions = [send("ممنون که خبر دادید. " + why)]
-        _notify(spec, b.id, _summary(r), actions, prefix=f"⚠️ مشتری اعلام کرد نمی‌تواند بیاید (مهلت لغو گذشته) · {b.title}")
+        _notify(spec, b.id, _summary(r, b), actions, prefix=f"⚠️ مشتری اعلام کرد نمی‌تواند بیاید (مهلت لغو گذشته) · {b.title}")
         return [*actions, menu_actions(spec)]
     actions, _ = cancel_record(spec, store, now, b, r, by="customer")
     return [send("نوبت شما لغو شد؛ ممنون که خبر دادید."), *actions, menu_actions(spec)]
@@ -2864,9 +2899,9 @@ def cancel_record(spec: BotSpec, store, now, b, r: dict, by: str = "customer", r
     store.update(b.id, r["id"], status="cancelled", _cancelled_at=now.isoformat(), _cancelled_by=by)
     actions: list[dict] = []
     if by == "customer":
-        _notify(spec, b.id, _summary(r), actions, prefix=f"❌ لغو توسط مشتری · {b.title}")
+        _notify(spec, b.id, _summary(r, b), actions, prefix=f"❌ لغو توسط مشتری · {b.title}")
     if b.type == "booking":
-        actions += _staff_notice(r, f"❌ نوبت {'توسط مشتری' if by == 'customer' else 'توسط مدیر'} لغو شد · {b.title}\n{_summary(r)}")
+        actions += _staff_notice(r, f"❌ نوبت {'توسط مشتری' if by == 'customer' else 'توسط مدیر'} لغو شد · {b.title}\n{_summary(r, b)}")
     promoted = None
     if b.type == "booking":
         if prev == "confirmed":  # a place just opened: the first person waiting for the SAME date gets it
@@ -2886,7 +2921,7 @@ def cancel_record(spec: BotSpec, store, now, b, r: dict, by: str = "customer", r
                     actions.append({"type": "notify_customer", "cust": w["_cust"],
                                     "text": f"🎉 جای خالی شد! ثبت‌نام شما در «{w.get('slot_label', b.title)}» تأیید شد."})
                 if by == "customer":
-                    _notify(spec, b.id, _summary(w), actions, prefix=f"✅ از لیست انتظار تأیید شد · {b.title}")
+                    _notify(spec, b.id, _summary(w, b), actions, prefix=f"✅ از لیست انتظار تأیید شد · {b.title}")
                 if left <= 0:
                     break
     elif b.source == "table":

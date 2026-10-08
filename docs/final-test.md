@@ -33,6 +33,12 @@ General rules to check in **every** bot:
 **Expect:** capacity counts per date; remaining places shown; after cancelling the place is free.
 **Edge:** fill all 8 places with 8 different customers (use several accounts or the test records) → 9th gets the waitlist; cancel one confirmed → first waiting customer is promoted and told; same customer books the same class twice → refused or asked; cancel after the deadline → refused with a clear reason; reschedule («🔄 تغییر زمان») → old place freed only after the new one is confirmed.
 
+## 3b. Workshop with specific dates, info message and duplicates
+**Prompt:** «بات رزرو کارگاه که ظرفیت و ثبت‌نام را مدیریت کند و درخواست افزودن فهرست انتظار را هم اجرا کند.» → answer: «کارگاه سفالگری «سفال‌گری مقدماتی»، کارگاه هنر شهر، خیابان ولیعصر، ۸۰۰ هزار تومان؛ ۴ جلسه: ۱۵ و ۲۲ و ۲۹ مهر و ۶ آبان ساعت ۱۰، ظرفیت هر جلسه ۶ نفر.»
+**Expect:** a «درباره‌ی کارگاه» entry with exactly those facts; 4 dated sessions «جلسه‌ی ۱…۴ — تاریخ شمسی»; reminder 24 h before and cancel deadline; waiting list. With «هر طور صلاح می‌دانی» the agent asks once, then builds a weekly session with reminder and cancel deadline and says the info is missing.
+**Customer:** register for session 2 until full → the next gets «جایگاه شما در فهرست انتظار: N»; register the same person twice for the same session → «شما قبلاً برای این زمان ثبت‌نام کرده‌اید» (nothing stored); cancel one → the first waiting customer is promoted and messaged; a session whose start has passed disappears.
+**Owner:** the notification reads «زمان / نام / شماره موبایل / وضعیت» in Persian (no English keys).
+
 ## 4. Appointment calendar (dentist, salon: booking with schedule) ★
 **Prompt:** «برای کلینیک دندانپزشکی ربات نوبت‌دهی بساز. شنبه تا چهارشنبه ۹ تا ۱۳ و ۱۶ تا ۲۰، هر نوبت ۳۰ دقیقه، ناهار ۱۳ تا ۱۶ تعطیل. دو پزشک: دکتر احمدی و دکتر رضایی. خدمات: ویزیت ۳۰ دقیقه، جراحی ۶۰ دقیقه. یادآوری یک روز قبل.»
 **Customer:** pick service → doctor → day → time → name → phone → confirm.

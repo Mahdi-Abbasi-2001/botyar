@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 import logging
 
-from . import faq_index, llm, prompts
+from . import fidelity, faq_index, llm, prompts
 from .llm_schema import LLMBotSpec
 from .models import Bot, BotVersion, BuilderMessage, BuilderRun, LlmCall, Product, VersionFixture, VersionTests
 from .spec import BotSpec
@@ -185,6 +185,10 @@ class Builder:
                 restored = restore_dropped(s["current"], spec.model_dump(), s["request"])
                 if restored:
                     spec = BotSpec.model_validate(restored)
+            if n < MAX_DESIGN:  # the last attempt is never refused over a detail: a working bot beats none
+                slips = fidelity.problems(spec.model_dump(), fidelity.owner_text(s.get("history", ""), s.get("request", "")), "\n".join(s.get("assumptions", [])))
+                if slips:
+                    raise ValueError("the design does not match what the owner said: " + "; ".join(slips))
             taken = [m.label for m in spec.menu if m.label.replace("\u200c", "").replace(" ", "") in RESERVED_LABELS]
             if taken:
                 raise ValueError(f"menu item «{taken[0]}» is a name the engine already gives its own built-in button: remove that menu item (customers get it automatically when allow_cancel is true)")
@@ -343,6 +347,9 @@ def run_builder(run_id: int, bot_id: int, request: str):
             others = [a for a in final.get("assumptions") or [] if a not in missing]
             if others:
                 msg += "\nفرض‌ها:" + "".join(f"\n• {a.strip().rstrip('.؛')}" for a in others)
+            for blk in (final.get("spec") or {}).get("blocks", []):  # what was really built, in numbers the model cannot misstate
+                if blk.get("type") == "quiz":
+                    msg += f"\nℹ️ آزمون «{blk.get('title', '')}»: {len(blk.get('questions', []))} سؤال در ربات نوشته شده است" + (f" و هر بار {blk['pick']} سؤال نمایش داده می‌شود" if blk.get("pick") else "")
             if missing:  # its own marked line: the workspace offers to send it to the team as a ticket
                 msg += "\n" + DECLINE_MARK + "؛ ".join(a.removeprefix("پشتیبانی نمی‌شود:").strip().rstrip(".؛") for a in missing)
             db.add(BuilderMessage(bot_id=bot_id, role="assistant", content=msg))

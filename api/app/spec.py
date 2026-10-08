@@ -202,10 +202,18 @@ class Slot(BaseModel):
     capacity: int = Field(gt=0)
     price: int = Field(default=0, ge=0)  # Toman, shown on the button (0 = not shown)
     weekday: int | None = None  # None = one-off slot (capacity counts for ever); 0=شنبه … 6=جمعه = repeats every week
-    time: str | None = None  # "HH:MM" 24h Tehran time, required for weekly slots
+    time: str | None = None  # "HH:MM" 24h Tehran time, required for weekly slots and dated sessions
+    on: str | None = None  # a DATED one-off session, Jalali «1405/07/25» (with time): capacity per session, hidden once it has started
 
     @model_validator(mode="after")
     def _weekly(self):
+        if self.on is not None:
+            if self.weekday is not None:
+                raise ValueError(f"slot '{self.id}': a dated session has `on` OR `weekday`, not both")
+            if jalali_date(self.on) is None:
+                raise ValueError(f"slot '{self.id}': `on` must be a Jalali date like 1405/07/25")
+            if not self.time or not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", self.time):
+                raise ValueError(f"slot '{self.id}': a dated session needs time as HH:MM")
         if self.weekday is not None:
             if not 0 <= self.weekday <= 6:
                 raise ValueError(f"slot '{self.id}': weekday must be 0 (شنبه) to 6 (جمعه)")
