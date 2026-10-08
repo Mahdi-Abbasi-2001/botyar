@@ -990,10 +990,27 @@ def _finish_booking(spec, session, block, store, now, row, status, text):
     return actions
 
 
+def _held_by_customer(block: BookingBlock, session: dict, store, d: dict) -> dict | None:
+    """This customer's active (confirmed or waiting) booking of exactly the place they just picked, if any."""
+    cust = session.get("cust")
+    if not cust:
+        return None
+    for r in store.find(block.id, _cust=cust):
+        if r.get("status") in ("confirmed", "waitlisted") and (r.get("slot"), r.get("date"), r.get("time")) == (d.get("slot"), d.get("date"), d.get("time")):
+            return r
+    return None
+
+
 def _after_pick(spec, session, block: BookingBlock, store, now):
     """The customer chose the time. A reschedule reuses the contact details of the old booking and commits at once."""
     d = session["data"]
     old = next(iter(store.find(block.id, id=d["_replace"])), None) if d.get("_replace") else None
+    held = None if old else _held_by_customer(block, session, store, d)
+    if held is not None:  # the same person cannot hold the same place twice (confirmed or waiting)
+        _reset(session)
+        waiting = held.get("status") == "waitlisted"
+        hint = f" برای لغو یا تغییر، «{my_label(spec)}» را بزنید." if block.allow_cancel else ""
+        return [send("شما قبلاً برای این زمان " + ("در لیست انتظار هستید." if waiting else "ثبت‌نام کرده‌اید.") + hint), menu_actions(spec)]
     if old:
         if (old.get("slot"), old.get("date"), old.get("time")) == (d.get("slot"), d.get("date"), d.get("time")):
             for k in ("slot", "slot_label", "date", "time"):

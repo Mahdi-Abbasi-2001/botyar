@@ -221,3 +221,41 @@ def test_deposit_cannot_be_combined_with_a_waitlist_or_series():
     for kw in ({"waitlist": True}, {"repeat_weeks": 4}):
         with pytest.raises(ValidationError):
             deposit_spec(**kw)
+
+
+def test_one_person_cannot_take_the_same_place_twice_but_others_and_other_times_are_fine():
+    from datetime import datetime
+    from app.dates import TEST_NOW
+    from app.engine import MemoryStore, handle, new_session
+    from app.spec import BotSpec
+    spec = BotSpec.model_validate({"name": "w", "welcome": "سلام", "menu": [{"label": "ثبت‌نام", "block": "b"}],
+                                   "blocks": [{"type": "booking", "id": "b", "title": "کارگاه", "waitlist": True, "allow_cancel": True,
+                                               "slots": [{"id": "thu", "label": "پنجشنبه", "capacity": 1, "weekday": 5, "time": "10:00"}, {"id": "once", "label": "رویداد", "capacity": 5}]}]})
+    st = MemoryStore()
+
+    def register(cust, slot):
+        s = new_session(); s["cust"] = cust
+        out = handle(spec, s, "m:0", st, TEST_NOW)
+        out = handle(spec, s, slot, st, TEST_NOW)
+        if "با همین مشخصات" in "\n".join(a.get("text", "") for a in out):  # a returning customer reuses the saved details
+            out = handle(spec, s, "ru:yes", st, TEST_NOW)
+        else:
+            for t in ("علی", "09121234567"):
+                out = handle(spec, s, t, st, TEST_NOW)
+        return "\n".join(a.get("text", "") for a in out)
+
+    text = lambda out: "\n".join(a.get("text", "") for a in out)
+    first = register("bale:1", "s:thu@20261008")
+    assert "ثبت‌نام شما" in first
+    s = new_session(); s["cust"] = "bale:1"
+    handle(spec, s, "m:0", st, TEST_NOW)
+    again = text(handle(spec, s, "s:thu@20261008", st, TEST_NOW))
+    assert "قبلاً" in again and s["block"] is None and len(st.find("b")) == 1       # refused, nothing stored
+    assert "ثبت‌نام شما" in register("bale:1", "s:thu@20261015")                     # another date is a different place
+    assert len(st.find("b", _cust="bale:1")) == 2
+    waiting = register("bale:2", "s:thu@20261008")                                    # full: the other person waits
+    assert "لیست انتظار" in waiting
+    s2 = new_session(); s2["cust"] = "bale:2"
+    handle(spec, s2, "m:0", st, TEST_NOW)
+    assert "در لیست انتظار هستید" in text(handle(spec, s2, "s:thu@20261008", st, TEST_NOW))
+    assert len(st.find("b")) == 3                                                   # two for bale:1 and the waiting bale:2, nothing extra
