@@ -30,11 +30,11 @@ Both options are slow, and changes later (a new price, a new class time) need th
 | | Botyar | Visual/no-code builders with usage billing | Flat-plan bot builders | Freelancers |
 |---|---|---|---|---|
 | How you build | **describe in Persian** | blocks, plugins, advanced scripting | button/menu configuration | brief + waiting |
-| Tested before publish | **yes, automatic** | not seen in their documentation | not researched | manual, depends |
-| Price model | flat monthly per plan [proposed] | per feature per day plus per message (about 20 Toman per "diamond", 3 Toman per "point", +10% VAT); their own sample bots work out to roughly 150–235k Toman/month [sourced: the builder's own price calculator, read 2026-10-05] | flat plans of 183k / 287k / 609k Toman/month, about 22–26% off when paid yearly [sourced: public price page, read 2026-10-05] | one-off 2–30M Toman |
+| Tested before publish | **yes, automatic** | not mentioned in their public information | not mentioned | manual, depends |
+| Price model | **flat monthly plan from 299,000 Toman** [proposed] | per feature per day plus per message (about 20 Toman per "diamond", 3 Toman per "point", +10% VAT); their own sample bots work out to roughly 150–235k Toman/month [sourced: the builder's own price calculator, read 2026-10-05] | flat plans of 183k / 287k / 609k Toman/month, about 22–26% off when paid yearly [sourced: public price page, read 2026-10-05] | one-off 2–30M Toman |
 | Channels | Bale, Telegram | many (Bale, Telegram, Eitaa, iGap, Rubika, Soroush, WhatsApp, SMS) | — | any |
 | Breadth | focused: booking, orders, FAQ, forms, payments, community tools | very broad (shop, scheduled posts, group manager, API/AI, custom code) | — | unlimited |
-Honest position: we do **not** win on breadth. We win on **time to a working, tested bot for a non-technical owner**, and on **predictable pricing**.
+Honest position: we do **not** win on breadth. We win on **time to a working, tested bot for a non-technical owner**, on **a runtime owners can trust** (the agent builds and changes the bot; the published bot says exactly what the owner approved) and on **predictable pricing**. We are not the cheapest either: Basic costs more than the first two columns, and its advantage is a predictable bill and no freelancer fee for every change.
 
 ## 6. Business model [proposed, not validated]
 Per-account monthly plans; every feature is in every plan, plans differ only in limits (enforced in the product, see `api/app/billing.py` and the public `/pricing` page):
