@@ -27,7 +27,14 @@ def owner_text(history: str, request: str) -> str:
         if mine:
             chunks.append(line)
     chunks.append(request or "")
-    return "\n".join(chunks)
+    return _answers_only("\n".join(chunks))
+
+
+def _answers_only(text: str) -> str:
+    """The question card sends «<n>. <the agent's question>\nجواب: <owner's answer>»: only the answer is the owner's own words
+    (the question can mention card payment, times or numbers the owner never said)."""
+    text = re.sub(r"(?m)^[ \t]*[\d۰-۹]+[.)][^\n]*\n(?=[ \t]*جواب:)", "", text)
+    return re.sub(r"(?m)^[ \t]*جواب:[ \t]*", "", text)
 
 
 def _squash(s: str) -> str:

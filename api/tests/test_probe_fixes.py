@@ -88,3 +88,13 @@ def test_a_change_request_cannot_silently_wipe_a_shops_discount_code_or_delivery
     assert fixed["discount_codes"][0]["code"] == "WELCOME10" and fixed["delivery_fee"] == 35000
     assert fixed["order_hours"][0]["end"] == "22:00"          # what the owner changed is kept as changed
     assert restore_dropped(old, new, "کد تخفیف را حذف کن") is None  # an explicit removal is respected
+
+
+def test_the_agents_own_question_is_not_taken_as_the_owners_words():
+    history = "OWNER: ربات کافه بساز\nBOTYAR: ❓ پرداخت داخل بله یا کارت‌به‌کارت، ساعت ۱۰:۰۰؟"
+    request = "۱. برای کافه، کدام موردها را اضافه کنم: پرداخت داخل بله یا کارت‌به‌کارت، ساعت ۱۰:۰۰ را هم؟\nجواب: نیازی نیست"
+    said = fidelity.owner_text(history, request)
+    assert "کارت" not in said and "10:00" not in said and "۱۰:۰۰" not in said and "نیازی نیست" in said and "ربات کافه بساز" in said
+    order = {"type": "catalog_order", "id": "o", "payment": "none"}
+    assert not fidelity.notices({"blocks": [order]}, said)                       # no «card payment was not added» note
+    assert fidelity.notices({"blocks": [order]}, fidelity.owner_text("", "پرداخت کارت‌به‌کارت هم اضافه کن"))  # a real request still gets it
