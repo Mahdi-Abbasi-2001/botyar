@@ -39,6 +39,8 @@
 3. **Every version is tested before it can be published.** The agent writes test conversations, the engine runs them,
    failures go back to the agent for repair, and publishing stays locked while any test fails. A change request
    produces a readable diff and re-runs all earlier tests.
+   Besides the model's own tests, deterministic checks (no LLM) compare every design with what the owner actually said and
+   send slips back for another attempt; see section 6 of `docs/technical.md`.
 
 Models: `gpt-6-luna` for every agent step (owner decision, cost), `text-embedding-3-small` for FAQ matching. Every call
 is logged with its token count and cost (kept for the operator; the UI does not show prices to owners; `GET /api/bots/{id}/cost` still exists).
@@ -51,6 +53,7 @@ is logged with its token count and cost (kept for the operator; the UI does not 
 | `api/app/engine.py` | Runtime engine: all bot behaviour, shared by simulator, tests and Bale |
 | `api/app/agent.py`, `api/app/prompts.py` | LangGraph builder agent and its prompts |
 | `api/app/testing.py` | Test runner and spec diff |
+| `api/app/fidelity.py`, `api/app/datasets.py` | Deterministic checks that a designed bot still holds what the owner said (times, numbers, notifications, reward codes); the owner's tables copied into the bot exactly |
 | `api/app/llm.py` | The single LLM entry point (model, pricing, cost log) |
 | `api/app/bale.py`, `api/app/publish.py` | Messenger glue shared by Bale and Telegram; Bale publishing and webhooks |
 | `api/app/telegram.py`, `relay/` | Telegram channel and the Deno relay it goes through (Telegram is unreachable from Iran) |
@@ -62,7 +65,7 @@ is logged with its token count and cost (kept for the operator; the UI does not 
 | `api/app/communities.py`, `gate.py`, `referral.py`, `anon.py` | Channel/group linking, post forwarding, group moderation, forced join, invite links, anonymous chat |
 | `api/tests/` | Backend tests (no network, no OpenAI) |
 | `web/` | Next.js frontend (static export, Persian RTL) |
-| `docs/fa/` | **Persian competition documents**: `technical.fa.md`, `business-plan.fa.md`, `pitch/pitch.html`, `video-script.fa.md`; `make-submission.sh` builds the zip |
+| `docs/fa/` | **Persian competition documents**: `technical.fa.md`, `business-plan.fa.md`, `pitch/pitch.html`, `video-script.fa.md`; `make-submission.sh` builds the zip. Test sheets with the exact prompts to try: `test-prompts.fa.md` (single requests), `test-prompts-by-block.fa.md` (ordered scenarios, one per bot type) |
 | `docs/` | **`technical.md`** (architecture and behaviour), `business-plan.md`, `TEST-TOUR.md`, `real-bale-checklist.md`, agent and FAQ evaluations, design brief, sample import files |
 | `build.sh`, `deploy.sh` | Build the frontend into `api/static`; deploy to Liara |
 

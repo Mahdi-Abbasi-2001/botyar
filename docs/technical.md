@@ -57,7 +57,7 @@ Design principles (each is enforced in code, not just intended):
 | `api/app/catalog.py`, `export.py`, `faq_index.py`, `faq_match.py`, `media.py`, `customers.py`, `records_ops.py` | Catalog import, exports, FAQ retrieval, files, customers list/bans, owner actions on records |
 | `api/app/models.py`, `store.py`, `db.py`, `auth.py`, `config.py`, `dates.py` | Tables, record store, DB session, JWT auth, settings, Jalali dates and the fixed test clock |
 | `web/app/*`, `web/components/workspace/*` | UI: landing, auth, bots, workspace tabs, pricing, account |
-| `api/tests/` (457 tests) | Backend tests (no network, no OpenAI) |
+| `api/tests/` (491 tests) | Backend tests (no network, no OpenAI) |
 | `api/scripts/` | Agent regression harness (`eval_agent.py`, 68 cases), `odd_requests.py`, FAQ evaluation scripts |
 
 ## 4. The BotSpec
@@ -100,13 +100,14 @@ Validation rules worth knowing: block ids unique; menu targets exist; `admin_not
 
 LangGraph: `clarify → design → validate → write_tests → run_tests → repair (≤3) → save`. Outcomes: `done`, `needs_input` (≤3 focused Persian questions), `failed`, `declined`.
 - **clarify** decides whether to build, ask, or decline. In the first round of a new bot it also **suggests natural extras for that kind of business** (shops: payment/delivery/discounts/options; appointments: reminders/cancel deadline/services; applications: accept-reject/file upload; …) in one short question the owner can skip with «نیازی نیست»; it never asks twice and never builds an extra that needs a fact it would have to invent. Rules in the prompt: build the closest supported bot instead of declining when only part of a request is unsupported; decline only when nothing useful can be built; never invent business facts (prices, hours, coordinates, quiz answers, channel names); say unsupported parts with the words «پشتیبانی نمی‌شود».
-- **design** returns the full spec via strict structured output; Pydantic errors go back to the model for another attempt (max 3).
+- **design** returns the full spec via strict structured output; Pydantic errors go back to the model for another attempt (max 3). After that **deterministic fidelity checks** (`app/fidelity.py`, no model) compare the spec with what the owner actually said and send slips back as errors: every given time, Jalali date, phone number, card number, @channel and link must be somewhere in the bot; appointment length equals the minutes said; «شنبه تا چهارشنبه» covers every day in between; a free-delivery threshold needs a delivery fee; no customer text may contain an instruction to the owner («اینجا وارد کنید»); every form, booking, order and contact block has an `admin_notify`; a referral that promises a discount has a real `reward_code` and the friend count the owner named; no message exists only to announce what the bot cannot do; a phone number lives in the message text, and a separate contact card is built only when the owner asks for one-tap calling; the assumptions never claim a feedback block or reminder that is not in the spec.
+- **Deterministic fixes** (no model): a discount code used as a quiz or referral reward is always private (`visible: false`), otherwise anyone could use it without earning it; a working-hours end of «24:00» / «00:00» (closing at midnight) is read as 23:59, while closing after midnight is unsupported; when card-to-card payment was asked for without a card number, nothing is invented and the final message says «پرداخت کارت‌به‌کارت اضافه نشد؛ شماره کارت را بفرستید»; the owner's tables (menu, quiz questions, sessions, FAQ, services) are validated and copied into the bot exactly (`app/datasets.py`).
 - **write_tests** produces ≤4 scenarios (steps with expected/forbidden substrings, setup runs for capacity, record checks). Tests are LLM-written and executed by the deterministic runner (`testing.py`).
 - **repair** decides whether the spec or the test is wrong and fixes it; publishing stays locked while any test fails.
 - **Change requests** receive the current spec, produce a readable diff, and re-run old and new tests.
 - **Cost control**: per-user 40 runs/day, global 300 runs/day, plan limit on agent requests per 30 days, every call logged in `llm_calls` with tokens and cost; the owner UI does not show them.
 - **Interrupted runs** (server restart) are failed at startup or after 6 minutes so a bot is never locked.
-- **Quality harness**: `api/scripts/eval_agent.py` runs 68 real-model cases (supported builds with content checks, honest declines, no-invention rules, regression cases for every past failure). It is run only for the affected cases after a prompt change and once in full before a deploy.
+- **Quality harness**: `api/scripts/eval_agent.py` runs 68 real-model cases (supported builds with content checks, honest declines, no-invention rules, regression cases for every past failure). It is run only for the affected cases after a prompt change and once in full before a deploy. Multi-step manual scripts (build, then several changes in a row, with the exact messages) are in `docs/fa/test-prompts-by-block.fa.md`; running them found the midnight-closing failure, the missing referral code and the missing owner notification listed above.
 
 ## 7. Messenger layer
 
@@ -183,9 +184,9 @@ All need the bot to be inside the channel/group; the owner links a chat by posti
 | Mutation checks | key rules were broken on purpose to confirm tests fail (done for cancellation and capacity logic) |
 | Agent quality | `scripts/eval_agent.py` against the real model (see `docs/agent-quality-eval.md`) |
 
-Run: `cd api && OPENAI_API_KEY=sk-invalid DATABASE_URL=sqlite:///./test.db .venv/bin/python -m pytest -q` (an invalid key guarantees no credits are spent). Last full run: **457 collected, all passing at the last full run of each group**. Tests do **not** prove behaviour on the real Bale/Telegram servers; that is what `docs/real-bale-checklist.md` is for.
+Run: `cd api && OPENAI_API_KEY=sk-invalid DATABASE_URL=sqlite:///./test.db .venv/bin/python -m pytest -q` (an invalid key guarantees no credits are spent). Last count: **491 collected**; run the groups you touch (the whole suite takes tens of minutes because of the integration tests). Tests do **not** prove behaviour on the real Bale/Telegram servers; that is what `docs/real-bale-checklist.md` is for.
 
-## 14. API surface (98 operations)
+## 14. API surface (99 operations)
 
 Auth `POST /api/auth/register|login`, `GET /api/me`, `GET /api/health`, `GET /api/templates`. Plans `GET /api/plans` (public), `GET /api/me/plan`, `POST /api/me/upgrade`, `POST /api/me/plan/cancel`, admin `GET/POST /api/admin/upgrades…`.
 Bots `GET/POST /api/bots`, `POST /api/bots/draft`, `GET /api/bots/{id}`, builder (`POST …/builder`, `GET …/builder/{active|messages|runs/{run}}`), `GET …/versions|tests|cost`, simulator (`POST …/simulate`, `…/simulate/reset`).

@@ -56,7 +56,7 @@ def world(monkeypatch):
     state = {"fail": False}
 
     def fake(token, method, payload=None, timeout=15):
-        if method == "sendMessage":
+        if method in ("sendMessage", "editMessageText"):  # a button tap is answered by editing the message in place
             sent.append((str(payload["chat_id"]), payload["text"], payload.get("reply_markup")))
         if method == "getMe":
             return {"username": "botyar_test_bot", "id": 9999}

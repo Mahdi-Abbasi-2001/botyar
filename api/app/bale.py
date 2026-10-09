@@ -582,7 +582,7 @@ def _process(db: Session, kind: str, pub_id: int | None, update: dict, ch: Chann
                 db.commit()
                 return
             if t == "gate:check":
-                t = "/start"
+                t, welcome_now = "/start", True  # passing the join check starts the bot fresh: the welcome, not just the menu
         if db.scalars(select(BannedCustomer).where(BannedCustomer.bot_id == pub.bot_id, BannedCustomer.key == skey)).first():
             row.state = state
             db.commit()
