@@ -33,7 +33,7 @@
    calendars from working hours, with cancel and reschedule), catalog order (stock, delivery fee, discount codes, online
    payment in Bale), FAQ, contact the owner, feedback, sub-menu, quiz, invite links, anonymous chat, admin notify; plus
    an optional forced channel join.
-2. **Customers never talk to a language model.** A deterministic engine runs the spec, so a live bot behaves the same
+2. **AI builds the bot; a deterministic engine serves customers.** The engine runs the spec the owner approved, so a live bot behaves the same
    every time, can't be prompt-injected and costs almost nothing per message. (FAQ free-text questions use one small
    embeddings lookup against the owner's own sentences; answers are never generated.)
 3. **Every version is tested before it can be published.** The agent writes test conversations, the engine runs them,
@@ -114,7 +114,7 @@ For frontend work with hot reload, run `npm run dev` in `web/` with `NEXT_PUBLIC
 
 40 agent runs per user per 24 h, 300 agent runs and 300 AI-assisted imports per 24 h across all users, 8 sign-ups per
 IP per hour, plus per-plan limits (bots, live bots, active customers, agent requests; `docs/technical.md` §10). A typical
-bot costs about $0.002 to build (`docs/agent-quality-eval.md`).
+bot costs about $0.004 to build or change (re-measured on 9 October; earlier figures in `docs/agent-quality-eval.md`).
 
 ## Tests
 

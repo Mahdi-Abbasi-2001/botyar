@@ -23,13 +23,13 @@ router = APIRouter()
 WINDOW_DAYS = 30  # "per month" = the last 30 days, so there is no calendar-month edge case
 
 PLANS: dict[str, dict] = {
-    "free": {"name": "رایگان", "price": 0, "bots": 3, "live_bots": 1, "customers": 100, "ai_requests": 30,
+    "free": {"name": "رایگان", "price": 0, "bots": 1, "live_bots": 1, "customers": 100, "ai_requests": 10,
              "tagline": "برای آشنایی و ربات‌های ساده"},
-    "basic": {"name": "پایه", "price": 149_000, "bots": 3, "live_bots": 1, "customers": 500, "ai_requests": 100,
+    "basic": {"name": "پایه", "price": 299_000, "bots": 3, "live_bots": 1, "customers": 500, "ai_requests": 50,
               "tagline": "برای یک کسب‌وکار کوچک با مشتریان ثابت"},
-    "pro": {"name": "حرفه‌ای", "price": 349_000, "bots": 10, "live_bots": 3, "customers": 3000, "ai_requests": 300,
+    "pro": {"name": "حرفه‌ای", "price": 699_000, "bots": 10, "live_bots": 3, "customers": 3000, "ai_requests": 120,
             "tagline": "برای کسب‌وکارهای پرمشتری یا چندشعبه‌ای"},
-    "agency": {"name": "سازمانی", "price": 1_490_000, "bots": 50, "live_bots": 10, "customers": 3000, "ai_requests": 1500,
+    "agency": {"name": "سازمانی", "price": 2_990_000, "bots": 50, "live_bots": 10, "customers": 3000, "ai_requests": 500,
                "tagline": "برای سازمان‌ها، آژانس‌ها و فریلنسرهایی که چند ربات را اداره می‌کنند"},
 }
 INCLUDED = [  # every plan has every feature; plans differ only by the limits above

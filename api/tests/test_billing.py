@@ -65,10 +65,10 @@ def test_public_plans_list_and_my_plan_start_on_free(world):
     assert me["plan"]["key"] == "free" and me["usage"]["bots"] == 0 and me["admin"] is False
 
 
-def test_bot_limit_blocks_the_fourth_draft_on_free_and_an_upgrade_lifts_it(world):
+def test_bot_limit_blocks_the_second_draft_on_free_and_an_upgrade_lifts_it(world):
     c, user, _ = world
     H, B = user("a_x.com"), user("boss_x.com")
-    for _ in range(3):
+    for _ in range(1):  # the free plan has one bot
         assert c.post("/api/bots/draft", headers=H).status_code == 200
     r = c.post("/api/bots/draft", headers=H)
     assert r.status_code == 402 and "ارتقا" in r.json()["detail"]
@@ -178,14 +178,14 @@ def test_demo_mode_simulates_the_payment_activates_the_plan_at_once_and_can_be_c
     monkeypatch.setattr(settings, "billing_demo", True)
     H = user("d_x.com")
     assert c.get("/api/plans").json()["demo"] is True
-    for _ in range(3):
+    for _ in range(1):
         c.post("/api/bots/draft", headers=H)
     assert c.post("/api/bots/draft", headers=H).status_code == 402
     r = c.post("/api/me/upgrade", json={"plan": "pro"}, headers=H).json()
-    assert r == {"ok": True, "simulated": True, "plan": "pro", "amount": 349000}
+    assert r == {"ok": True, "simulated": True, "plan": "pro", "amount": 699000}
     me = c.get("/api/me/plan", headers=H).json()
     assert me["plan"]["key"] == "pro" and me["demo"] is True and me["pending_request"] is None
-    assert [(p["plan"], p["amount"], p["simulated"]) for p in me["payments"]] == [("pro", 349000, True)]
+    assert [(p["plan"], p["amount"], p["simulated"]) for p in me["payments"]] == [("pro", 699000, True)]
     assert c.post("/api/bots/draft", headers=H).status_code == 200                    # the higher limit applies immediately
     assert c.post("/api/me/upgrade", json={"plan": "free"}, headers=H).status_code == 422
     assert c.post("/api/me/upgrade", json={"plan": "nope"}, headers=H).status_code == 422

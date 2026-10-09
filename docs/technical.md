@@ -8,9 +8,9 @@ A business owner describes a chat bot in Persian. An agent builds it as a valida
 
 Design principles (each is enforced in code, not just intended):
 1. **The agent never writes code.** It produces a BotSpec (Pydantic models in `api/app/spec.py`); a fixed engine runs it.
-2. **Customers never talk to a language model.** The runtime has no LLM call. (The only AI use at customer time is one embeddings lookup for FAQ free-text questions, which can only return the owner's own sentences, and it degrades to word matching if the provider is down.)
+2. **AI builds the bot; a deterministic engine serves customers.** The runtime has no LLM call. (The only AI use at customer time is one embeddings lookup for FAQ free-text questions, which can only return the owner's own sentences, and it degrades to word matching if the provider is down.)
 3. **A version cannot be published until every test passes.**
-4. **Cheap by construction.** One LLM (`gpt-6-luna`) for all agent steps, effort tuned per step, cost logged per call; a typical build is about $0.002 [measured, `docs/agent-quality-eval.md`].
+4. **Cheap by construction.** One LLM (`gpt-6-luna`) for all agent steps, effort tuned per step, cost logged per call; a typical build or change is about $0.004, at most about $0.01 [measured, re-measured 9 October].
 5. **Fail open for customers, closed for money.** Setup mistakes (join gate, wallet) never lock customers out; payments only count when the messenger confirms them.
 
 ## 2. Architecture
@@ -146,10 +146,10 @@ Background jobs run in one daemon thread (production only, i.e. when `PUBLIC_BAS
 
 | Plan | Toman/month | Bots / live | Active customers per live bot (30 days) | Agent requests (30 days) |
 |---|---|---|---|---|
-| Free | 0 | 3 / 1 | 100 | 30 |
-| Basic | 149,000 | 3 / 1 | 500 | 100 |
-| Pro | 349,000 | 10 / 3 | 3,000 | 300 |
-| Agency | 1,490,000 | 50 / 10 | 3,000 | 1,500 |
+| Free | 0 | 1 / 1 | 100 | 10 |
+| Basic | 299,000 | 3 / 1 | 500 | 50 |
+| Pro | 699,000 | 10 / 3 | 3,000 | 120 |
+| Agency | 2,990,000 | 50 / 10 | 3,000 | 500 |
 
 All features are in all plans. Limits are enforced when creating a bot, publishing, calling the agent, and when a *new* customer arrives (existing customers are never cut off; the owner is told once a day). **Demo billing** (`BILLING_DEMO=true`, the default): upgrading simulates a successful payment, activates the plan at once and records a clearly labelled simulated payment; no money moves. `BILLING_DEMO=false` switches to request-and-approve by accounts listed in `ADMIN_USERNAMES`.
 

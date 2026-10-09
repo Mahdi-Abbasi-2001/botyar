@@ -12,8 +12,8 @@ Small Iranian businesses (cafés, clinics, salons, gyms, shops, teachers) live o
 Both options are slow, and changes later (a new price, a new class time) need the same effort again.
 
 ## 3. The solution (what exists today, in production)
-- **Agent builder**: Persian description → clarifying questions only when needed → bot spec → **automatic test scenarios run against the real engine** → repair loop (up to 3) → save. Measured cost **about $0.001–0.009 per build or change** [measured: `llm_calls` log, eval harness].
-- **Deterministic runtime**: customers never talk to an LLM; the agent only writes a validated spec that an engine executes. Safe, cheap, testable, explainable.
+- **Agent builder**: Persian description → clarifying questions only when needed → bot spec → **automatic test scenarios run against the real engine** → repair loop (up to 3) → save. Measured cost **about $0.002–0.010 per build or change, typically $0.004** [measured: `llm_calls` log, eval harness].
+- **AI where it builds, certainty where it serves**: the agent builds and changes the bot; the published bot says exactly what the owner approved (a validated spec run by an engine). Safe, cheap, testable, explainable.
 - **Block types** (all in the spec language): messages (random variants, photo/file, map pin), forms, bookings (fixed slots with capacity and waitlist, weekly repeats with Jalali dates, **individual appointments from working hours and staff**, cancel and reschedule), orders and shops (catalog from CSV/Excel/paste/photo, stock, delivery fee, discount codes, **online payment inside Bale**), FAQ (retrieval only: answers are the owner's own sentences), quizzes, sub-menus, ratings, invite links, anonymous chat, "talk to the owner" inbox, owner notifications, optional forced channel join.
 - **Owner panel**: records with cancel/status actions, inbox with replies delivered to the customer's chat, announcements (manual and scheduled, with `/stop` opt-out), customers list with Excel export, booking reminders, files tab, plan and usage page.
 - **Channels**: Bale (shared bot with links/QR and a directory, or the owner's own bot token); Telegram via a relay outside Iran.
@@ -41,16 +41,16 @@ Per-account monthly plans; every feature is in every plan, plans differ only in 
 
 | Plan | Price (Toman/month) | Bots / live | Active customers per live bot (30 days) | Agent requests (30 days) |
 |---|---|---|---|---|
-| Free | 0 | 3 / 1 | 100 | 30 |
-| Basic | 149,000 | 3 / 1 | 500 | 100 |
-| Pro | 349,000 | 10 / 3 | 3,000 | 300 |
-| Enterprise («سازمانی») | 1,490,000 | 50 / 10 | 3,000 | 1,500 |
-Why these anchors: a usage-billed builder's own sample bots cost 150–235k Toman/month; a flat-plan builder starts at 183k; a freelancer's single basic bot costs 2–8M once — so ~150–350k/month is in-market and cheap next to a freelancer. **The founder must still validate the numbers with owners.**
+| Free | 0 | 1 / 1 | 100 | 10 |
+| Basic | 299,000 | 3 / 1 | 500 | 50 |
+| Pro | 699,000 | 10 / 3 | 3,000 | 120 |
+| Enterprise («سازمانی») | 2,990,000 | 50 / 10 | 3,000 | 500 |
+Why these numbers: prices are set at about 270,000 Toman per USD, and each plan's request limit is chosen so that even if the limit is used in full every month the AI cost stays near 45% of the price (the costs are in dollars, the prices in Toman, so they need revisiting when the rate moves). For comparison: a usage-billed builder's own sample bots cost 150–235k Toman/month, a flat-plan builder starts at 183k, and a freelancer's single basic bot costs 2–8M once. Basic at 299k is above the first two and has to be justified by value (building and changing bots without a freelancer, automatic tests before publishing, the management panel). **The founder must still validate the numbers with owners.**
 In this demo build, upgrading is a **simulated payment**: the plan is activated immediately and the account page shows an invoice history marked «پرداخت آزمایشی» (no money moves, because there is no payment gateway yet). A switch (`BILLING_DEMO=false`) turns on the request-and-approve flow for a manual launch. Real subscription payment (e.g. ZarinPal) is **[blank — needs merchant onboarding]**.
 Later options: annual discount (the flat-plan builders give about 22–26%), one-off "we build it for you" service, white-label for agencies. Not taking a cut of customers' payments: money goes to the owner's own Bale wallet by design.
 
 ## 7. Unit economics
-Measured AI cost per request is $0.001–0.009 (median about $0.002). Worst-case AI cost per plan if the limit is fully used every month: Free 30 × $0.009 ≈ **$0.27**; Basic 100 × $0.009 ≈ **$0.90**; Pro 300 ≈ **$2.70**; Enterprise 1,500 ≈ **$13.50**. Customers chatting with bots cost **no AI**; the FAQ's embedding call is ≈ $0.0000003 per question [measured].
+Measured AI cost per request is $0.002–0.010 (typically about $0.004; re-measured on 9 October after the fidelity checks were added). Worst-case AI cost per plan if the limit is fully used every month, at $0.01 per request: Free 10 → **$0.10** (≈ 27k Toman); Basic 50 → **$0.50** (≈ 135k); Pro 120 → **$1.20** (≈ 324k); Enterprise 500 → **$5.00** (≈ 1.35M); each about 45% of the plan price. Customers chatting with bots cost **no AI**; the FAQ's embedding call is ≈ $0.0000003 per question [measured].
 Not yet known: hosting cost per bot (Liara plan price **[blank]**), USD→Toman rate used for the plan **[blank]**, payment-gateway fees **[blank]**, support time. Gross margin therefore cannot be stated yet; the AI cost is a small fraction of any plausible price.
 
 ## 8. Go-to-market
