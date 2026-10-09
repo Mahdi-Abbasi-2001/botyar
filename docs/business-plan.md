@@ -51,7 +51,7 @@ Later options: annual discount (the flat-plan builders give about 22–26%), one
 
 ## 7. Unit economics
 Measured AI cost per request is $0.002–0.010 (typically about $0.004; re-measured on 9 October after the fidelity checks were added). Worst-case AI cost per plan if the limit is fully used every month, at $0.01 per request: Free 10 → **$0.10** (≈ 27k Toman); Basic 50 → **$0.50** (≈ 135k); Pro 120 → **$1.20** (≈ 324k); Enterprise 500 → **$5.00** (≈ 1.35M); each about 45% of the plan price. Customers chatting with bots cost **no AI**; the FAQ's embedding call is ≈ $0.0000003 per question [measured].
-Not yet known: hosting cost per bot (Liara plan price **[blank]**), USD→Toman rate used for the plan **[blank]**, payment-gateway fees **[blank]**, support time. Gross margin therefore cannot be stated yet; the AI cost is a small fraction of any plausible price.
+Not yet known: hosting cost per account (estimated at about 5,000 Toman a month, roughly 1M Toman for a small instance ÷ about 200 accounts; no load test yet), USD→Toman rate used for the plan **[blank]**, payment-gateway fees **[blank]**, support time. Gross margin therefore cannot be stated yet; the AI cost is a small fraction of any plausible price.
 
 ## 8. Go-to-market
 1. **Demo video + live link** (this competition) and 3–5 pilot businesses (a clinic, a café, a salon) whose real feedback replaces the blanks above **[blank — founder]**.
