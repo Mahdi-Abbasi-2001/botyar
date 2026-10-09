@@ -54,7 +54,8 @@ DECLINE_MARK = "🚧 "  # starts a message that declines the request, or the lin
 
 RESERVED_LABELS = {x.replace(" ", "") for x in ("ثبتهای من", "سفارشهای من", "نوبتهای من", "ثبتنامهای من", "کدهای تخفیف", "نتیجههای من")}
 
-KEPT_FIELDS = ("hours", "links", "contact", "location", "media", "variants")
+KEPT_FIELDS = ("hours", "links", "contact", "location", "media", "variants",  # message block
+               "discount_codes", "delivery_zones", "delivery_fee", "free_delivery_over", "time_windows")  # shop: a change request must not wipe these
 REMOVAL_WORDS = ("حذف", "بردار", "پاک", "نمی‌خوام", "نمی‌خواهم", "نمیخوام", "نمی‌خواهیم", "دیگر نیاز", "نیازی ندارم", "جایگزین", "عوض", "تغییر بده")
 
 

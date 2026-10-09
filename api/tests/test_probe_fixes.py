@@ -74,3 +74,17 @@ def test_closing_at_midnight_is_accepted():
     import pytest
     with pytest.raises(ValueError):
         WorkDay(weekday=4, start="18:00", end="02:00")  # past midnight into the next day is not supported
+
+
+def test_a_change_request_cannot_silently_wipe_a_shops_discount_code_or_delivery():
+    from app.agent import dropped_fields, restore_dropped
+    old = {"blocks": [{"id": "order", "type": "catalog_order", "discount_codes": [{"code": "WELCOME10", "percent": 10}], "delivery_fee": 35000,
+                       "order_hours": [{"weekday": 0, "start": "08:00", "end": "23:00"}]}]}
+    new = {"blocks": [{"id": "order", "type": "catalog_order", "discount_codes": [], "delivery_fee": 0,
+                       "order_hours": [{"weekday": 0, "start": "08:00", "end": "22:00"}]}]}
+    req = "سفارش‌گیری فقط تا ساعت ۲۲ باشد و یک براونی هم به منو اضافه کن."
+    assert len(dropped_fields(old, new, req)) == 2
+    fixed = restore_dropped(old, new, req)["blocks"][0]
+    assert fixed["discount_codes"][0]["code"] == "WELCOME10" and fixed["delivery_fee"] == 35000
+    assert fixed["order_hours"][0]["end"] == "22:00"          # what the owner changed is kept as changed
+    assert restore_dropped(old, new, "کد تخفیف را حذف کن") is None  # an explicit removal is respected

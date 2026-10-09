@@ -1,6 +1,6 @@
 # Botyar (بات‌یار) — Technical documentation
 
-Version of 2026-10-08. Persian versions for the competition judges: `docs/fa/technical.fa.md`, `docs/fa/business-plan.fa.md`, `docs/fa/pitch/pitch.html`. Live: https://botyar.liara.run · Shared Bale bot: `@botyar_ai_bot`. This document describes what is in the repository; things that are built but not yet proven on a real messenger are marked **[unverified on a real messenger]** and listed in `docs/real-bale-checklist.md`.
+Version of 2026-10-08. Persian versions for the competition judges: `docs/fa/technical.fa.md`, `docs/fa/business-plan.fa.md`, `docs/fa/pitch/pitch.html`. Live: https://botyar.liara.run · Shared bot on Bale and Telegram: `@botyar_ai_bot`. This document describes what is in the repository; the product has been tried by hand on real Bale and Telegram to some extent, and what still needs a systematic pass on real messengers is listed in `docs/real-bale-checklist.md`.
 
 ## 1. What the system does
 
@@ -16,17 +16,24 @@ Design principles (each is enforced in code, not just intended):
 ## 2. Architecture
 
 ```
- Owner's browser ──► static Next.js UI ──► FastAPI (single instance) ──► PostgreSQL (SQLite in dev)
-                                              │
-        ┌─────────────────────────────────────┼──────────────────────────────┐
-        ▼                                     ▼                              ▼
- BUILDER AGENT (LangGraph)            RUNTIME ENGINE (no LLM)        BACKGROUND JOBS (1 thread)
- clarify → design → validate →        engine.handle(spec, session,   reminders · scheduled announcements ·
- write tests → run tests →            text, store) → actions         unpaid-order expiry · anon-chat queue ·
- repair (≤3) → save version                    ▲                     outbox retries · webhook refresh
-        │                                      │ webhook updates
-        ▼                              ┌───────┴────────┐
-   OpenAI API                     Bale Bot API    Telegram (through a Deno relay outside Iran)
+ Owner's browser
+      │
+      ▼
+ Next.js UI (static) ──► FastAPI (single instance) ──► PostgreSQL
+                              │                        (SQLite in dev)
+        ┌─────────────────────┼──────────────────────┐
+        ▼                     ▼                      ▼
+ BUILDER AGENT          RUNTIME ENGINE         BACKGROUND JOBS
+ (LangGraph)            (no LLM)               (1 thread)
+ clarify → design       engine.handle(spec,    reminders, scheduled
+ → validate →           session, text,         announcements, unpaid-
+ write tests →          store) → actions       order expiry, anon-chat
+ run tests →                   ▲               queue, outbox retries,
+ repair (≤3) →                 │ webhooks      webhook refresh
+ save version                  │
+      │                ┌──────┴───────┐
+      ▼                │              │
+ OpenAI API     Bale Bot API   Telegram (via relay outside Iran)
 ```
 
 | Layer | Technology |
@@ -162,7 +169,7 @@ All need the bot to be inside the channel/group; the owner links a chat by posti
 | **Forced channel join** (`spec.gate`) | before anything else the bot asks the messenger whether the customer is a member (`getChatMember`); non-members get a join link + «عضو شدم» | the bot must be an **admin** of the channel; if the check fails the customer is let in and the owner warned once a day; the panel shows whether setup is correct; not applied in the simulator |
 | **Referral links** | personal code `r…` → `…?start=<code>`; a brand-new customer arriving through it counts once for the referrer, who is told | self-invites and existing customers never count; the reward is the owner's own text (nothing paid automatically); leaderboard in the customers tab |
 | **Anonymous chat** | pairs two waiting customers (even Bale + Telegram); relays text as «👤 …»; end / next / report | text only, ≤500 chars, 20 msgs/min; links, @ids and phone numbers are not relayed; a report stores the last 8 messages for the owner (cleared when a chat ends normally); owner can ban customers; waiting expires after 10 minutes. **The owner is responsible for moderation.** |
-| **Post forwarding** | new posts of a linked channel are copied to other linked channels/groups (`copyMessage`) | bot admin in source and destination; rules that would create a loop are refused; Bale↔Telegram text only; **[unverified on a real messenger: whether Bale delivers channel posts to bots]** |
+| **Post forwarding** | new posts of a linked channel are copied to other linked channels/groups (`copyMessage`) | bot admin in source and destination; rules that would create a loop are refused; Bale↔Telegram text only; tried by hand on real Bale, not exhaustively; whether Bale delivers channel posts to bots depends on Bale's rules |
 | **Group moderation** | delete messages with links/@ids, forwards or banned words; warnings; ban at N warnings; welcome message; admin commands `/ban` `/unban` `/warns` on replies | admins are never moderated; Bale documents delete (<48 h old), ban, unban but **no mute**; **[unverified on a real messenger: group message delivery on Bale]** |
 
 ## 12. Security
@@ -203,7 +210,7 @@ Owner panel `…/records` (+`PATCH` cancel/status), `…/inbox` (+reply), `…/b
 ## 16. Known limits (honest list)
 
 1. **Single instance**: locks and the scheduler are in process; two instances would need database locks and a leader for background jobs.
-2. **Unverified on real messengers**: channel post / group message delivery on Bale, multipart file upload format, invoice flow, deep-link payload with referral codes, join check on channels. Telegram paths are tested against a fake relay only.
+2. **Real-messenger testing is partial**: channel posts and groups, file uploads, the invoice flow, referral deep links, the channel-join check and the Telegram path through the relay have been tried by hand on real Bale and Telegram, but not systematically; a full pass over `docs/real-bale-checklist.md` is still to do.
 3. **No password reset or account/data deletion** (accounts have no email to reset through).
 4. **No monitoring/alerting or database backup policy** beyond Liara's defaults.
 5. **Catalog** loads the whole product list per tap (fine for hundreds of items, untested at thousands); category lists are not paginated.

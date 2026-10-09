@@ -1,6 +1,6 @@
 # Botyar — Test Tour (learn the product by trying to break it)
 
-Live site: https://botyar.liara.run · Shared Bale bot: **@botyar_ai_bot** · Sample files: `docs/samples/`
+Live site: https://botyar.liara.run · Shared bot on Bale and Telegram: **@botyar_ai_bot** · Sample files: `docs/samples/`
 
 How to use this: go station by station. Each station says **what it is**, **how it works**, **what to do**, **what you
 should see**, and **how to try to break it**. Write down anything that surprises you — a surprise is either a bug or a
@@ -259,7 +259,7 @@ You do not need special tools:
 4. **Single server instance.** The anti-double-booking lock and the background jobs live in memory, so we cannot run two instances without moving locks into the database. No uptime monitoring/alerts; database backup policy unverified.
 5. **No password reset, account/data deletion.** (Out of competition scope, needed for a real product.)
 6. **Dates are Gregorian in exports** (conversations use Jalali). Telegram exists (through a relay) but is tested against a fake relay only. One owner chat gets notifications per publication.
-7. **Several things are untested on real messengers**: own-token mode, channel/group message delivery on Bale (post forwarding, moderation, channel linking), file upload format, invoices — see `docs/real-bale-checklist.md`.
+7. **Several things have only been tried partly on real messengers**: own-token mode, channel/group message delivery on Bale (post forwarding, moderation, channel linking), file upload format, invoices — see `docs/real-bale-checklist.md`.
 8. **No owner analytics** (e.g. "40% of customers drop out at the phone-number step") — also a strong pitch point.
 9. **Photo import can misread small text** (we saw a wrong size range). It always needs the owner's review; consider a second-pass check.
 10. **Prices/totals in notifications** use the digits typed; consistent Persian/Latin policy is a product decision.

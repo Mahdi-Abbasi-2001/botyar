@@ -1,12 +1,12 @@
 # Real-Bale / Telegram test checklist (things automated tests CANNOT prove)
 
-The automated tests use a fake messenger. Everything below must be tried once on a real phone before it is shown to judges. For each item: what to do, what you should see, and what a failure tells us. Use two phones or two accounts where noted. After each pass or fail, tell me and I will fix or reword.
+The automated tests use a fake messenger. Much of this has already been tried by hand to some extent; use the list for one complete, systematic pass on real phones. For each item: what to do, what you should see, and what a failure tells us. Use two phones or two accounts where noted. After each pass or fail, tell me and I will fix or reword.
 
 ## A. Setup
 1. Deploy, then log in at https://botyar.liara.run with a fresh account. (`ADMIN_USERNAMES` is only needed if you set `BILLING_DEMO=false`.)
 2. Build one bot with the agent (for example a café with a menu), run its tests, publish it on Bale, open the link, and send `/admin <code>` from your own Bale to receive notifications.
 
-## B. Already-built features that were never tested on a phone
+## B. Already-built features to check systematically on a phone
 | # | Do | Expected | If it fails |
 |---|---|---|---|
 | B1 | Customer places an order; owner changes status in the panel | owner gets the order message; customer gets «در حال آماده‌سازی» etc. | Bale `sendMessage` to the customer failing, or `/admin` link missing |

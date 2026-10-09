@@ -1,8 +1,8 @@
 # بات‌یار — مستندات فنی و زیرساخت
 
-**نسخهٔ آنلاین:** https://botyar.liara.run · **ربات مشترک بله:** `@botyar_ai_bot` · **مخزن کد:** github.com/Mahdi-Abbasi-2001/botyar
+**نسخهٔ آنلاین:** https://botyar.liara.run · **ربات مشترک بله و تلگرام:** `@botyar_ai_bot` · **مخزن کد:** github.com/Mahdi-Abbasi-2001/botyar
 
-این سند برای داوران نوشته شده است و هر چیزی که می‌گوید در کد همین مخزن وجود دارد. مواردی که ساخته شده‌اند اما هنوز روی پیام‌رسان واقعی آزموده نشده‌اند، صریحاً با عبارت **«آزموده‌نشده روی پیام‌رسان واقعی»** مشخص شده‌اند (بخش ۱۲).
+این سند برای داوران نوشته شده است و هر چیزی که می‌گوید در کد همین مخزن وجود دارد. محصول تا حدی روی بله و تلگرام واقعی به‌صورت دستی آزموده شده است؛ مواردی که هنوز به‌طور نظام‌مند آزموده نشده‌اند در بخش ۱۲ و فهرست آزمایش میدانی آمده‌اند.
 
 ## ۱. محصول در یک نگاه
 
@@ -19,17 +19,24 @@
 ## ۲. معماری
 
 ```
- Owner browser --> Next.js UI (static export) --> FastAPI (single instance) --> PostgreSQL (SQLite in dev)
-                                                       |
-        +----------------------------------------------+------------------------------+
-        v                                              v                              v
- BUILDER AGENT (LangGraph)                  RUNTIME ENGINE (no LLM)           BACKGROUND JOBS (1 thread)
- clarify > design > validate >              engine.handle(spec, session,      reminders, scheduled announcements,
- write_tests > run_tests >                  text, store) -> actions           unpaid-order expiry, anon-chat queue,
- repair (max 3) > save version                      ^                         outbox retries, webhook refresh
-        |                                           | webhooks
-        v                                   +-------+--------+
-   OpenAI API                          Bale Bot API      Telegram (via a Deno relay outside Iran)
+ Owner browser
+      |
+      v
+ Next.js UI (static) --> FastAPI (single instance) --> PostgreSQL
+                              |                        (SQLite in dev)
+        +---------------------+----------------------+
+        v                     v                      v
+ BUILDER AGENT          RUNTIME ENGINE         BACKGROUND JOBS
+ (LangGraph)            (no LLM)               (1 thread)
+ clarify > design       engine.handle(spec,    reminders, scheduled
+ > validate >           session, text,         announcements, unpaid-
+ write_tests >          store) -> actions      order expiry, anon-chat
+ run_tests >                   ^               queue, outbox retries,
+ repair (max 3) >              | webhooks      webhook refresh
+ save version                  |
+      |                +------+-------+
+      v                |              |
+ OpenAI API     Bale Bot API   Telegram (via relay outside Iran)
 ```
 
 | لایه | فناوری |
@@ -161,7 +168,9 @@ cd .. && ./build.sh        # ساخت رابط کاربری داخل api/static
 بدون `DATABASE_URL` از SQLite استفاده می‌شود؛ بدون `PUBLIC_BASE_URL` webhookها ثبت نمی‌شوند (شبیه‌ساز وب همه‌جا کار می‌کند). اجرای تست‌ها (با کلید نامعتبر عمداً تا هزینه‌ای ایجاد نشود):
 
 ```bash
-cd api && OPENAI_API_KEY=sk-invalid DATABASE_URL=sqlite:///./test.db .venv/bin/python -m pytest -q
+cd api
+OPENAI_API_KEY=sk-invalid DATABASE_URL=sqlite:///./test.db \
+  .venv/bin/python -m pytest -q
 ```
 
 **استقرار روی لیارا:** `./deploy.sh` رابط کاربری را می‌سازد، متغیرهای محیطی را از `api/.env` روی برنامهٔ `botyar` تنظیم می‌کند (بدون چاپ رازها) و تصویر Docker را مستقر می‌کند. لیارا روزانه ۲۰ استقرار مجاز می‌داند.
@@ -187,7 +196,7 @@ cd api && OPENAI_API_KEY=sk-invalid DATABASE_URL=sqlite:///./test.db .venv/bin/p
 ## ۱۲. محدودیت‌های فنی (فهرست صادقانه)
 
 1. **یک نمونه:** قفل‌ها و زمان‌بند داخل فرایند هستند؛ برای چند نمونه به قفل دیتابیسی و رهبر برای کارهای پس‌زمینه نیاز است.
-2. **آزموده‌نشده روی پیام‌رسان واقعی:** دریافت پست کانال و پیام گروه در بله، فرمت دقیق آپلود چندبخشی فایل، جریان فاکتور، وضعیتی که `getChatMember` برای غیرعضو برمی‌گرداند (قفل عضویت)، مسیر تلگرام (فقط با رلهٔ شبیه‌سازی‌شده آزموده شده). فهرست آزمایش میدانی: `docs/real-bale-checklist.md`.
+2. **آزمون روی پیام‌رسان واقعی ناقص است:** دریافت پست کانال و پیام گروه در بله، آپلود فایل، جریان فاکتور، لینک دعوت، قفل عضویت و مسیر تلگرام از طریق رله به‌صورت دستی و تا حدی روی بله و تلگرام واقعی آزموده شده‌اند، اما هنوز یک دور کامل و نظام‌مند انجام نشده است. فهرست آزمایش میدانی: `docs/real-bale-checklist.md`.
 3. **پرداخت اشتراک بات‌یار آزمایشی است** (درگاه پرداخت متصل نیست).
 4. **بازیابی گذرواژه و حذف حساب** وجود ندارد (حساب ایمیل ندارد).
 5. **پایش، هشداردهی و پشتیبان‌گیری** فراتر از پیش‌فرض‌های لیارا نداریم.

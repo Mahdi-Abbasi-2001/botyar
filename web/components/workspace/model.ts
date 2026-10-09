@@ -251,14 +251,17 @@ const FIELD_NAME: Record<string, string> = {
   done_text: "پیام پایان فرم", price: "قیمت", min_total: "حداقل مبلغ سفارش", max_items: "حداکثر تعداد آیتم", fields: "سؤال‌های فرم",
   slots: "زمان‌ها", items: "آیتم‌ها", on: "زمان ارسال پیام به مدیر", kind: "نوع", required: "اجباری", choices: "گزینه‌ها", options: "گزینه‌ها",
   block: "مقصد", blocks: "بخش‌ها", type: "نوع", delivery_fee: "هزینه‌ی ارسال", delivery_zones: "مناطق ارسال", free_delivery_over: "ارسال رایگان از مبلغ", fee: "هزینه‌ی ارسال",
+  order_hours: "ساعت سفارش‌گیری", discount_codes: "کدهای تخفیف", time_windows: "بازه‌های تحویل", hours: "ساعت کاری", links: "پیوندها", reminder_hours: "یادآوری (ساعت قبل)", payment: "روش پرداخت",
 };
 
 export function showValue(v: any, key?: string): string {
   if (v === null || v === undefined) return "—";
   if (typeof v === "boolean") return v ? "فعال" : "غیرفعال";
-  if (typeof v === "number") return key === "price" || key === "min_total" ? toman(v) : fa(v);
+  if (typeof v === "number") return key === "price" || key === "min_total" || key === "delivery_fee" || key === "free_delivery_over" ? toman(v) : fa(v);
   if (typeof v === "string") return v;
   if (Array.isArray(v)) return v.map((x) => showValue(x)).join("، ") || "خالی";
+  if ("start" in v && "end" in v) return `${"weekday" in v ? (WEEKDAYS[v.weekday] ?? "") + " " : ""}${fa(v.start)}–${fa(v.end)}`.trim();  // working hours, delivery windows
+  if ("code" in v) return `${v.code}${v.percent ? ` (${fa(v.percent)}٪)` : v.amount ? ` (${toman(v.amount)})` : ""}`;  // discount code
   return v.label ?? v.name ?? v.title ?? (v.text ? String(v.text).slice(0, 40) : "یک مورد");
 }
 

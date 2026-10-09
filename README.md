@@ -5,7 +5,7 @@
 خواسته شود را با نمایش تفاوت‌ها و اجرای دوباره‌ی همه‌ی تست‌ها اعمال می‌کند.
 
 - نسخه‌ی آنلاین: https://botyar.liara.run
-- ربات مشترک بله: `@botyar_ai_bot`. هر ربات یک لینک و QR می‌گیرد که مشتری را مستقیم واردش می‌کند؛ کسی که بدون لینک بیاید، فهرست کسب‌وکارها را می‌بیند. همان ربات را می‌شود روی تلگرام هم منتشر کرد.
+- ربات مشترک بله و تلگرام: `@botyar_ai_bot` (همین نام در هر دو). هر ربات یک لینک و QR می‌گیرد که مشتری را مستقیم واردش می‌کند؛ کسی که بدون لینک بیاید، فهرست کسب‌وکارها را می‌بیند. همان ربات را می‌شود روی تلگرام هم منتشر کرد.
 - راهنمای آزمودن قدم‌به‌قدم: [`docs/TEST-TOUR.md`](docs/TEST-TOUR.md)
 
 مسئله‌ی انتخاب‌شده در رویداد BuildX: **۳ — سازنده و نگه‌دارنده‌ی ربات بله/تلگرام.**
@@ -132,7 +132,8 @@ separately against the real model; see `docs/agent-quality-eval.md` and `docs/fa
 (`PROD_DATABASE_URL`, `OPENAI_API_KEY`, `BALE_SHARED_BOT_TOKEN`, `JWT_SECRET`, and the optional Telegram and admin
 variables) and deploys the Docker image. It never prints secrets. Liara allows 20 deployments per day.
 
-## What still has to be tried on real messengers
+## Real-messenger testing
 
-Automated tests use a fake messenger. `docs/real-bale-checklist.md` lists every step that must be tried once on real
-Bale/Telegram accounts, what you should see, and what a failure means.
+Automated tests use a fake messenger. The product has also been tried by hand on real Bale and Telegram to some extent;
+`docs/real-bale-checklist.md` lists every step for a full, systematic pass on real accounts, what you should see, and
+what a failure means.
