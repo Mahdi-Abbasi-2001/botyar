@@ -43,7 +43,7 @@ Design principles (each is enforced in code, not just intended):
 | Agent | LangGraph; OpenAI Responses API with strict structured outputs; model `gpt-6-luna` (only) |
 | Embeddings | `text-embedding-3-small` (FAQ only) |
 | Database | PostgreSQL on Liara (SQLite for development and tests) |
-| Hosting | Liara (Docker), one app instance; Telegram relay on Deno Deploy |
+| Hosting | Liara (Docker), one app instance; Telegram relay on Cloudflare Workers |
 | Messengers | Bale Bot API (`tapi.bale.ai`), Telegram Bot API via the relay |
 
 ## 3. Repository map
@@ -64,7 +64,7 @@ Design principles (each is enforced in code, not just intended):
 | `api/app/catalog.py`, `export.py`, `faq_index.py`, `faq_match.py`, `media.py`, `customers.py`, `records_ops.py` | Catalog import, exports, FAQ retrieval, files, customers list/bans, owner actions on records |
 | `api/app/models.py`, `store.py`, `db.py`, `auth.py`, `config.py`, `dates.py` | Tables, record store, DB session, JWT auth, settings, Jalali dates and the fixed test clock |
 | `web/app/*`, `web/components/workspace/*` | UI: landing, auth, bots, workspace tabs, pricing, account |
-| `api/tests/` (491 tests) | Backend tests (no network, no OpenAI) |
+| `api/tests/` (493 tests) | Backend tests (no network, no OpenAI) |
 | `api/scripts/` | Agent regression harness (`eval_agent.py`, 68 cases), `odd_requests.py`, FAQ evaluation scripts |
 
 ## 4. The BotSpec
@@ -191,7 +191,7 @@ All need the bot to be inside the channel/group; the owner links a chat by posti
 | Mutation checks | key rules were broken on purpose to confirm tests fail (done for cancellation and capacity logic) |
 | Agent quality | `scripts/eval_agent.py` against the real model (see `docs/agent-quality-eval.md`) |
 
-Run: `cd api && OPENAI_API_KEY=sk-invalid DATABASE_URL=sqlite:///./test.db .venv/bin/python -m pytest -q` (an invalid key guarantees no credits are spent). Last count: **491 collected**; run the groups you touch (the whole suite takes tens of minutes because of the integration tests). Tests do **not** prove behaviour on the real Bale/Telegram servers; that is what `docs/real-bale-checklist.md` is for.
+Run: `cd api && OPENAI_API_KEY=sk-invalid DATABASE_URL=sqlite:///./test.db .venv/bin/python -m pytest -q` (an invalid key guarantees no credits are spent). Last count: **493 collected**; run the groups you touch (the whole suite takes tens of minutes because of the integration tests). Tests do **not** prove behaviour on the real Bale/Telegram servers; that is what `docs/real-bale-checklist.md` is for.
 
 ## 14. API surface (99 operations)
 
@@ -204,7 +204,7 @@ Owner panel `…/records` (+`PATCH` cancel/status), `…/inbox` (+reply), `…/b
 
 - `./deploy.sh` builds the frontend into `api/static`, sets the environment on the Liara app from `api/.env` (never printing secrets) and deploys the Docker image. Liara allows 20 deployments per day.
 - Environment: `DATABASE_URL`, `JWT_SECRET`, `OPENAI_API_KEY`, `BALE_SHARED_BOT_TOKEN`, `PUBLIC_BASE_URL`, `TELEGRAM_RELAY_URL`, `TELEGRAM_RELAY_KEY`, `TELEGRAM_SHARED_BOT_TOKEN`, `BILLING_DEMO`, `ADMIN_USERNAMES`, `CORS_ORIGINS` (see `README.md`).
-- Telegram relay: `relay/main.ts` on Deno Deploy (`relay/README.md`).
+- Telegram relay: `relay/cloudflare-worker.js` on Cloudflare Workers (`relay/main.ts` is the same relay for Deno Deploy; `relay/README.md`).
 - Cost evidence: per-call LLM log (not shown to owners; available through `/api/bots/{id}/cost`).
 
 ## 16. Known limits (honest list)

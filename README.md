@@ -1,6 +1,6 @@
 # بات‌یار (Botyar)
 
-**بگو چی می‌خوای، ربات رو می‌سازم.** صاحب کسب‌وکار ربات بله‌اش را به فارسی توضیح می‌دهد؛ ایجنت ابهام‌ها را می‌پرسد،
+**بگویید چه می‌خواهید؛ ربات را می‌سازیم.** صاحب کسب‌وکار ربات بله‌اش را به فارسی توضیح می‌دهد؛ ایجنت ابهام‌ها را می‌پرسد،
 ربات را می‌سازد، خودش برایش تست می‌نویسد و اجرا می‌کند، نسخه‌ی تست‌شده را روی بله منتشر می‌کند، و هر تغییری که بعداً
 خواسته شود را با نمایش تفاوت‌ها و اجرای دوباره‌ی همه‌ی تست‌ها اعمال می‌کند.
 
@@ -56,7 +56,7 @@ is logged with its token count and cost (kept for the operator; the UI does not 
 | `api/app/fidelity.py`, `api/app/datasets.py` | Deterministic checks that a designed bot still holds what the owner said (times, numbers, notifications, reward codes); the owner's tables copied into the bot exactly |
 | `api/app/llm.py` | The single LLM entry point (model, pricing, cost log) |
 | `api/app/bale.py`, `api/app/publish.py` | Messenger glue shared by Bale and Telegram; Bale publishing and webhooks |
-| `api/app/telegram.py`, `relay/` | Telegram channel and the Deno relay it goes through (Telegram is unreachable from Iran) |
+| `api/app/telegram.py`, `relay/` | Telegram channel and the relay it goes through (Cloudflare Worker) (Telegram is unreachable from Iran) |
 | `api/app/catalog.py`, `api/app/export.py` | Product catalogs, CSV/Excel/paste/photo/PDF import, CSV/XLSX export |
 | `api/app/faq_index.py`, `api/app/faq_match.py` | FAQ retrieval (embeddings) |
 | `api/app/outreach.py`, `api/app/payments.py`, `api/app/records_ops.py` | Reminders, announcements (manual and scheduled), Bale invoices, owner actions on records |

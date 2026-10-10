@@ -1,4 +1,4 @@
-# Telegram relay (Deno Deploy)
+# Telegram relay (Cloudflare Workers or Deno Deploy)
 
 Telegram is unreachable from Iranian servers (checked from the Liara container: «No route to host»), so the backend
 reaches Telegram through this small reverse proxy outside Iran, and Telegram delivers updates to the backend through

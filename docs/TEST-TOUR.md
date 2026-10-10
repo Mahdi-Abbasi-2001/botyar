@@ -198,14 +198,14 @@ republish a changed version **while a customer is mid-booking** → the customer
 ## Station 7b — Telegram, through the relay (new, NOT yet tested on real Telegram)
 
 **What it is:** the same bot, also live on Telegram. Telegram is unreachable from Iranian servers (checked from the
-Liara container), so every call goes through `relay/main.ts` on Deno Deploy. Setup: `relay/README.md`.
+Liara container), so every call goes through `relay/cloudflare-worker.js` on Cloudflare Workers. Setup: `relay/README.md`.
 **Do:** after the relay is deployed and `./deploy.sh` has run with `TELEGRAM_RELAY_URL`, open **انتشار** → the
 Telegram card → publish (shared bot, or your own token from Telegram's @BotFather). Open the `t.me/<bot>?start=<code>`
 link on a phone with Telegram, book a seat, send `/admin <code>` from your own Telegram account.
 **Expect:** the link opens your bot directly (a Telegram-only customer can also pick it from the shared bot's directory); the booking appears in the same records; the owner notification arrives
 on Telegram; an announcement reaches customers on both messengers; no pay button on Telegram (payments are Bale only).
 **Break it:** book the last seat on Bale and join the waitlist on Telegram, then cancel on Bale: the Telegram customer
-must get the «freed place» message on Telegram. Stop the relay (or put a wrong `RELAY_KEY` on Deno): Bale must keep
+must get the «freed place» message on Telegram. Stop the relay (or put a wrong `RELAY_KEY` on the Worker): Bale must keep
 working and the Telegram publish button must give a clear error instead of hanging.
 
 ## Station 8 — Shops with a catalog

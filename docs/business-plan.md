@@ -19,7 +19,7 @@ Both options are slow, and changes later (a new price, a new class time) need th
 - **Channels**: Bale and Telegram. The shared bot `@botyar_ai_bot` exists on both (links/QR and a directory of businesses), or an owner can use their own bot token. Telegram runs through a relay outside Iran.
 - **Community tools** (new, to be proven on real Bale): forced channel join, invite links with counting, anonymous chat with report/ban, post forwarding between channels, group moderation.
 - **Reliability**: safe retries, a retry queue and a health banner when Bale or Telegram is unreachable (`docs/technical.md` §8).
-- **Quality evidence**: 491 automated tests, a committed agent regression harness (68 real-model cases), mutation checks for business rules, fuzzing of conversations.
+- **Quality evidence**: 493 automated tests, a committed agent regression harness (68 real-model cases), mutation checks for business rules, fuzzing of conversations.
 
 ## 4. Market
 - Bale: **28.7 million monthly active users and 16.2 million daily** (Iran's Information Technology Organization, published March 2026, covering the period to the end of the Iranian year 1404). The same report attributes part of the growth to the internet-outage periods, so we read the number as the current size of the market and not as a guaranteed trend.
