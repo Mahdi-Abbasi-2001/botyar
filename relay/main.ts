@@ -5,7 +5,7 @@
 //   POST /hook/<path>           from Telegram (webhooks)                ->  ${UPSTREAM}/api/tghook/<path>
 // Nothing else is forwarded: no other hosts, no other paths. The webhook path carries the backend's own secret.
 //
-// Environment: RELAY_KEY (same value as TELEGRAM_RELAY_KEY on the backend), UPSTREAM (e.g. https://botyar.liara.run).
+// Environment: RELAY_KEY (same value as TELEGRAM_RELAY_KEY on the backend), UPSTREAM (e.g. https://botyar.mahdidev.ir).
 
 const KEY = Deno.env.get("RELAY_KEY") ?? "";
 const UPSTREAM = (Deno.env.get("UPSTREAM") ?? "").replace(/\/+$/, "");

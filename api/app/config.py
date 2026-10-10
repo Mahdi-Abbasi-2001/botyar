@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     global_daily_runs: int = 300        # agent runs per 24h across ALL users (protects the OpenAI budget)
     global_daily_imports: int = 300     # AI-assisted catalog imports per 24h across all users
     register_per_ip_hour: int = 8       # new accounts per IP per hour
-    public_base_url: str = ""  # e.g. https://botyar.liara.run; empty in local dev (no webhooks registered)
+    public_base_url: str = ""  # e.g. https://botyar.mahdidev.ir; empty in local dev (no webhooks registered)
     # Telegram is unreachable from Iranian servers, so every Telegram call (and every incoming update) goes through a
     # small reverse proxy outside Iran (relay/main.ts on Deno Deploy). Empty relay URL = Telegram disabled.
     telegram_relay_url: str = ""   # e.g. https://botyar-relay.<org>.deno.net

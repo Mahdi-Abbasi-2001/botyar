@@ -29,13 +29,14 @@ for k in TELEGRAM_RELAY_URL TELEGRAM_RELAY_KEY TELEGRAM_SHARED_BOT_TOKEN ADMIN_U
   [ -n "$(get $k)" ] && TG_ENV+=("$k=$(get $k)")
 done
 
+PUBLIC_URL="$(get PUBLIC_BASE_URL)"; PUBLIC_URL="${PUBLIC_URL:-https://botyar.mahdidev.ir}"  # set PUBLIC_BASE_URL in api/.env to move to another domain
 ./build.sh
 liara env set -a "$APP" --team-id "$TEAM" -f \
   "DATABASE_URL=$(get PROD_DATABASE_URL)" \
   "JWT_SECRET=$(get JWT_SECRET)" \
   "OPENAI_API_KEY=$(get OPENAI_API_KEY)" \
   "BALE_SHARED_BOT_TOKEN=$(get BALE_SHARED_BOT_TOKEN)" \
-  "PUBLIC_BASE_URL=https://botyar.liara.run" "${TG_ENV[@]}" >/dev/null
+  "PUBLIC_BASE_URL=$PUBLIC_URL" "${TG_ENV[@]}" >/dev/null
 echo "env vars set${TG_ENV:+ (with Telegram)}"
 # stage only what the image needs (keeps .venv and .env out of the upload)
 STAGE="$(mktemp -d)"

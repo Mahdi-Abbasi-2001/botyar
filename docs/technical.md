@@ -1,6 +1,6 @@
 # Botyar (بات‌یار) — Technical documentation
 
-Version of 2026-10-08. Persian versions for the competition judges: `docs/fa/technical.fa.md`, `docs/fa/business-plan.fa.md`, `docs/fa/pitch/pitch.html`. Live: https://botyar.liara.run · Shared bot on Bale and Telegram: `@botyar_ai_bot`. This document describes what is in the repository; the product has been tried by hand on real Bale and Telegram to some extent, and what still needs a systematic pass on real messengers is listed in `docs/real-bale-checklist.md`.
+Version of 2026-10-08. Persian versions for the competition judges: `docs/fa/technical.fa.md`, `docs/fa/business-plan.fa.md`, `docs/fa/pitch/pitch.html`. Live: https://botyar.mahdidev.ir · Shared bot on Bale and Telegram: `@botyar_ai_bot`. This document describes what is in the repository; the product has been tried by hand on real Bale and Telegram to some extent, and what still needs a systematic pass on real messengers is listed in `docs/real-bale-checklist.md`.
 
 ## 1. What the system does
 

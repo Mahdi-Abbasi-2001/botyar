@@ -1,6 +1,6 @@
 # Botyar — Test Tour (learn the product by trying to break it)
 
-Live site: https://botyar.liara.run · Shared bot on Bale and Telegram: **@botyar_ai_bot** · Sample files: `docs/samples/`
+Live site: https://botyar.mahdidev.ir · Shared bot on Bale and Telegram: **@botyar_ai_bot** · Sample files: `docs/samples/`
 
 How to use this: go station by station. Each station says **what it is**, **how it works**, **what to do**, **what you
 should see**, and **how to try to break it**. Write down anything that surprises you — a surprise is either a bug or a
@@ -230,7 +230,7 @@ Then in the simulator: categories → 5 products per page → next/previous → 
 
 You do not need special tools:
 1. While logged in as user A, copy a bot URL (`/bot/?id=3`). Log in as user B and open it → "not found". (Automated: every route is checked.)
-2. Open `https://botyar.liara.run/docs` → 404 (the API schema is not published).
+2. Open `https://botyar.mahdidev.ir/docs` → 404 (the API schema is not published).
 3. In DevTools → Network, replay a request without the `Authorization` header → 401.
 4. Look at `/api/hook/shared/anything` → 404. The real webhook URL contains a secret because Bale cannot sign requests.
 
